@@ -1,35 +1,51 @@
-# ============================================================================
-# train_agent.py
-# 训练路由策略（PPO）。需要先训练好保真度预测器（Multi-GNN）。
-#
-# 用法:
-#   python -m routing.rl.train_agent \
-#       --predictor models/predictor.pt \
-#       --out models/policy.pt --timesteps 20000
-# ============================================================================
-
 from __future__ import annotations
 
 import argparse
+import json
 import os
+import pickle
+import random
 import sys
 
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sim.sim import NoiseConfig
 from routing.graph.circuit_dag import CircuitDAG
 from routing.graph.features import HardwareFeatures
-from routing.gnn.predictor import MultiGNNTidelityPredictor
 from routing.rl.env import RoutingEnv
 from routing.rl.agent import PPOAgent
-from utils.data_gen import random_circuit
 
 
-def build_default_config(num_qubits: int = 5) -> NoiseConfig:
+# ---------------------------------------------------------------------------
+#  Hardware config from JSON
+# ---------------------------------------------------------------------------
+def load_topo(path: str) -> tuple:
+    with open(path) as f:
+        topo = json.load(f)
+    coupling_map = [tuple(e) for e in topo["coupling_map"]]
+    dp = topo["device_params"]
+    config = NoiseConfig(
+        t1_times=dp["t1_times"],
+        t2_times=dp["t2_times"],
+        freq_ghz=dp["freq_ghz"],
+        single_q_gate_error=dp["single_q_gate_error"],
+        two_q_gate_error=dp["two_q_gate_error"],
+        coupling_map=coupling_map,
+        readout_error=dp["readout_error"],
+        shots=dp.get("shots", 1024),
+        crosstalk_strength=topo.get("crosstalk_strength"),
+    )
+    hw = HardwareFeatures.from_noise_config(config)
+    return config, hw, coupling_map
+
+
+def load_topo_or_default(num_qubits: int = 5, topo_path: str = None) -> tuple:
+    if topo_path:
+        return load_topo(topo_path)
     coupling = [(i, i + 1) for i in range(num_qubits - 1)]
-    return NoiseConfig(
+    config = NoiseConfig(
         t1_times=[50.0] * num_qubits,
         t2_times=[70.0] * num_qubits,
         freq_ghz=[5.0] * num_qubits,
@@ -39,44 +55,121 @@ def build_default_config(num_qubits: int = 5) -> NoiseConfig:
         readout_error=[0.02] * num_qubits,
         shots=1024,
     )
+    hw = HardwareFeatures.from_noise_config(config)
+    return config, hw, list(config.coupling_map)
 
 
-def load_predictor(path: str, device: str):
-    model = MultiGNNTidelityPredictor()
-    model.load_state_dict(torch.load(path, map_location=device))
-    model.eval()
-    return model
+# ---------------------------------------------------------------------------
+#  Dataset loader
+# ---------------------------------------------------------------------------
+def load_split(path: str) -> list[str]:
+    with open(path) as f:
+        return [line.strip() for line in f if line.strip()]
 
 
+def build_split_paths(data_dir: str) -> dict:
+    return {
+        "stage1_phase1": os.path.join(data_dir, "splits", "stage1_phase1.txt"),
+        "stage1_phase2": os.path.join(data_dir, "splits", "stage1_phase2.txt"),
+        "stage1_phase3": os.path.join(data_dir, "splits", "stage1_phase3.txt"),
+        "stage2_mixed": os.path.join(data_dir, "splits", "stage2_mixed.txt"),
+        "stage3_alg": os.path.join(data_dir, "splits", "stage3_alg.txt"),
+    }
+
+
+def pick_circuit(data_dir: str, split_name: str):
+    split_map = build_split_paths(data_dir)
+    split_path = split_map[split_name]
+    paths = load_split(split_path)
+    path = random.choice(paths)
+    with open(os.path.join(data_dir, path), "rb") as f:
+        qc = pickle.load(f)
+    return CircuitDAG.from_circuit(qc)
+
+
+# ---------------------------------------------------------------------------
+#  Curriculum phase for Stage 1
+# ---------------------------------------------------------------------------
+def stage1_phase(progress: float) -> str:
+    if progress < 0.3:
+        return "stage1_phase1"
+    elif progress < 0.7:
+        return "stage1_phase2"
+    else:
+        return "stage1_phase3"
+
+
+def reward_mode_split(reward_mode: str) -> tuple:
+    mapping = {
+        "routing": ("stage1_phase1", stage1_phase),
+        "noise_aware": ("stage2_mixed", lambda _: "stage2_mixed"),
+        "fidelity_shaping": ("stage3_alg", lambda _: "stage3_alg"),
+    }
+    return mapping[reward_mode]
+
+
+# ---------------------------------------------------------------------------
+#  create_env helper
+# ---------------------------------------------------------------------------
+def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_init, seed):
+    return RoutingEnv(
+        dag=dag,
+        hw=hw,
+        coupling_map=coupling_map,
+        reward_mode=reward_mode,
+        max_episode_steps=max_episode_steps,
+        random_init=random_init,
+        seed=seed,
+    )
+
+
+# ---------------------------------------------------------------------------
+#  Main
+# ---------------------------------------------------------------------------
 def main():
     parser = argparse.ArgumentParser(description="Train routing policy with PPO")
-    parser.add_argument("--predictor", type=str, required=True)
-    parser.add_argument("--out", type=str, default="models/policy.pt")
-    parser.add_argument("--num-qubits", type=int, default=5)
+    parser.add_argument("--data-dir", type=str, default="../traindata",
+                        help="数据集根目录")
+    parser.add_argument("--topo", type=str, default=None,
+                        help="硬件拓扑 JSON 路径（默认使用线性链）")
+    parser.add_argument("--out", type=str, default="../models/policy.pt")
+    parser.add_argument("--num-qubits", type=int, default=5,
+                        help="硬件比特数（仅无 --topo 时生效）")
     parser.add_argument("--timesteps", type=int, default=20000)
     parser.add_argument("--rollout-steps", type=int, default=256)
     parser.add_argument("--epochs", type=int, default=4)
     parser.add_argument("--lr", type=float, default=3e-4)
-    parser.add_argument("--device", type=str, default="cpu")
+    parser.add_argument("--device", type=str, default="cuda:0",
+                        help="训练设备 (cpu / cuda:N)")
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--load", type=str, default=None,
+                        help="加载预训练模型")
+    parser.add_argument("--reward-mode", type=str, default="routing",
+                        choices=["routing", "noise_aware", "fidelity_shaping"],
+                        help="奖励模式")
+    parser.add_argument("--max-episode-steps", type=int, default=200,
+                        help="每个 episode 的最大步数（超时截断）")
+    parser.add_argument("--random-init", action=argparse.BooleanOptionalAction,
+                        default=False,
+                        help="是否随机化初始映射")
     args = parser.parse_args()
 
     import torch
-
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
+    random.seed(args.seed)
 
-    config = build_default_config(args.num_qubits)
-    hw = HardwareFeatures.from_noise_config(config)
-    predictor = load_predictor(args.predictor, args.device)
+    device = torch.device(args.device)
 
-    env = RoutingEnv(
-        dag=CircuitDAG.from_circuit(random_circuit(args.num_qubits, 6, seed=args.seed)),
-        hw=hw,
-        coupling_map=list(config.coupling_map),
-        predictor=predictor,
-        seed=args.seed,
-    )
+    # Hardware (fixed across all circuits)
+    config, hw, coupling_map = load_topo_or_default(args.num_qubits, args.topo)
+
+    # Dataset
+    initial_split_key, phase_fn = reward_mode_split(args.reward_mode)
+
+    sample_dag = pick_circuit(args.data_dir, initial_split_key)
+    env = create_env(sample_dag, hw, coupling_map, args.reward_mode,
+                     args.max_episode_steps, args.random_init, args.seed)
 
     agent = PPOAgent(
         obs_dim=int(np.prod(env.observation_space.shape)),
@@ -84,60 +177,108 @@ def main():
         lr=args.lr,
         device=args.device,
     )
+    if args.load:
+        agent.load(args.load)
+        print(f"Loaded pretrained model: {args.load}")
 
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
 
     obs, _ = env.reset()
+    ep_buffer = {"obs": [], "act": [], "logp": [], "val": [], "rew": [], "done": []}
+    ep_total_reward = 0.0
     ep_rewards = []
     ep_fids = []
-    buffer = {"obs": [], "act": [], "logp": [], "val": [], "rew": [], "done": []}
+    ep_swaps_log = []
+    ep_truncated = 0
+    ep_completed = 0
 
     total_steps = 0
-    best_fid = -1.0
+    best_metric = -1.0
+
     while total_steps < args.timesteps:
         for _ in range(args.rollout_steps):
             action, logp, val = agent.act(obs)
-            next_obs, reward, done, _, info = env.step(action)
-            buffer["obs"].append(obs)
-            buffer["act"].append(action)
-            buffer["logp"].append(logp)
-            buffer["val"].append(val)
-            buffer["rew"].append(reward)
-            buffer["done"].append(done)
+            next_obs, reward, done, truncated, info = env.step(action)
+
+            episode_end = done or truncated
+            ep_total_reward += reward
+
+            ep_buffer["obs"].append(obs)
+            ep_buffer["act"].append(action)
+            ep_buffer["logp"].append(logp)
+            ep_buffer["val"].append(val)
+            ep_buffer["rew"].append(reward)
+            ep_buffer["done"].append(episode_end)
+
             obs = next_obs
             total_steps += 1
-            if done:
-                ep_rewards.append(info.get("episode_reward", reward))
-                if "fidelity" in info and info["fidelity"] is not None:
-                    ep_fids.append(info["fidelity"])
-                obs, _ = env.reset()
 
-        # 计算 GAE（用最后一个状态的 value 作 bootstrap）
+            if episode_end:
+                ep_rewards.append(ep_total_reward)
+                if truncated:
+                    ep_truncated += 1
+                else:
+                    ep_completed += 1
+                if "fidelity" in info:
+                    ep_fids.append(info["fidelity"])
+                ep_swaps_log.append(info.get("num_swaps", 0))
+
+                progress = total_steps / args.timesteps
+                split_key = phase_fn(progress)
+                new_dag = pick_circuit(args.data_dir, split_key)
+                env = create_env(new_dag, hw, coupling_map, args.reward_mode,
+                                 args.max_episode_steps, args.random_init,
+                                 args.seed + total_steps)
+                obs, _ = env.reset()
+                ep_total_reward = 0.0
+
         with torch.no_grad():
             last_val = agent.model(
-                torch.tensor(obs, dtype=torch.float32, device=args.device).unsqueeze(0)
+                torch.tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
             )[1].item()
         adv, ret = PPOAgent.compute_gae(
-            buffer["rew"], buffer["val"], buffer["done"],
+            ep_buffer["rew"], ep_buffer["val"], ep_buffer["done"],
             bootstrap=last_val, gamma=agent.gamma, lam=agent.lam,
         )
         train_batch = {
-            "obs": buffer["obs"],
-            "act": buffer["act"],
-            "logp": buffer["logp"],
+            "obs": ep_buffer["obs"],
+            "act": ep_buffer["act"],
+            "logp": ep_buffer["logp"],
             "adv": adv,
             "ret": ret,
         }
-        agent.update(train_batch, epochs=args.epochs)
-        buffer = {k: [] for k in buffer}
+        losses = agent.update(train_batch, epochs=args.epochs)
+        ep_buffer = {k: [] for k in ep_buffer}
 
-        avg_fid = np.mean(ep_fids[-20:]) if ep_fids else 0.0
-        print(f"step={total_steps}  avg_fid(近20)={avg_fid:.3f}  "
-              f"avg_ep_reward={np.mean(ep_rewards[-20:]) if ep_rewards else 0:.2f}")
-        if avg_fid > best_fid:
-            best_fid = avg_fid
+        avg_rew = np.mean(ep_rewards[-20:]) if ep_rewards else 0.0
+        avg_swaps = np.mean(ep_swaps_log[-20:]) if ep_swaps_log else 0.0
+        total_eps = ep_completed + ep_truncated
+        trunc_pct = 100 * ep_truncated / max(1, total_eps)
+        parts = [
+            f"step={total_steps:>6d}",
+            f"rew={avg_rew:+.3f}",
+            f"swp={avg_swaps:.1f}",
+            f"trunc={trunc_pct:.0f}%",
+            f"pl={losses['pl']:.3f}",
+            f"vl={losses['vl']:.3f}",
+            f"ent={losses['ent']:.3f}",
+            f"kl={losses['kl']:.4f}",
+            f"gn={losses['grad']:.3f}",
+        ]
+        if ep_fids:
+            avg_fid = np.mean(ep_fids[-20:])
+            parts.append(f"fid={avg_fid:.4f}")
+        print("  ".join(parts))
+
+        if args.reward_mode == "routing":
+            metric = avg_rew
+        else:
+            metric = np.mean(ep_fids[-20:]) if ep_fids else 0.0
+        if metric > best_metric:
+            best_metric = metric
             agent.save(args.out)
-    print(f"策略已保存至 {args.out}")
+
+    print(f"Policy saved to {args.out}")
 
 
 if __name__ == "__main__":

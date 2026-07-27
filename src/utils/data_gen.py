@@ -35,7 +35,7 @@ def _ideal_statevector(circuit, skip_transpile: bool = False):
     from qiskit_aer import AerSimulator
     from qiskit import transpile
     sim = AerSimulator(method="statevector")
-    tc = circuit if skip_transpile else transpile(
+    tc = circuit.copy() if skip_transpile else transpile(
         circuit, basis_gates=["rz", "sx", "x", "cx"])
     tc.save_statevector()
     result = sim.run(tc, shots=1).result()

@@ -78,6 +78,7 @@ class PPOAgent:
         adv = (adv - adv.mean()) / (adv.std() + 1e-8)
 
         n = obs.shape[0]
+        log_data = {"pl": [], "vl": [], "ent": [], "kl": [], "grad": []}
         for _ in range(epochs):
             idx = np.random.permutation(n)
             for start in range(0, n, batch_size):
@@ -97,8 +98,18 @@ class PPOAgent:
 
                 self.optimizer.zero_grad()
                 loss.backward()
-                nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
+                gn = nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
                 self.optimizer.step()
+
+                with torch.no_grad():
+                    approx_kl = ((ratio - 1.0) - ratio.log()).mean()
+                log_data["pl"].append(policy_loss.item())
+                log_data["vl"].append(value_loss.item())
+                log_data["ent"].append(entropy.item())
+                log_data["kl"].append(approx_kl.item())
+                log_data["grad"].append(gn.item())
+
+        return {k: float(np.mean(v)) for k, v in log_data.items()}
 
     def save(self, path: str):
         torch.save(self.model.state_dict(), path)
@@ -108,18 +119,24 @@ class PPOAgent:
 
     @staticmethod
     def compute_gae(rewards, values, dones, bootstrap, gamma, lam):
-        """广义优势估计 (GAE-lambda)。"""
+        """广义优势估计 (GAE-lambda)。
+
+        dones[t] = True 表示 episode 在步 t 结束（无论是 done 还是 truncated），
+        此时 λ-bootstrapping 截止，且 δ_t 使用 0 作为 next_value。
+        """
         T = len(rewards)
         advantages = np.zeros(T, dtype=float)
         last_adv = 0.0
         for t in reversed(range(T)):
-            if t == T - 1:
-                next_nonterminal = 1.0 - dones[t]
-                next_value = bootstrap
+            if dones[t]:
+                delta = rewards[t] - values[t]
+                next_nonterminal = 0.0
+            elif t == T - 1:
+                delta = rewards[t] + gamma * bootstrap - values[t]
+                next_nonterminal = 1.0
             else:
-                next_nonterminal = 1.0 - dones[t + 1]
-                next_value = values[t + 1]
-            delta = rewards[t] + gamma * next_value * next_nonterminal - values[t]
+                delta = rewards[t] + gamma * values[t + 1] - values[t]
+                next_nonterminal = 1.0
             last_adv = delta + gamma * lam * next_nonterminal * last_adv
             advantages[t] = last_adv
         returns = advantages + np.array(values)

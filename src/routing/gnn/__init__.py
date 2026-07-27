@@ -1,1 +1,1 @@
-"""Graph neural network subpackage: encoders and fidelity predictor."""
+"""Graph neural network subpackage: encoders for observation features."""

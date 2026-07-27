@@ -386,63 +386,51 @@ obs = [GNN embedding (384-d) |  normalized mapping (M-d) |  progress (1-d)]
 - `normalized mapping`：`mapping[i] / num_physical_qubits`，长度 = logical qubits 数
 - `progress`：`executed_gates / total_gates`
 
-**动作空间**：`Discrete(num_edges + 1)`
+**动作空间**：`Discrete(num_edges)`
 
 | 动作 | 含义 |
 |------|------|
 | `0 … E-1` | 在 `coupling_map[action]` 上执行 SWAP |
-| `E` | "execute"：执行最早可执行的双比特门 |
+
+每次 SWAP 后环境自动检查并执行所有可执行的双比特门，直至无可执行门为止。
 
 **奖励函数**（通过 `reward_mode` 配置，支持三阶段训练）：
 
-每种模式的奖励都是步级奖励 `r_step` 与回合终端奖励 `R_T` 之和：
+```
+R = Σ (r_execute_t + r_swap_t + r_propagate_t) + R_T
+```
 
-```
-R = Σ r_step + R_T
-```
+每种模式由步级奖励（三组件）与回合终端奖励组成（Stage 3 步级为 0）。
 
 **`reward_mode = 'routing'`（Stage 1 — 纯路由先验）**
 
 仅使用步级稠密奖励，不引入模拟器 fidelity。目标：在硬件拓扑约束下学习有效的 SWAP 路径规划。
+奖励由三大组件构成：**门执行收益**、**SWAP 惩罚**、**错误传播信号**。
 
-| 事件 | 奖励 |
-|------|------|
-| SWAP 动作 | `-swap_penalty`（默认 0.1） |
-| 成功 execute | `+α_gate`（默认 0.5） |
-| 无 gate 可执行时 execute | `-invalid_penalty`（默认 1.0） |
-| 映射距离变化 | `-γ_dist · Δdist`（可选，默认 0） |
+| 组件 | 条件 / 事件 | 步级奖励 |
+|------|------------|---------|
+| **门执行收益** | 成功执行 gate g（映射在物理比特 p_a, p_b 上） | `+R_base(type(g)) − ε_err · e_g − ε_xtalk · X_g` |
+| **错误传播** | 门执行后更新 X/Z 错误率 | `−η_xz · Δ_total_XZ` |
 
+SWAP 本身无显式惩罚；不必要的 SWAP 会被折扣因子 γ < 1 隐式约束（更多 SWAP → 更晚获得终端奖励 → 更低折扣回报）。
+其中 `R_base(type)` 按门类型查表，`e_g` 为 gate 的硬件错误率，`X_g` 为邻居串扰代价。
+每次 SWAP 后环境自动执行所有可执行的双比特门，累积门执行收益和错误传播惩罚：
+`r_step = Σ(r_execute_i + r_propagate_i)`（SWAP 本身无显式惩罚，由折扣因子隐式约束 SWAP 次数）。
 回合终端奖励 `R_T = 0`（无 fidelity 信号）。
 
-**`reward_mode = 'noise_aware'`（Stage 2 — 步级路由 + 终端保真度）**
+**`reward_mode = 'noise_aware'`（Stage 2 — 步级路由 + 终端分布优化）**
 
-保留 Stage 1 的步级稠密奖励，回合结束时加入 Qiskit noisy simulator 终端保真度。此时 agent 已学会基础路由，现在学习在多个可行路由方案中选择保真度更高的。
+延用 Stage 1 的三组件步级奖励（门执行收益 + SWAP 惩罚 + 错误传播），回合结束时通过 Qiskit Aer noisy simulator 获取理想/噪声输出分布，计算 KL 散度、交叉熵、TVD 加权作为终端奖励。此时 agent 已学会基础路由，现在学习在多个可行路由方案中选择输出分布最接近理想分布的路径。
 
-步级奖励 `r_step`：
+**`reward_mode = 'fidelity_shaping'`（Stage 3 — 纯终端输出分布优化）**
 
-| 事件 | 奖励 |
-|------|------|
-| SWAP 动作 | `-swap_penalty`（默认 0.1） |
-| 成功 execute | `+α_gate`（默认 0.5） |
-| 无 gate 可执行时 execute | `-invalid_penalty`（默认 1.0） |
-| 串扰惩罚（耦合边被占用） | `-γ_xtalk`（默认 0.02） |
-| 高错误率边惩罚 | `-δ_err`（双比特门通过高错误率耦合边时，默认 0.01） |
+在天衍/高精度模拟器或真机场景下使用。不设任何步级奖励，仅在回合结束时通过模拟器/真机采样获取理想与噪声输出分布，计算 KL 散度、交叉熵、TVD 加权作为终端奖励。此时 agent 已具备完整的路由能力，仅通过输出分布差异信号做最终精调。
 
-回合终端奖励：`R_T = λ_fid · F_Qiskit`（λ_fid 默认 5.0，F_Qiskit 为 Qiskit Aer noisy simulator 输出保真度）。
+步级奖励：`r_step = 0`（无步级信号）
 
-总奖励：`R = Σ r_step + λ_fid · F_Qiskit`
+回合终端奖励：`R_T = λ_fid · F_high`（λ_fid 默认 5.0，F_high 为天衍/高精度模拟器输出的终端保真度）。
 
-**`reward_mode = 'fidelity_shaping'`（Stage 3 — 保真度塑造）**
-
-在天衍/高精度模拟器或真机场景下使用。在 Stage 2 的基础上，每步额外加入保真度变化奖励，提供更丰富的反馈。
-
-步级奖励扩展：`r_step = r_routing + η·ΔF_t`
-
-其中 `ΔF_t = F(s_{t+1}) − F(s_t)` 是用高精度模拟器估计的单步保真度变化。
-
-回合终端奖励：`R_T = λ_fid · F_final`
-
-总奖励：`R = Σ(r_routing + η·ΔF_t) + λ_fid · F_final`
+总奖励：`R = λ_fid · F_high`
 
 ## 7.2 环境内部逻辑
 
@@ -450,16 +438,159 @@ R = Σ r_step + R_T
 1. 自动执行所有 executable 的单比特门（无需动作）
 2. 扫描双比特门：依赖满足 且 两 logical qubit 在物理上相邻 → 加入 `executable_2q` 列表
 
-`step(action)`：
-- 若 action == `num_edges`（execute）：弹出 `executable_2q` 中最早的门执行；若列表为空则给予 `invalid_penalty`
-- 若 action < `num_edges`（SWAP）：交换 `mapping` 中对应物理位置的两个 logical qubit
-- 重新调用 `_update()`
-- 所有 gate 执行完毕 → `done=True`，添加 fidelity 奖励
+`_apply_swap(p, q)` 处理物理比特多于逻辑比特的情况（`env.py:115-133`）：
+
+| p 状态 | q 状态 | 行为 |
+|--------|--------|------|
+| 空闲 | 空闲 | no-op（空 SWAP，不改变 mapping） |
+| 空闲 | 占用 | 逻辑比特从 q 移到 p |
+| 占用 | 空闲 | 逻辑比特从 p 移到 q |
+| 占用 | 占用 | 正常交换两个逻辑比特 |
+
+通过反查表 `inv = {phys: log for log, phys in enumerate(self.mapping)}` 和 `.get()` 安全处理未占用比特。`_swap_counter` 在每次 SWAP 动作后递增，回合结束时写入 `info["num_swaps"]`。
+
+`step(action)`（`env.py:313-327`）—— 宏步 MDP：
+
+1. agent 选择 `action ∈ [0, E-1]`，即一条物理耦合边
+2. 在该边上执行 SWAP（`_apply_swap`），`_swap_counter += 1`
+3. 执行 `_auto_execute_batch()`：
+   - `_update()` 刷新状态，找出当前所有可执行双比特门
+   - 循环执行所有可执行门：
+     - 执行最早的可执行双比特门（加入 `self.executed`）
+     - 累加 `r_execute` 和 `r_propagate`
+     - 重新 `_update()`（执行完一个门可能解锁后续门）
+   - 直到 `executable_2q` 为空
+4. `reward = r_swap + Σ r_execute + Σ r_propagate`
+5. 若全部 gate 执行完毕 → `done=True`，叠加 `_terminal_reward(info)`
+
+`_auto_execute_batch()` 在 `reset()` 末尾也被调用，确保初始映射下已相邻的门立即执行。
 
 ## 7.3 初始化
 
 - `random_init=True`：随机 permutation 作为初始 mapping
 - `random_init=False`：identity mapping
+
+## 7.4 奖励函数实现详解
+
+文件：`src/routing/rl/env.py`。每步仅 SWAP 动作，随后自动执行所有可执行门，步级奖励仅来自门执行：
+
+```
+r_step = Σ(r_execute_i + r_propagate_i)
+```
+
+SWAP 未解锁任何门时 `r_step = 0`（无显式 SWAP 惩罚，由折扣因子隐式约束）。
+终端奖励 `R_T` 仅在 episode 结束时叠加。
+
+### 7.4.1 门执行收益（r_execute）
+
+成功执行 gate g 时：
+
+```
+r_execute = R_base(type(g)) − ε_err · gate_error_rate − ε_xtalk · crosstalk_cost
+```
+
+**R_base(type)** — 按门类型的基础收益查表：
+
+| 门类型 | 基础收益 | 说明 |
+|--------|---------|------|
+| `cx` / `cz` / `ecr` | 2.0 | 双比特纠缠门，最核心 |
+| `swap` | 1.5 | 类似双比特 |
+| `h` / `sx` | 0.5 | 常用单比特 |
+| `x` / `y` / `z` | 0.3 | 单比特 Pauli |
+| `rz` / `s` / `t` | 0.2 | 相位门 |
+| `measure` / `barrier` | 0.0 | 不计入 |
+
+**gate_error_rate** — 当前映射物理比特对上的硬件错误率：
+
+```
+gate_error_rate = single_q_err[p]                        若单比特门
+                  two_q_err[p_a, p_b]                    若双比特门
+```
+
+从 `HardwareFeatures` 读取（已归一化）。
+
+**crosstalk_cost** — 执行 gate 时邻居被占用导致的串扰惩罚：
+
+```
+crosstalk_cost = ∑_{q ∈ N(p_a) ∪ N(p_b)} zz[q, p_*] · occupied[q]
+```
+
+其中 `N(p)` 是物理比特 p 在 coupling map 上的邻居，`zz[]` 是 ZZ 串扰强度矩阵。
+
+### 7.4.2 SWAP 惩罚（隐式约束）
+
+SWAP 本身无显式奖励项。每次 SWAP 的基准开销 `C_swap = 3 · γ_cnot`（γ_cnot = 0.1）并不直接扣减奖励，而是**通过折扣因子 γ 隐式约束**：无用的 SWAP 增加 episode 长度，使门执行奖励和终端奖励被更远的折扣因子衰减，从而间接降低累积回报。
+
+```
+U = Σᵗ γᵗ · r_t    (γ < 1)
+```
+
+额外 SWAP → t 更大 → γᵗ 更小 → 回报更低。PPO 自然学会最小化 SWAP 次数。 
+SWAP 的 CNOT 分解开销仍作为设计参考保留在超参数 `cnot_cost` 和 `swap_cost` 中。
+
+### 7.4.3 错误传播（r_propagate）
+
+为每个 logical qubit 维护一对 `(X_i, Z_i)` 错误率，模拟 Pauli 错误在电路中的传播。
+
+**初始化**：每个 logical qubit 从噪声数据获得初始错误率：
+
+```
+X_i⁰ = single_q_err[M⁻¹(p_i)]         — 映射物理比特的单比特错误率
+Z_i⁰ = single_q_err[M⁻¹(p_i)]         — 初始 Z 错误率（对称初始化）
+```
+
+**门执行后的传播规则**：
+
+| 门类型 | X 传播 | Z 传播 |
+|--------|--------|--------|
+| **CX** (控制 c, 目标 t) | X_c → X_c ⊗ I, X_t → X_c ⊗ X_t | Z_c → Z_c ⊗ Z_t, Z_t → I ⊗ Z_t |
+| 即 | `X_c ← X_c, X_t ← X_c + X_t` | `Z_c ← Z_c + Z_t, Z_t ← Z_t` |
+| **H** (h) | `X ← Z, Z ← X` | 交换 |
+| **S** / **SX** | `X ← Z` | 不变 |
+| **Rz** / **T** | 不变 | 不变 |
+| **通用单比特** | `X ← X + g_e, Z ← Z + g_e` | 累加门错误率 |
+
+更新公式（以 error rate 相加模拟概率）：
+```
+X_t' = X_t + g_e                       # 执行门在目标比特上注入新错误
+X_c' = X_c + X_t'                      # CX 把控制门 X 传播到目标
+Z_c' = Z_c + g_e
+Z_t' = Z_t + Z_c'                      # CX 把目标门 Z 传播到控制
+```
+
+**步级错误传播惩罚**：
+
+```
+r_propagate = −η_xz · (ΔX + ΔZ)
+
+ΔX = Σ_i (X_i' − X_i)      # 所有比特的 X 错误率增量
+ΔZ = Σ_i (Z_i' − Z_i)      # 所有比特的 Z 错误率增量
+```
+
+每步执行 gate 后（包括 SWAP 中的 3 个 CNOT），`r_propagate` 累加新增误差，给 agent 一个"该操作引入多少新错误"的稠密信号。
+
+### 7.4.4 终端奖励
+
+```python
+def _terminal_reward(self, info: dict) -> float:
+```
+
+| 模式 | `info` 写入 | 奖励值 |
+|------|------------|--------|
+| routing | `num_swaps` | 0 |
+| noise_aware | `num_swaps`, `divergence_metrics` | `λ_kl · D_KL + λ_ce · H_cross + λ_tvd · TVD` |
+| fidelity_shaping | `num_swaps`, `divergence_metrics` | `λ_kl · D_KL + λ_ce · H_cross + λ_tvd · TVD` |
+
+Stage 1 不使用任何终端奖励，仅依赖步级稠密信号。Stage 2/3 输出分布指标见 §11.2。
+
+### 7.4.5 总奖励
+
+```
+R = Σ (Σ r_execute + Σ r_propagate) + R_T
+```
+
+其中每步只做 SWAP，自动执行批量的门。SWAP 无显式惩罚。
+`R_T` 在 episode 结束时由 `_terminal_reward` 叠加。
 
 ---
 
@@ -516,26 +647,23 @@ train_agent.py --reward_mode fidelity_shaping \   # Stage 3
 | 阶段 | reward_mode | 模拟器 | 核心目标 |
 |------|-------------|--------|---------|
 | Stage 1 | `routing` | 无 | 学习硬件拓扑下的有效 SWAP 路径规划 |
-| Stage 2 | `noise_aware` | Qiskit Aer noisy simulator | 在多个可行路径中选择保真度更高的 |
-| Stage 3 | `fidelity_shaping` | 天衍/高精度模拟器/真机 | 利用高精度保真度反馈做精细塑造 |
+| Stage 2 | `noise_aware` | Qiskit Aer noisy simulator | 在多个可行路径中选择输出分布最接近理想分布的 |
+| Stage 3 | `fidelity_shaping` | 天衍/高精度模拟器/真机 | 纯终端输出分布差异指标，最终精调 |
 
 **Stage 1 — 路由先验训练**：
-- 不使用任何模拟器 fidelity
-- 仅用步级稠密奖励（`ΔN_exec`、`C_swap`）
-- 学习 routing policy prior：哪些 SWAP 合理、如何减少映射距离、如何避免无效搜索
-- 不引入 fidelity 的原因：① 目标冲突（agent 可能还没能力理解长期影响）；② 初始噪声模型简化导致的 simulator bias
+- 不引入模拟器 fidelity，也不使用任何终端奖励
+- 使用三组件步级奖励：门执行收益（按类型 + 错误率 + 串扰）、SWAP 惩罚（3 CNOT 等价）、错误传播（X/Z 跟踪）
+- 学习 routing policy prior：哪些 SWAP 合理、如何减少错误累积、如何避免无效搜索
 
 **Stage 2 — 噪声感知训练**：
 - 加载 Stage 1 模型，在 Qiskit Aer noisy simulator 上微调
-- 保留步级稠密奖励 + 加入终端保真度信号 `λ_fid · F_Qiskit`
-- 此时 agent 已知道如何完成路由，学习在多个可行方案中选择保真度更高的
-- 终端保真度作为稀疏信号与步级稠密奖励互补
+- 步级奖励延用 Stage 1 三组件，终端奖励改为输出分布指标
+- 此时 agent 已知道如何完成路由，学习在多个可行方案中选择输出分布最接近理想分布的路径
 
-**Stage 3 — 保真度塑造训练**：
+**Stage 3 — 纯终端输出分布优化**：
 - 加载 Stage 2 模型，在高精度模拟器/真机上微调
-- 额外加入每步保真度变化 `η·ΔF_t`，提供逐步反馈
-- 终端保真度 `λ_fid · F_final` 仍保留
-- 高精度模拟器足够快，可产生丰富反馈支持 fidelity shaping
+- 步级奖励为 0，仅通过理想 vs 噪声输出分布的 KL 散度、交叉熵、TVD 给出终端奖励
+- 此时 agent 已掌握路由能力，通过纯输出分布差异信号做最终精调
 
 **训练循环**（每阶段通用）：
 1. 创建 `RoutingEnv`（随机电路 + 噪声配置，`reward_mode` 决定奖励函数）
@@ -589,88 +717,226 @@ Step 5: 回到 Step 1
 
 ## Stage 1: 纯路由先验（Routing Prior）
 
-**目标**：在硬件拓扑约束下，学习通过 SWAP 有效完成线路映射。不优化最终保真度，仅学习 routing 能力。
+**目标**：在硬件拓扑约束下，学习通过 SWAP 有效完成线路映射。不优化终端 fidelity（无模拟器），但引入**错误传播模型**作为稠密替代信号，引导 agent 理解错误累积。
 
-**奖励**：
+**奖励**：每步 `r_step` 由三部分求和：
 
 ```
-r_t = α·ΔN_exec − β·C_swap − γ·C_distance（可选）
-R_T = 0（无终端保真度）
+r_step = r_execute + r_swap + r_propagate
 ```
 
-| 参数 | 含义 | 默认值 |
-|------|------|--------|
-| `ΔN_exec` | 该步新执行的双比特门数 | — |
-| `C_swap` | SWAP 开销 | 0.1 per SWAP |
-| `C_distance` | 映射距离变化惩罚（可选） | 0 |
+### 组件 1：门执行收益（r_execute）
 
-**为什么 Stage 1 不引入 fidelity**：
+成功执行 gate g（映射在物理比特 p_a, p_b 上）：
 
-1. **目标冲突**：agent 可能还没能力理解长期影响——某个 SWAP 立即释放 5 个门但降低估计保真度 vs 暂时无门执行但远期更好
-2. **Simulator bias**：初始噪声模型简化，过早优化 `F_sim` 会让 agent 学会适应你的模拟器误差，而非学会好的 routing
-3. **信用分配困难**：episode 可能有几十到几百步，terminal fidelity 非常延迟，RL 难以判断哪一步 SWAP 贡献了最终好坏
+```
+r_execute = R_base(type(g)) − ε_err · gate_error_rate(p_a, p_b) − ε_xtalk · crosstalk_cost(g)
 
-**本质**：学习 routing policy prior —— 哪些 SWAP 合理，如何减少映射距离，如何避免无效搜索。
+gate_error_rate = single_q_err[p_a]               若单比特门
+                  two_q_err[p_a, p_b]             若双比特门
+```
+
+**R_base 查表**：
+
+| 门类型 | 基础收益 | 物理意义 |
+|--------|---------|---------|
+| `cx` / `cz` / `ecr` | 2.0 | 双比特纠缠门，核心操作 |
+| `swap` | 1.5 | 等效 3 CNOT |
+| `h` / `sx` | 0.5 | 常用单比特 Clifford |
+| `x` / `y` / `z` | 0.3 | 单比特 Pauli |
+| `rz` / `s` / `t` | 0.2 | 相位门 |
+| `measure` / `barrier` | 0.0 | 不计入 |
+
+**crosstalk_cost** — 执行该 gate 时，其物理比特的邻居若被占用则产生 ZZ 串扰：
+
+```
+crosstalk_cost(g) = ∑_{q ∈ N(p_a) ∪ N(p_b)} zz[q, p_*] · occupied_flag[q]
+
+其中 occupied_flag[q] = 1 若 q ∈ {M(ℓ) | ℓ ∈ logical_qubits}，否则 0
+```
+
+`N(p)` 为物理比特 p 在 `coupling_map` 上的邻居集合，`zz[]` 为 HardwareFeatures 的串扰强度矩阵。
+
+### 组件 2：SWAP 惩罚（r_swap）
+
+物理 SWAP 门由 3 个 CNOT 门分解实现：
+
+```
+SWAP(q₀, q₁) = CNOT(q₀, q₁) · CNOT(q₁, q₀) · CNOT(q₀, q₁)
+```
+
+每次插入 SWAP 的步级惩罚：
+
+```
+r_swap = −C_swap     (默认 0.3)
+
+C_swap = 3 · γ_cnot
+γ_cnot = 0.1        (单 CNOT 的基准开销)
+```
+
+SWAP 的 3 个 CNOT 还会在错误传播模型（组件 3）中额外累加 `3 × CNOT` 的误差量。
+
+### 组件 3：错误传播信号（r_propagate）
+
+为每个 logical qubit ℓ 维护 `(X_ℓ, Z_ℓ)` 错误率，模拟 Pauli 错误在电路中的传播。
+
+**初始化**：每个 logical qubit ℓ 映射到物理比特 p = M(ℓ)：
+
+```
+X_ℓ⁰ = single_q_err[p]          # 初始 X 错误率
+Z_ℓ⁰ = single_q_err[p]          # 初始 Z 错误率（对称初始化）
+```
+
+**门传播规则**：执行 gate g（逻辑比特 qa, qb，物理比特 pa, pb）后更新涉及的比特。
+
+假设 error rate ≪ 1，以加法近似概率传播（忽略 O(ε²) 项）：
+
+| 门类型 | X 后 | Z 后 |
+|--------|------|------|
+| **CNOT** (控制 c, 目标 t) | `X_c ← X_c, X_t ← X_c + X_t + g_e` | `Z_c ← Z_c + Z_t + g_e, Z_t ← Z_t` |
+| **H** | `X ← Z, Z ← X` | +g_e 对两者 |
+| **S / SX** | `X ← Z + g_e` | Z 不变 |
+| **Rz / T / S** | X 不变 | Z 不变 |
+| 其他单比特 | `X ← X + g_e, Z ← Z + g_e` | 各累加单比特门错误率 |
+
+其中 `g_e = gate_error_rate(pa, pb)` 是当前 step 执行该 gate 的硬件错误率。
+
+**SWAP 的传播**：SWAP 分解为 3 个 CNOT，依次应用上述规则。
+
+**步级错误传播惩罚**：
+
+```
+r_propagate = −η_xz · (ΔX_total + ΔZ_total)
+
+ΔX_total = Σ_ℓ (X_ℓ' − X_ℓ)      # 所有 logical qubit 的 X 错误率增量
+ΔZ_total = Σ_ℓ (Z_ℓ' − Z_ℓ)      # 所有 logical qubit 的 Z 错误率增量
+```
+
+每步的 `r_propagate` 给 agent 一个稠密信号：该操作引入了多少新错误。
+
+### 总奖励
+
+```
+R = Σ (r_execute_t + r_propagate_t)
+
+  = Σ [ R_base(type(g_t)) − ε_err · e_g_t − ε_xtalk · X_g_t ]
+    + Σ [ −η_xz · (ΔX_t + ΔZ_t) ]
+```
+
+不含显式 SWAP 惩罚。不必要的 SWAP 通过折扣因子 γ < 1 隐式约束。
+
+### 参数表
+
+| 参数 | 含义 | 默认值 | 代码符号 |
+|------|------|--------|---------|
+| `R_base(type)` | 门类型基础收益 | cx=2.0, h=0.5, … | `gate_base_reward` (dict) |
+| `ε_err` | 硬件错误率惩罚系数 | 0.5 | `eta_err` |
+| `ε_xtalk` | 串扰惩罚系数 | 0.02 | `eta_xtalk` |
+| `γ_cnot` | 单 CNOT 基准开销（参考值） | 0.1 | `cnot_cost` |
+| `η_xz` | 步级 X/Z 传播惩罚系数 | 0.1 | `eta_xz_step` |
+
+**为什么 Stage 1 引入错误传播而非模拟器 fidelity**：
+
+1. **稠密信号**：每步的 `(ΔX, ΔZ)` 给 agent 即时反馈，而非 fidelity 的稀疏终端信号
+2. **无模拟器开销**：错误传播是 O(N) 解析计算，无需运行 Qiskit Aer
+3. **可解释性**：`(X, Z)` 错误率直观反映每条 routing 路径的噪声累积量
+4. **与 Stage 2 平滑过渡**：Stage 1 低噪声路径 ≈ Stage 2 高保真度路径
 
 ## Stage 2: 噪声感知路由（Noise-Aware Routing）
 
-**目标**：在已掌握基础路由的基础上，学习在多个可行方案中选择保真度更高的。
+**目标**：在已掌握基础路由的基础上，学习在多个可行方案中选择终端噪声更低的路径。
+
+**步级奖励**：延用 Stage 1 的三组件设计（门执行收益 + 错误传播）。
+每步 agent 选择一条 coupling edge 执行 SWAP，环境自动执行后续所有可执行门：
+
+```
+Σ r_execute  = Σ [ R_base(type(g)) − ε_err · e_g − ε_xtalk · X_g ]   (本批门执行收益)
+Σ r_propagate = Σ [ −η_xz · (ΔX + ΔZ) ]                              (本批门错误传播)
+```
+
+SWAP 本身无显式惩罚（见 §7.4.2）。
+
+**终端奖励**：不再使用标量保真度，而是通过 Qiskit Aer noisy simulator 同时获取**理想分布**与**噪声分布**的输出结果，计算多个分布差异指标，加权作为终端奖励：
+
+```
+R_T = λ_kl · D_KL(P_noisy ‖ P_ideal) + λ_ce · H(P_ideal, P_noisy) + λ_tvd · TVD(P_noisy, P_ideal)
+```
+
+其中：
+
+| 指标 | 含义 | 公式 | 范围 | 默认权重 |
+|------|------|------|------|---------|
+| **KL divergence** `D_KL` | 噪声分布相对于理想分布的 KL 散度 | `Σ_x P_ideal(x) · log(P_ideal(x) / P_noisy(x))` | [0, ∞) | `λ_kl = 0.5` |
+| **Cross-entropy** `H_cross` | 理想与噪声分布的交叉熵 | `−Σ_x P_ideal(x) · log(P_noisy(x))` | [0, ∞) | `λ_ce = 0.3` |
+| **Total Variation Distance** `TVD` | 全变差距离 | `½ Σ_x |P_ideal(x) − P_noisy(x)|` | [0, 1] | `λ_tvd = 1.0` |
+
+- `P_ideal`：Qiskit Aer 无噪声模拟的输出分布（`shots` 次采样直方图）
+- `P_noisy`：Qiskit Aer 含噪声模拟的输出分布（相同 `shots`，相同噪声配置）
+
+**比标量保真度精度更高**：
+- 标量保真度 `F = Σ_x √(P_ideal(x) · P_noisy(x))` 只反映分布的部分信息（重叠度）
+- KL 散度对分布尾部和大偏差更敏感，惩罚非物理结果的能力更强
+- TVD 上限为 1，易于归一化和调参
+- 交叉熵等价于负对数似然，在信息论意义上给出分布差异
+
+**权重归一化**：`R_T` 的 scale 通过各指标默认权重调节，实际使用前应通过经验回放计算各指标的实际数值范围，自适应调整 `λ` 使三者的贡献大致均衡。
+
+总奖励：
+
+```
+R = Σ (r_execute_t + r_swap_t + r_propagate_t) + λ_kl · D_KL + λ_ce · H_cross + λ_tvd · TVD
+```
+
+| 参数 | 含义 | 默认值 | 代码符号 |
+|------|------|--------|---------|
+| `λ_kl` | KL 散度终端权重 | 0.5 | `lambda_kl` |
+| `λ_ce` | 交叉熵终端权重 | 0.3 | `lambda_ce` |
+| `λ_tvd` | TVD 终端权重 | 1.0 | `lambda_tvd` |
+| 其余步级参数 | 同 Stage 1 | — | — |
+
+**为什么用分布指标替换标量保真度**：
+
+1. **精细度**：TVD 和 KL 散度对不同路由策略的输出差异区分力更强，尤其在保真度接近 0.9–0.99 区间时
+2. **端到端优化**：RL agent 直接优化"输出分布与理想分布一致"，而非一个中间标量
+3. **与 GNN 预测器互补**：GNN 预测器输出标量保真度作为 state embedding，终端奖励用分布指标作为信号，两者互补
+
+## Stage 3: 纯终端输出分布优化（Terminal-Only Distribution Shaping）
+
+**目标**：在天衍/高精度模拟器或真机场景下，仅通过终端输出分布差异指标对已具备路由能力的 agent 做最终优化。
 
 **奖励**：
 
 ```
-步级：r_t = α·ΔN_exec − β·C_swap − γ·C_xtalk − δ·C_error
-终端：R_T = λ_fid · F_Qiskit
-总奖励：R = Σ r_t + λ_fid · F_Qiskit
+步级：r_t = 0（无步级奖励）
+终端：R_T = λ_kl · D_KL + λ_ce · H_cross + λ_tvd · TVD
+总奖励：R = λ_kl · D_KL + λ_ce · H_cross + λ_tvd · TVD
 ```
 
-| 参数 | 含义 | 默认值 |
-|------|------|--------|
-| `C_xtalk` | 串扰惩罚（耦合边被占用） | 0.02 |
-| `C_error` | 高错误率边惩罚（双比特门通过高错误率耦合边） | 0.01 |
-| `F_Qiskit` | Qiskit Aer noisy simulator 终端保真度 | — |
-| `λ_fid` | 终端保真度权重 | 5.0 |
+使用与 Stage 2 相同的分布指标（KL 散度、交叉熵、TVD），但去掉所有步级奖励。P_ideal 来自理想模拟器（或已知真机精确分布），P_noisy 来自含噪模拟器/真机采样。
 
-**为什么 Stage 2 用步级 + 终端混合**：
+| 参数 | 含义 | 默认值 | 代码符号 |
+|------|------|--------|---------|
+| `D_KL` | KL 散度 `D_KL(P_noisy ‖ P_ideal)` | — | `divergence_metrics['kl']` |
+| `H_cross` | 交叉熵 `H(P_ideal, P_noisy)` | — | `divergence_metrics['cross_entropy']` |
+| `TVD` | 全变差距离 `½Σ|P_noisy − P_ideal|` | — | `divergence_metrics['tvd']` |
+| `λ_kl` | KL 权重 | 0.5 | `lambda_kl` |
+| `λ_ce` | 交叉熵权重 | 0.3 | `lambda_ce` |
+| `λ_tvd` | TVD 权重 | 1.0 | `lambda_tvd` |
 
-- 保留步级稠密奖励保证训练信号充分
-- 终端保真度作为稀疏信号与稠密奖励互补
-- 类似：Stage 1 学会了"如何到达目的地"，Stage 2 学习"选择哪条路质量最好"
+**去掉步级奖励**：
 
-## Stage 3: 保真度塑造（Fidelity Shaping）
-
-**目标**：利用高精度模拟器/真机的丰富反馈，精细优化每一步的路由决策。
-
-**奖励**：
-
-```
-步级：r_t = α·ΔN_exec − β·C_swap − γ·C_xtalk + η·ΔF_t
-      ΔF_t = F(s_{t+1}) − F(s_t)  （高精度模拟器单步保真度变化）
-终端：R_T = λ_fid · F_final
-总奖励：R = Σ(r_t + η·ΔF_t) + λ_fid · F_final
-```
-
-| 参数 | 含义 | 默认值 |
-|------|------|--------|
-| `ΔF_t` | 高精度模拟器估计的单步保真度变化 | — |
-| `η` | 单步保真度变化权重 | 1.0 |
-| `F_final` | 高精度模拟器终端保真度 | — |
-| `λ_fid` | 终端保真度权重 | 5.0 |
-
-**与 Stage 2 的区别**：
-
-- Stage 2 只在 episode 结束时获得一次 fidelity 信号
-- Stage 3 每步都获得 `ΔF_t`（fidelity shaping），信用分配更精确
-- 高精度模拟器足够快，可以产生丰富的 per-step 反馈
+- 前两阶段已教会 agent 路由能力和噪声感知能力
+- Step reward 在后期可能产生干扰，让 agent 为了即时收益（如执行更多门、减少 SWAP）而牺牲终端输出分布质量
+- 纯终端信号迫使 agent 关注全局最终输出结果，由高精度模拟器/真机给出最真实的分布评价
 
 ## 阶段递进关系
 
 ```
 Stage 1 (routing)      →    学会怎么路由
     ↓
-Stage 2 (noise_aware)  →    学会在可行路径中选择保真度高的
+Stage 2 (noise_aware)  →    学会在可行路径中选择输出分布最接近理想分布的
     ↓
-Stage 3 (fidelity_shaping) → 精细塑造每步决策
+Stage 3 (fidelity_shaping) → 纯终端输出分布差异精调
 ```
 
 每阶段加载上一阶段模型权重进行微调（fine-tune），而非从头训练。
@@ -741,14 +1007,19 @@ Gate-RGAT：加入 dependency + error propagation 关系
 | 参数 | 含义 | 默认值 |
 |------|------|--------|
 | `reward_mode` | 奖励模式: `routing` / `noise_aware` / `fidelity_shaping` | `routing` |
-| `swap_penalty` | SWAP 动作惩罚系数 β | 0.1 |
-| `gate_reward` | 双比特门执行奖励系数 α | 0.5 |
-| `invalid_penalty` | 无效 execute 惩罚 | 1.0 |
-| `γ_dist` | 映射距离惩罚系数（Stage 1 可选） | 0.0 |
-| `γ_xtalk` | 串扰惩罚系数（Stage 2/3） | 0.02 |
-| `δ_err` | 高错误率耦合边惩罚系数（Stage 2/3） | 0.01 |
-| `λ_fid` | 终端保真度权重（Stage 2/3） | 5.0 |
-| `η` | 单步保真度变化权重（Stage 3） | 1.0 |
+| `gate_base_reward` | 门类型基础收益表 | `{"cx":2.0, "h":0.5, "rz":0.2, …}` |
+| `eta_err` | 硬件错误率惩罚系数 ε_err | 0.5 |
+| `eta_xtalk` | 串扰惩罚系数 ε_xtalk | 0.02 |
+| `cnot_cost` | 单 CNOT 基准开销 γ_cnot | 0.1 |
+| `swap_cost` | SWAP 惩罚 (= 3·cnot_cost) | 0.3 |
+| `eta_xz_step` | 步级 X/Z 传播惩罚系数 η_xz | 0.1 |
+| `invalid_penalty` | 无效动作惩罚 | 1.0 |
+| `init_x_error` | 初始 X 错误率（若为 None 则从 single_q_err 取） | `None` |
+| `init_z_error` | 初始 Z 错误率（若为 None 则从 single_q_err 取） | `None` |
+| `lambda_kl` | KL 散度终端权重（Stage 2/3） | 0.5 |
+| `lambda_ce` | 交叉熵终端权重（Stage 2/3） | 0.3 |
+| `lambda_tvd` | TVD 终端权重（Stage 2/3） | 1.0 |
+| `fidelity_fn` | 外部模拟器函数 (dag, mapping) → (P_ideal, P_noisy) | `None` |
 
 ## PPOAgent
 

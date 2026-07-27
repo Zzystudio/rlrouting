@@ -5,16 +5,15 @@
 # 工作流程
 # --------
 # 1. 解析电路为 DAG；
-# 2. （可选）用训练好的 Multi-GNN 预测器挑选噪声自适应初始映射；
-# 3. 贪心 SWAP 路由：对不相邻的双比特门，沿耦合图插入 SWAP 直至相邻；
-# 4. 返回物理电路与统计信息（SWAP 数、初始映射、预测保真度）。
+# 2. 贪心 SWAP 路由：对不相邻的双比特门，沿耦合图插入 SWAP 直至相邻；
+# 3. 返回物理电路与统计信息（SWAP 数、初始映射）。
 # ============================================================================
 
 from __future__ import annotations
 
 from typing import List, Optional, Tuple
 
-from .graph.circuit_dag import CircuitDAG, build_routing_graph
+from .graph.circuit_dag import CircuitDAG
 from .graph.features import HardwareFeatures
 
 
@@ -26,39 +25,9 @@ def _append_gate(phys, g, phys_qubits):
         phys.append(g.operation, phys_qubits)
 
 
-def _best_initial_layout(
-    dag: CircuitDAG,
-    hw: HardwareFeatures,
-    coupling_map: List[Tuple[int, int]],
-    predictor,
-    num_trials: int = 8,
-    seed: int = 0,
-) -> List[int]:
-    """用预测器在多个随机初始映射中挑选预测保真度最高的那个。"""
-    import random
-    import torch
-
-    rng = random.Random(seed)
-    n = dag.num_logical_qubits
-    best_layout = list(range(n))
-    best_fid = -1.0
-    for _ in range(num_trials):
-        perm = list(range(n))
-        rng.shuffle(perm)
-        data = build_routing_graph(dag, perm, hw, coupling_map).to_pyg()
-        with torch.no_grad():
-            fid = predictor.predict_fidelity(data).item()
-        if fid > best_fid:
-            best_fid = fid
-            best_layout = perm
-    return best_layout
-
-
 def greedy_route(
     circuit,
     config,
-    predictor=None,
-    num_layout_trials: int = 8,
     seed: int = 0,
 ):
     """贪心 SWAP 路由，返回 (物理电路, 信息字典)。"""
@@ -69,12 +38,7 @@ def greedy_route(
     coupling_map = list(config.coupling_map)
     n = circuit.num_qubits
 
-    if predictor is not None:
-        mapping = _best_initial_layout(
-            dag, hw, coupling_map, predictor, num_layout_trials, seed
-        )
-    else:
-        mapping = list(range(n))
+    mapping = list(range(n))
 
     phys = QuantumCircuit(n, circuit.num_clbits)
     inv = {p: l for l, p in enumerate(mapping)}
@@ -122,34 +86,9 @@ def greedy_route(
         "num_physical_gates": phys.num_nonlocal_gates
         if hasattr(phys, "num_nonlocal_gates") else None,
     }
-    if predictor is not None:
-        import torch
-        data = build_routing_graph(dag, mapping, hw, coupling_map).to_pyg()
-        with torch.no_grad():
-            info["predicted_fidelity"] = float(predictor.predict_fidelity(data).item())
     return phys, info
 
 
-def route_circuit(
-    circuit,
-    config,
-    predictor_path: Optional[str] = None,
-    device: str = "cpu",
-    **kwargs,
-):
-    """路由入口。
-
-    Parameters
-    ----------
-    circuit : 逻辑量子电路 (Qiskit QuantumCircuit)
-    config  : NoiseConfig
-    predictor_path : 已训练的 Multi-GNN 预测器权重路径（None 则退化为默认布局）
-    """
-    predictor = None
-    if predictor_path is not None:
-        from .gnn.predictor import MultiGNNTidelityPredictor
-        import torch
-        predictor = MultiGNNTidelityPredictor()
-        predictor.load_state_dict(torch.load(predictor_path, map_location=device))
-        predictor.eval()
-    return greedy_route(circuit, config, predictor, **kwargs)
+def route_circuit(circuit, config, **kwargs):
+    """路由入口。"""
+    return greedy_route(circuit, config, **kwargs)
