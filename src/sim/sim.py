@@ -6,8 +6,10 @@
 # 错误传播通过密度矩阵模拟器自然实现
 # ============================================================================
 
-from dataclasses import dataclass
-from typing import List, Dict, Tuple, Optional
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 
 from qiskit import QuantumCircuit, transpile
@@ -19,7 +21,6 @@ from qiskit_aer.noise import (
     pauli_error,
     ReadoutError,
 )
-from qiskit_aer import Aer  # 用于获取 backends
 
 
 # ----------------------------- 配置类 ---------------------------------------
@@ -56,6 +57,9 @@ class NoiseConfig:
 
     # 模拟器附加选项
     shots: int = 1024                   # 默认采样次数
+    parallel: bool = True               # 是否启用多线程并行
+    max_parallel_threads: int = 0       # 0 = 使用 CPU 核数
+    device: str = 'CPU'                 # 模拟设备: 'CPU' 或 'GPU' (需要 GPU 版 qiskit-aer)
 
 
 # ----------------------------- 模拟器类 ---------------------------------------
@@ -84,14 +88,18 @@ class NoiseSimulator:
 
     # ========== 构建噪声模型 =================================================
     def _build_noise_model(self) -> NoiseModel:
-        """根据配置构建完整的 NoiseModel"""
+        """根据配置构建完整的 NoiseModel
+
+        顺序：先添加 all-qubit 门错误，后添加 per-qubit 热弛豫，
+        确保两者都生效（Qiskit Aer 中 per-qubit 优先于 all-qubit）。
+        """
         noise_model = NoiseModel()
 
-        # 1. 热弛豫噪声 (T1, T2)
-        self._add_thermal_relaxation(noise_model)
-
-        # 2. 门错误 (退极化)
+        # 1. 门错误 (退极化) — all-qubit，先加
         self._add_gate_errors(noise_model)
+
+        # 2. 热弛豫噪声 (T1, T2) — per-qubit，后加（覆盖 all-qubit）
+        self._add_thermal_relaxation(noise_model)
 
         # 3. 串扰噪声 (基于拓扑的ZZ串扰)
         self._add_crosstalk(noise_model)
@@ -189,62 +197,106 @@ class NoiseSimulator:
     def get_simulator(self) -> AerSimulator:
         """获取或创建 AerSimulator 实例（懒加载）"""
         if self._simulator is None:
-            self._simulator = AerSimulator(
+            kwargs = dict(
                 noise_model=self.noise_model,
                 basis_gates=self.noise_model.basis_gates,
                 coupling_map=self.config.coupling_map,
-                # 使用密度矩阵方法来模拟混合态和错误传播
                 method='density_matrix',
-                # 可选: 提高模拟速度
-                # device='GPU'  # 如果有 GPU 支持
+                device=self.config.device,
             )
+            if self.config.parallel:
+                kwargs['max_parallel_threads'] = self.config.max_parallel_threads or 0
+            self._simulator = AerSimulator(**kwargs)
         return self._simulator
 
-    def run(self, circuit: QuantumCircuit, shots: Optional[int] = None) -> dict:
+    def _transpile(self, circuit: QuantumCircuit) -> QuantumCircuit:
+        """将电路转译到基础门和拓扑"""
+        return transpile(
+            circuit,
+            basis_gates=self.noise_model.basis_gates,
+            coupling_map=[list(e) for e in self.config.coupling_map],
+            optimization_level=1,
+        )
+
+    def run(self, circuit: QuantumCircuit, shots: Optional[int] = None,
+            skip_transpile: bool = False) -> dict:
         """
         执行电路并返回计数结果 (counts)
         自动根据耦合图进行转译（transpile）以确保电路符合拓扑。
+        若 circuit 已转译过，设置 skip_transpile=True 跳过重复转译。
         """
         if shots is None:
             shots = self.config.shots
-
-        # 将电路转译到基础门和拓扑
-        transpiled = transpile(
-            circuit,
-            basis_gates=self.noise_model.basis_gates,
-            coupling_map=[list(edge) for edge in self.config.coupling_map],
-            optimization_level=1,  # 适度的优化
-        )
-
+        if not skip_transpile:
+            circuit = self._transpile(circuit)
         simulator = self.get_simulator()
-        job = simulator.run(transpiled, shots=shots)
+        job = simulator.run(circuit, shots=shots)
         result = job.result()
         return result.get_counts()
 
-    def run_and_get_counts(self, circuit: QuantumCircuit, shots: Optional[int] = None) -> dict:
+    def run_and_get_counts(self, circuit: QuantumCircuit,
+                           shots: Optional[int] = None) -> dict:
         """同 run，返回 counts"""
         return self.run(circuit, shots)
 
-    def run_and_get_statevector(self, circuit: QuantumCircuit):
+    def run_and_get_statevector(self, circuit: QuantumCircuit,
+                                skip_transpile: bool = False):
         """
         返回电路的密度矩阵（电路不应包含测量操作）。
-        如果电路包含测量，将抛出异常。
+        若 circuit 已转译过，设置 skip_transpile=True 跳过重复转译。
         """
         if circuit.num_clbits > 0:
             raise ValueError("run_and_get_statevector 要求电路不含测量操作")
-
+        if not skip_transpile:
+            circuit = self._transpile(circuit)
         simulator = self.get_simulator()
-        # 使用 save_density_matrix 保存密度矩阵结果
-        circuit_with_save = circuit.copy()
-        circuit_with_save.save_density_matrix()
-
-        job = simulator.run(circuit_with_save, shots=1)
+        circ = circuit.copy()
+        circ.save_density_matrix()
+        job = simulator.run(circ, shots=1)
         result = job.result()
         return result.data()['density_matrix']
+
+    def run_batch(self, circuits: List[QuantumCircuit],
+                  shots: Optional[int] = None,
+                  skip_transpile: bool = False) -> List[dict]:
+        """
+        批量执行多个电路并返回计数结果。
+        利用 AerSimulator 内部的并行能力，比逐个调用 run() 快得多。
+        """
+        if shots is None:
+            shots = self.config.shots
+        if not skip_transpile:
+            circuits = [self._transpile(c) for c in circuits]
+        simulator = self.get_simulator()
+        job = simulator.run(circuits, shots=shots)
+        result = job.result()
+        return [result.get_counts(i) for i in range(len(circuits))]
+
+    def run_batch_statevector(self, circuits: List[QuantumCircuit],
+                              skip_transpile: bool = False):
+        """
+        批量计算多个无测量电路的密度矩阵。
+        """
+        if not skip_transpile:
+            circuits = [self._transpile(c) for c in circuits]
+        simulator = self.get_simulator()
+        circs = []
+        for c in circuits:
+            if c.num_clbits > 0:
+                raise ValueError("run_batch_statevector 要求电路不含测量操作")
+            cc = c.copy()
+            cc.save_density_matrix()
+            circs.append(cc)
+        job = simulator.run(circs, shots=1)
+        result = job.result()
+        return [result.data(i)['density_matrix'] for i in range(len(circuits))]
 
 
 # ============================ 使用示例 ========================================
 if __name__ == "__main__":
+    import warnings
+    warnings.filterwarnings('ignore')
+
     # 1. 配置参数（以 3 比特线性拓扑为例）
     config = NoiseConfig(
         t1_times=[50.0, 50.0, 50.0],          # µs
@@ -254,8 +306,6 @@ if __name__ == "__main__":
         two_q_gate_error=0.01,                # 1%
         coupling_map=[(0, 1), (1, 2)],
         readout_error=[0.02, 0.02, 0.02],     # 2%
-        # 可选：自定义串扰强度
-        # crosstalk_strength={(0,1): 0.005, (1,2): 0.005},
         single_gate_time=0.1,
         two_gate_time=0.3,
         idle_time=0.1,

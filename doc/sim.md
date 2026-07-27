@@ -70,6 +70,7 @@ print(counts)
 | `two_gate_time` | `float` | 否 | 双比特门持续时间，默认 0.3 µs |
 | `idle_time` | `float` | 否 | 空闲等待时间，默认 0.1 µs |
 | `shots` | `int` | 否 | 默认采样次数，默认 1024 |
+| `device` | `str` | 否 | 模拟设备，`'CPU'` 或 `'GPU'`，默认 `'CPU'`（需 `qiskit-aer-gpu`） |
 
 ### NoiseSimulator
 
@@ -147,3 +148,45 @@ P(0|1) = P(1|0) = err
 ```
 
 理想 GHZ 态应只有 `000` 和 `111`，噪声导致其他状态出现。
+
+## GPU 加速
+
+### 安装
+
+GPU 加速需要 `qiskit-aer-gpu` 包（基于 CUDA），该包依赖较旧的 `qiskit<2.0`：
+
+```bash
+pip install 'qiskit<2.0'
+pip install qiskit-aer-gpu
+```
+
+### 使用
+
+在 `NoiseConfig` 中设置 `device='GPU'` 即可启用：
+
+```python
+config = NoiseConfig(
+    ...
+    device='GPU',
+)
+sim = NoiseSimulator(config)
+```
+
+### 性能基准
+
+测试环境: 8× NVIDIA RTX 4090 D, CUDA 13.2  
+模拟方法: density_matrix, shots=4096, 3 次平均
+
+| Qubits | Depth | CPU avg | GPU avg | Speedup |
+|--------|-------|---------|---------|---------|
+| 5      | 10    | 0.0459s | 0.5803s | 0.08x |
+| 5      | 50    | 0.0712s | 0.0622s | 1.14x |
+| 5      | 100   | 0.0971s | 0.0934s | 1.04x |
+| 10     | 10    | 0.2469s | 0.0787s | 3.14x |
+| 10     | 50    | 0.7512s | 0.1965s | 3.82x |
+| 12     | 10    | 1.6454s | 0.4061s | 4.05x |
+
+**结论**:
+- 小规模 (≤5 qubits): GPU 因核启动开销而更慢，建议使用 CPU
+- 中大规模 (≥10 qubits): GPU 加速比 3~4x，推荐启用 GPU
+- 默认 `device='CPU'` 适用于本项目 RL/GNN 训练中的小规模模拟

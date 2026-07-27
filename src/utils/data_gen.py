@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import Iterator, List, Optional, Tuple
+from typing import Iterator, List, Optional
 
 import numpy as np
 
@@ -26,30 +26,33 @@ class Sample:
 def random_circuit(num_qubits: int, depth: int, seed: int):
     """生成不含测量的随机电路（便于态矢量保真度计算）。"""
     from qiskit.circuit.random import random_circuit as _rc
-    # 强制不含测量
     qc = _rc(num_qubits, depth, measure=False, seed=seed)
     return qc
 
 
-def _ideal_statevector(circuit):
+def _ideal_statevector(circuit, skip_transpile: bool = False):
     """无噪声态矢量。"""
     from qiskit_aer import AerSimulator
     from qiskit import transpile
     sim = AerSimulator(method="statevector")
-    tc = transpile(circuit, basis_gates=["rz", "sx", "x", "cx"])
+    tc = circuit if skip_transpile else transpile(
+        circuit, basis_gates=["rz", "sx", "x", "cx"])
     tc.save_statevector()
     result = sim.run(tc, shots=1).result()
     return np.asarray(result.data()["statevector"])
 
 
-def physical_circuit_fidelity(logical_circuit, layout: List[int], config) -> float:
+def physical_circuit_fidelity(
+    logical_circuit, layout: List[int], config,
+    simulator: Optional[object] = None,
+) -> float:
     """给定逻辑电路与初始映射，转译后在噪声模拟器上求真实保真度。
 
-    同时考虑由映射引入的 SWAP 开销与硬件噪声（含串扰）。
+    可复用外部 NoiseSimulator 实例避免重复构建噪声模型。
     """
     from qiskit import transpile
     from sim.sim import NoiseSimulator
-    from utils.metrics import state_fidelity
+    from utils.metrics import state_fidelity, counts_fidelity
 
     coupling_map = [list(e) for e in config.coupling_map]
     transpiled = transpile(
@@ -59,24 +62,25 @@ def physical_circuit_fidelity(logical_circuit, layout: List[int], config) -> flo
         basis_gates=["rz", "sx", "x", "cx"],
         optimization_level=1,
     )
-    ideal_sv = _ideal_statevector(transpiled)
-    sim = NoiseSimulator(config)
+    ideal_sv = _ideal_statevector(transpiled, skip_transpile=True)
+    if simulator is None:
+        simulator = NoiseSimulator(config)
     try:
-        noisy_dm = sim.run_and_get_statevector(transpiled)
+        noisy_dm = simulator.run_and_get_statevector(
+            transpiled, skip_transpile=True)
     except Exception:
-        # 个别电路转译后含测量，回退到计数保真度
-        from utils.metrics import counts_fidelity
-        counts = sim.run(transpiled, shots=2048)
+        counts = simulator.run(transpiled, shots=2048, skip_transpile=True)
         ideal_counts = _ideal_counts(transpiled)
         return counts_fidelity(ideal_counts, counts)
     return state_fidelity(ideal_sv, np.asarray(noisy_dm.data))
 
 
-def _ideal_counts(circuit) -> dict:
+def _ideal_counts(circuit, skip_transpile: bool = False) -> dict:
     from qiskit_aer import AerSimulator
     from qiskit import transpile
     sim = AerSimulator(method="statevector")
-    tc = transpile(circuit, basis_gates=["rz", "sx", "x", "cx"])
+    tc = circuit if skip_transpile else transpile(
+        circuit, basis_gates=["rz", "sx", "x", "cx"])
     tc.measure_all()
     result = sim.run(tc, shots=2048).result()
     return result.get_counts()
@@ -96,22 +100,16 @@ def generate_dataset(
     depth: int = 6,
     seed: int = 0,
 ) -> List[Sample]:
-    """生成 (路由图, 保真度) 训练样本列表。"""
-    rng = random.Random(seed)
-    hw = HardwareFeatures.from_noise_config(config)
-    coupling_map = list(config.coupling_map)
-    n = len(config.t1_times)
+    """生成 (路由图, 保真度) 训练样本列表。
 
-    samples: List[Sample] = []
-    for c in range(num_circuits):
-        qc = random_circuit(n, depth, seed=seed * 1000 + c)
-        dag = CircuitDAG.from_circuit(qc)
-        for _ in range(layouts_per_circuit):
-            layout = random_layout(n, rng)
-            data = build_routing_graph(dag, layout, hw, coupling_map)
-            fid = physical_circuit_fidelity(qc, layout, config)
-            samples.append(Sample(data=data, fidelity=float(fid)))
-    return samples
+    使用共享 NoiseSimulator 实例避免重复构建噪声模型。
+    """
+    from sim.sim import NoiseSimulator
+    simulator = NoiseSimulator(config)
+    return list(sample_stream(
+        config, num_circuits, layouts_per_circuit, depth, seed,
+        simulator=simulator,
+    ))
 
 
 def sample_stream(
@@ -120,8 +118,15 @@ def sample_stream(
     layouts_per_circuit: int = 4,
     depth: int = 6,
     seed: int = 0,
+    simulator: Optional[object] = None,
 ) -> Iterator[Sample]:
-    """按需生成样本的迭代器（节省内存）。"""
+    """按需生成样本的迭代器（节省内存）。
+
+    可传入共享的 NoiseSimulator 避免重复构建噪声模型。
+    """
+    from sim.sim import NoiseSimulator
+    if simulator is None:
+        simulator = NoiseSimulator(config)
     rng = random.Random(seed)
     hw = HardwareFeatures.from_noise_config(config)
     coupling_map = list(config.coupling_map)
@@ -132,5 +137,6 @@ def sample_stream(
         for _ in range(layouts_per_circuit):
             layout = random_layout(n, rng)
             data = build_routing_graph(dag, layout, hw, coupling_map)
-            fid = physical_circuit_fidelity(qc, layout, config)
+            fid = physical_circuit_fidelity(
+                qc, layout, config, simulator=simulator)
             yield Sample(data=data, fidelity=float(fid))
