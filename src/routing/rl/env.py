@@ -59,6 +59,7 @@ class RoutingEnv(gym.Env):
 
         random_init: bool = True,
         use_gnn: bool = True,
+        gnn: Optional[SubGNN] = None,
         seed: int = 0,
     ):
         super().__init__()
@@ -88,8 +89,9 @@ class RoutingEnv(gym.Env):
         self.unfinished_penalty = unfinished_penalty
         self._rng = np.random.default_rng(seed)
 
-        self.use_gnn = use_gnn
-        if use_gnn:
+        if gnn is not None:
+            self._gnn = gnn
+        elif use_gnn:
             self._gnn = SubGNN(subgraph="full")
             self._gnn.eval()
         else:
@@ -179,6 +181,9 @@ class RoutingEnv(gym.Env):
                 executed_mask=executed_mask,
                 executable_2q=set(self.executable_2q),
             )
+            self._last_graph_data = graph_data
+            self._last_map_vec = map_vec
+            self._last_progress = progress
             with torch.no_grad():
                 emb = self._gnn(graph_data).cpu().numpy().flatten()
             return np.concatenate([emb, map_vec, progress]).astype(np.float32)

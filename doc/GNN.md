@@ -410,12 +410,12 @@ R = Σ (r_execute_t + r_swap_t + r_propagate_t) + R_T
 | 组件 | 条件 / 事件 | 步级奖励 |
 |------|------------|---------|
 | **门执行收益** | 成功执行 gate g（映射在物理比特 p_a, p_b 上） | `+R_base(type(g)) − ε_err · e_g − ε_xtalk · X_g` |
+| **SWAP 惩罚** | 在 coupling edge (p,q) 上插入 SWAP | `−C_swap`（默认等价 3 CNOT 代价） |
 | **错误传播** | 门执行后更新 X/Z 错误率 | `−η_xz · Δ_total_XZ` |
 
-SWAP 本身无显式惩罚；不必要的 SWAP 会被折扣因子 γ < 1 隐式约束（更多 SWAP → 更晚获得终端奖励 → 更低折扣回报）。
 其中 `R_base(type)` 按门类型查表，`e_g` 为 gate 的硬件错误率，`X_g` 为邻居串扰代价。
 每次 SWAP 后环境自动执行所有可执行的双比特门，累积门执行收益和错误传播惩罚：
-`r_step = Σ(r_execute_i + r_propagate_i)`（SWAP 本身无显式惩罚，由折扣因子隐式约束 SWAP 次数）。
+`r_step = r_swap + Σ(r_execute_i + r_propagate_i)`。
 回合终端奖励 `R_T = 0`（无 fidelity 信号）。
 
 **`reward_mode = 'noise_aware'`（Stage 2 — 步级路由 + 终端分布优化）**
@@ -424,7 +424,7 @@ SWAP 本身无显式惩罚；不必要的 SWAP 会被折扣因子 γ < 1 隐式�
 
 **`reward_mode = 'fidelity_shaping'`（Stage 3 — 纯终端输出分布优化）**
 
-在天衍/高精度模拟器或真机场景下使用。不设任何步级奖励，仅在回合结束时通过模拟器/真机采样获取理想与噪声输出分布，计算 KL 散度、交叉熵、TVD 加权作为终端奖励。此时 agent 已具备完整的路由能力，仅通过输出分布差异信号做最终精调。
+在天衍高精度模拟器或真机场景下使用。不设任何步级奖励，仅在回合结束时通过模拟器/真机采样获取理想与噪声输出分布，计算 KL 散度、交叉熵、TVD 加权作为终端奖励。此时 agent 已具备完整的路由能力，仅通过输出分布差异信号做最终精调。
 
 步级奖励：`r_step = 0`（无步级信号）
 
@@ -472,13 +472,13 @@ SWAP 本身无显式惩罚；不必要的 SWAP 会被折扣因子 γ < 1 隐式�
 
 ## 7.4 奖励函数实现详解
 
-文件：`src/routing/rl/env.py`。每步仅 SWAP 动作，随后自动执行所有可执行门，步级奖励仅来自门执行：
+文件：`src/routing/rl/env.py`。每步仅 SWAP 动作，随后自动执行所有可执行门，步级奖励三组件求和：
 
 ```
-r_step = Σ(r_execute_i + r_propagate_i)
+r_step = r_swap + Σ(r_execute_i + r_propagate_i)
 ```
 
-SWAP 未解锁任何门时 `r_step = 0`（无显式 SWAP 惩罚，由折扣因子隐式约束）。
+SWAP 未解锁任何门时只有 `r_swap`；解锁门则累加对应 `r_execute + r_propagate`。
 终端奖励 `R_T` 仅在 episode 结束时叠加。
 
 ### 7.4.1 门执行收益（r_execute）
@@ -517,16 +517,22 @@ crosstalk_cost = ∑_{q ∈ N(p_a) ∪ N(p_b)} zz[q, p_*] · occupied[q]
 
 其中 `N(p)` 是物理比特 p 在 coupling map 上的邻居，`zz[]` 是 ZZ 串扰强度矩阵。
 
-### 7.4.2 SWAP 惩罚（隐式约束）
+### 7.4.2 SWAP 惩罚（r_swap）
 
-SWAP 本身无显式奖励项。每次 SWAP 的基准开销 `C_swap = 3 · γ_cnot`（γ_cnot = 0.1）并不直接扣减奖励，而是**通过折扣因子 γ 隐式约束**：无用的 SWAP 增加 episode 长度，使门执行奖励和终端奖励被更远的折扣因子衰减，从而间接降低累积回报。
+在 coupling edge (p,q) 上插入 SWAP 时：
 
 ```
-U = Σᵗ γᵗ · r_t    (γ < 1)
+r_swap = −C_swap    (默认 C_swap = 0.3，即 3 个 CNOT 的等效惩罚)
 ```
 
-额外 SWAP → t 更大 → γᵗ 更小 → 回报更低。PPO 自然学会最小化 SWAP 次数。 
-SWAP 的 CNOT 分解开销仍作为设计参考保留在超参数 `cnot_cost` 和 `swap_cost` 中。
+CNOT 是其基本操作单元，每次 SWAP 的基准惩罚 `C_swap` 按其物理分解开销设定：
+
+```
+C_swap = 3 · γ_cnot
+γ_cnot = 0.1  (单个 CNOT 的基准开销)
+```
+
+SWAP 的插入还额外通过 7.4.3 的错误传播机制产生间接惩罚（误差累加）。
 
 ### 7.4.3 错误传播（r_propagate）
 
@@ -586,11 +592,10 @@ Stage 1 不使用任何终端奖励，仅依赖步级稠密信号。Stage 2/3 �
 ### 7.4.5 总奖励
 
 ```
-R = Σ (Σ r_execute + Σ r_propagate) + R_T
+R = Σ (r_swap + Σ r_execute + Σ r_propagate) + R_T
 ```
 
-其中每步只做 SWAP，自动执行批量的门。SWAP 无显式惩罚。
-`R_T` 在 episode 结束时由 `_terminal_reward` 叠加。
+其中每步只做 SWAP，自动执行批量的门。`R_T` 在 episode 结束时由 `_terminal_reward` 叠加。
 
 ---
 
@@ -817,13 +822,14 @@ r_propagate = −η_xz · (ΔX_total + ΔZ_total)
 ### 总奖励
 
 ```
-R = Σ (r_execute_t + r_propagate_t)
+R = Σ (r_execute_t + r_swap_t + r_propagate_t)
 
   = Σ [ R_base(type(g_t)) − ε_err · e_g_t − ε_xtalk · X_g_t ]
+    + Σ [ −C_swap · SWAP_t ]
     + Σ [ −η_xz · (ΔX_t + ΔZ_t) ]
 ```
 
-不含显式 SWAP 惩罚。不必要的 SWAP 通过折扣因子 γ < 1 隐式约束。
+不含任何终端奖励项，完全由步级稠密信号驱动。
 
 ### 参数表
 
@@ -832,8 +838,10 @@ R = Σ (r_execute_t + r_propagate_t)
 | `R_base(type)` | 门类型基础收益 | cx=2.0, h=0.5, … | `gate_base_reward` (dict) |
 | `ε_err` | 硬件错误率惩罚系数 | 0.5 | `eta_err` |
 | `ε_xtalk` | 串扰惩罚系数 | 0.02 | `eta_xtalk` |
-| `γ_cnot` | 单 CNOT 基准开销（参考值） | 0.1 | `cnot_cost` |
+| `γ_cnot` | 单 CNOT 基准开销 | 0.1 | `cnot_cost` |
+| `C_swap` | SWAP 惩罚 (= 3·γ_cnot) | 0.3 | `swap_cost` |
 | `η_xz` | 步级 X/Z 传播惩罚系数 | 0.1 | `eta_xz_step` |
+| `invalid_penalty` | 无效 execute 惩罚 | 1.0 | `invalid_penalty` |
 
 **为什么 Stage 1 引入错误传播而非模拟器 fidelity**：
 
@@ -846,15 +854,14 @@ R = Σ (r_execute_t + r_propagate_t)
 
 **目标**：在已掌握基础路由的基础上，学习在多个可行方案中选择终端噪声更低的路径。
 
-**步级奖励**：延用 Stage 1 的三组件设计（门执行收益 + 错误传播）。
+**步级奖励**：延用 Stage 1 的三组件设计（门执行收益 + SWAP 惩罚 + 错误传播）。
 每步 agent 选择一条 coupling edge 执行 SWAP，环境自动执行后续所有可执行门：
 
 ```
+r_swap       = −C_swap                                     (SWAP 惩罚)
 Σ r_execute  = Σ [ R_base(type(g)) − ε_err · e_g − ε_xtalk · X_g ]   (本批门执行收益)
 Σ r_propagate = Σ [ −η_xz · (ΔX + ΔZ) ]                              (本批门错误传播)
 ```
-
-SWAP 本身无显式惩罚（见 §7.4.2）。
 
 **终端奖励**：不再使用标量保真度，而是通过 Qiskit Aer noisy simulator 同时获取**理想分布**与**噪声分布**的输出结果，计算多个分布差异指标，加权作为终端奖励：
 
