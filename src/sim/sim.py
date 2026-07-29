@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Union
+import logging
 import numpy as np
 
 from qiskit import QuantumCircuit, transpile
@@ -35,9 +36,14 @@ class NoiseConfig:
     t2_times: List[float]               # 每个量子比特的T2退相干时间
     freq_ghz: List[float]               # 每个量子比特的工作频率 (GHz) —— 目前仅作预留
 
-    # 门错误率 (平均错误概率)
-    single_q_gate_error: float          # 单比特门（如 U1,U2,U3,SX,RZ 等）的错误率
-    two_q_gate_error: float             # 双比特门（通常是 CNOT）的错误率
+    # 门错误率
+    # single_q_gate_error:  float 表示所有比特相同的错误率,
+    #                       List[float] 表示每个比特独立错误率.
+    single_q_gate_error: Union[float, List[float]]
+    # two_q_gate_error:  float 表示所有耦合边相同的错误率,
+    #                    Dict[(int,int),float] 表示每条边独立错误率,
+    #                    dict 中应包含 coupling_map 中每条边的正反两个方向.
+    two_q_gate_error: Union[float, Dict[Tuple[int, int], float]]
 
     # 拓扑结构（耦合图）
     coupling_map: List[Tuple[int, int]] # 例如 [(0,1), (1,2), (2,3)] 表示线性相邻
@@ -88,95 +94,89 @@ class NoiseSimulator:
 
     # ========== 构建噪声模型 =================================================
     def _build_noise_model(self) -> NoiseModel:
-        """根据配置构建完整的 NoiseModel
+        logger = logging.getLogger('qiskit_aer.noise.noise_model')
+        prev_level = logger.level
+        logger.setLevel(logging.ERROR)
+        try:
+            noise_model = NoiseModel()
+            self._add_combined_gate_errors(noise_model)
+            self._add_crosstalk(noise_model)
+            self._add_readout_error(noise_model)
+            return noise_model
+        finally:
+            logger.setLevel(prev_level)
 
-        顺序：先添加 all-qubit 门错误，后添加 per-qubit 热弛豫，
-        确保两者都生效（Qiskit Aer 中 per-qubit 优先于 all-qubit）。
-        """
-        noise_model = NoiseModel()
-
-        # 1. 门错误 (退极化) — all-qubit，先加
-        self._add_gate_errors(noise_model)
-
-        # 2. 热弛豫噪声 (T1, T2) — per-qubit，后加（覆盖 all-qubit）
-        self._add_thermal_relaxation(noise_model)
-
-        # 3. 串扰噪声 (基于拓扑的ZZ串扰)
-        self._add_crosstalk(noise_model)
-
-        # 4. 读出错误
-        self._add_readout_error(noise_model)
-
-        return noise_model
-
-    def _add_thermal_relaxation(self, noise_model: NoiseModel):
-        """为所有量子比特添加热弛豫错误"""
+    def _add_combined_gate_errors(self, noise_model: NoiseModel):
+        """为每个比特组合退极化 + 热弛豫，作为一个量子错误添加到该比特。"""
         n_qubits = len(self.config.t1_times)
-        # 单比特门的热弛豫
+        single_gates = ['rz', 'sx', 'x', 'y', 'z', 'h']
+
+        sqe = self.config.single_q_gate_error
+        if isinstance(sqe, (list, tuple)):
+            single_depols = [depolarizing_error(float(sqe[i]), 1) for i in range(n_qubits)]
+        else:
+            single_depols = [depolarizing_error(float(sqe), 1)] * n_qubits
+
         for i in range(n_qubits):
-            error = thermal_relaxation_error(
+            thermal = thermal_relaxation_error(
                 t1=self.config.t1_times[i],
                 t2=self.config.t2_times[i],
                 time=self.config.single_gate_time,
             )
-            # 这些是 Qiskit 中常用的单比特门
-            noise_model.add_quantum_error(error, ['rz', 'sx', 'x', 'y', 'z', 'h'], [i])
-            # 空闲时间等待也会引入退相干
-            idle_error = thermal_relaxation_error(
+            combined = single_depols[i].compose(thermal)
+            noise_model.add_quantum_error(combined, single_gates + ['s', 't'], [i])
+
+            idle_thermal = thermal_relaxation_error(
                 t1=self.config.t1_times[i],
                 t2=self.config.t2_times[i],
                 time=self.config.idle_time,
             )
-            noise_model.add_quantum_error(idle_error, ['id'], [i])
+            noise_model.add_quantum_error(idle_thermal, ['id'], [i])
 
-        # 双比特门的热弛豫通过 depolarizing_error 在 _add_gate_errors 中处理
-        # 这里不重复添加，避免双重计数
-
-    def _add_gate_errors(self, noise_model: NoiseModel):
-        """添加退极化错误表示门操作错误"""
-        # 单比特门错误
-        single_error = depolarizing_error(self.config.single_q_gate_error, 1)
-        # 应用到常用单比特门
-        noise_model.add_all_qubit_quantum_error(single_error, ['rz', 'sx', 'x', 'y', 'z', 'h', 's', 't'])
-
-        # 双比特门错误（通常只针对 CNOT）
-        if self.config.two_q_gate_error > 0:
-            two_error = depolarizing_error(self.config.two_q_gate_error, 2)
-            noise_model.add_all_qubit_quantum_error(two_error, ['cx'])
+        tqe = self.config.two_q_gate_error
+        if isinstance(tqe, dict):
+            for (q1, q2), err in tqe.items():
+                if q1 >= n_qubits or q2 >= n_qubits:
+                    continue
+                if err > 0:
+                    cx_depol = depolarizing_error(err, 2)
+                    noise_model.add_quantum_error(cx_depol, ['cx'], [q1, q2])
+        elif tqe > 0:
+            cx_depol = depolarizing_error(tqe, 2)
+            noise_model.add_all_qubit_quantum_error(cx_depol, ['cx'])
 
     def _add_crosstalk(self, noise_model: NoiseModel):
-        """
-        添加基于拓扑的串扰噪声。采用 ZZ 耦合作为典型的串扰模型。
-        如果配置中未提供串扰强度字典，则根据双比特门错误率和耦合图自动生成默认值。
-        """
         n_qubits = len(self.config.t1_times)
-        # 确定串扰强度
         if self.config.crosstalk_strength is None:
-            # 默认：每条边上的串扰概率 = 双比特门错误率的 10%
-            default_strength = 0.1 * self.config.two_q_gate_error
+            tqe = self.config.two_q_gate_error
+            if isinstance(tqe, dict):
+                vals = [v for k, v in tqe.items() if k[0] < k[1]]
+                default_strength = 0.1 * float(np.mean(vals)) if vals else 0.001
+            else:
+                default_strength = 0.1 * tqe
             crosstalk_map = {}
             for q1, q2 in self.config.coupling_map:
-                # 去重：如果同时包含 (q1,q2) 和 (q2,q1)，只保留一个
                 if (q2, q1) not in crosstalk_map:
                     crosstalk_map[(q1, q2)] = default_strength
-                # 如果已存在反向，则忽略（因为无向）
         else:
             crosstalk_map = self.config.crosstalk_strength
 
-        # 为每对相邻比特添加 ZZ 串扰错误
         for (q1, q2), strength in crosstalk_map.items():
             if q1 >= n_qubits or q2 >= n_qubits:
                 raise ValueError(f"串扰涉及非法量子比特索引: ({q1}, {q2})")
             if strength <= 0:
                 continue
-            # 构造 Pauli 错误: 以概率 strength 施加 ZZ 门
-            # 注意：pauli_error 需要概率和对应的 Pauli 字符串
-            # 这里使用 'II' 表示无错误，'ZZ' 表示 ZZ 错误
             zz_error = pauli_error([('ZZ', strength), ('II', 1 - strength)])
-            # 将该错误添加到 CNOT 门上（表示在执行 CNOT 时受到串扰）
-            noise_model.add_quantum_error(zz_error, ['cx'], [q1, q2])
-            # 也可以添加到单比特门，表示相邻比特在空闲时产生的串扰（可选）
-            # 但那样更复杂，先忽略。
+            if isinstance(self.config.two_q_gate_error, dict):
+                cx_err = self.config.two_q_gate_error.get((q1, q2), 0.01)
+                cx_depol = depolarizing_error(cx_err, 2)
+            elif hasattr(self, '_cx_error_base'):
+                cx_depol = self._cx_error_base
+            else:
+                cx_depol = None
+            combined = cx_depol.compose(zz_error) if cx_depol is not None else zz_error
+            noise_model.add_quantum_error(combined, ['cx'], [q1, q2])
+            noise_model.add_quantum_error(combined, ['cx'], [q2, q1])
 
     def _add_readout_error(self, noise_model: NoiseModel):
         """添加读出错误"""

@@ -45,6 +45,9 @@ class HardwareFeatures:
     adj: np.ndarray             # (Q, Q) 0/1 邻接矩阵
     zz: np.ndarray              # (Q, Q) 归一化 ZZ 串扰强度
     dist: np.ndarray            # (Q, Q) 最短路径距离（归一化）
+    qubit_template: np.ndarray  # (Q, 32) 硬件不变的 qubit 特征模板
+    coupling_index: np.ndarray  # (2, 2*|E|) 双向耦合边索引
+    coupling_template: np.ndarray  # (2*|E|, 16) 硬件不变的耦合边特征模板
 
     @classmethod
     def from_noise_config(cls, config) -> "HardwareFeatures":
@@ -59,7 +62,10 @@ class HardwareFeatures:
             ro = np.asarray(config.readout_error, dtype=float)
         readout = ro / _READOUT_SCALE
 
-        sqe = np.full(n, config.single_q_gate_error / _ERROR_SCALE)
+        if isinstance(config.single_q_gate_error, (list, tuple, np.ndarray)):
+            sqe = np.asarray(config.single_q_gate_error, dtype=float) / _ERROR_SCALE
+        else:
+            sqe = np.full(n, config.single_q_gate_error / _ERROR_SCALE)
 
         adj = np.zeros((n, n), dtype=float)
         zz = np.zeros((n, n), dtype=float)
@@ -70,10 +76,18 @@ class HardwareFeatures:
             strength = _crosstalk_strength(config, q1, q2)
             zz[q1, q2] = strength / _ERROR_SCALE
             zz[q2, q1] = strength / _ERROR_SCALE
-            tqe[q1, q2] = config.two_q_gate_error / _ERROR_SCALE
-            tqe[q2, q1] = config.two_q_gate_error / _ERROR_SCALE
+            if isinstance(config.two_q_gate_error, dict):
+                err = config.two_q_gate_error.get((q1, q2), 0.01)
+            else:
+                err = config.two_q_gate_error
+            tqe[q1, q2] = err / _ERROR_SCALE
+            tqe[q2, q1] = err / _ERROR_SCALE
 
         dist = _shortest_path(adj, n)
+        coupling_list = list(config.coupling_map)
+        qubit_template = _build_qubit_template(n, t1, t2, freq, readout, sqe, tqe, adj, zz)
+        coupling_index, coupling_template = _build_coupling_template(
+            coupling_list, tqe, zz, t1, t2, freq, readout, sqe, adj)
         return cls(
             num_qubits=n,
             t1=t1,
@@ -85,6 +99,9 @@ class HardwareFeatures:
             adj=adj,
             zz=zz,
             dist=dist / max(1, n),
+            qubit_template=qubit_template,
+            coupling_index=coupling_index,
+            coupling_template=coupling_template,
         )
 
 
@@ -92,7 +109,10 @@ def _crosstalk_strength(config, q1: int, q2: int) -> float:
     if config.crosstalk_strength is not None:
         return config.crosstalk_strength.get((q1, q2), 0.0) or \
                config.crosstalk_strength.get((q2, q1), 0.0)
-    return 0.1 * config.two_q_gate_error
+    tqe = config.two_q_gate_error
+    if isinstance(tqe, dict):
+        return 0.1 * (tqe.get((q1, q2), 0.01) or 0.01)
+    return 0.1 * tqe
 
 
 def _shortest_path(adj: np.ndarray, n: int) -> np.ndarray:
@@ -273,3 +293,89 @@ def maps_to_edge_feature(
     feat[11] = occupied                               # 11: occupied
     feat[12] = distance_to_other_norm                 # 12: distance to other
     return feat
+
+
+# ---------------------------------------------------------------------------
+# 模板预计算（硬件不变部分）
+# ---------------------------------------------------------------------------
+
+def _build_qubit_template(
+    n: int,
+    t1: np.ndarray,
+    t2: np.ndarray,
+    freq: np.ndarray,
+    readout: np.ndarray,
+    single_q_err: np.ndarray,
+    two_q_err: np.ndarray,
+    adj: np.ndarray,
+    zz: np.ndarray,
+) -> np.ndarray:
+    feat = np.zeros((n, NODE_FEATURE_DIM), dtype=float)
+    median_freq = float(np.median(freq))
+    for pq in range(n):
+        neighbors = [nb for nb in range(n) if adj[pq, nb] > 0]
+        degree = len(neighbors)
+        deg_norm = degree / max(1, n - 1)
+
+        na_t1 = float(np.mean([t1[nb] for nb in neighbors])) if neighbors else 0.0
+        na_t2 = float(np.mean([t2[nb] for nb in neighbors])) if neighbors else 0.0
+        na_freq = float(np.mean([freq[nb] for nb in neighbors])) if neighbors else 0.0
+        na_readout = float(np.mean([readout[nb] for nb in neighbors])) if neighbors else 0.0
+        max_zz = float(max(zz[pq, nb] for nb in neighbors)) if neighbors else 0.0
+        avg_two = float(np.mean([two_q_err[pq, nb] for nb in neighbors])) if neighbors else 0.0
+        freq_det = abs(freq[pq] - median_freq) / max(1e-8, median_freq)
+
+        feat[pq, 0] = pq / max(1, n - 1)         # phys_index_norm
+        feat[pq, 1] = t1[pq]                     # T1
+        feat[pq, 2] = t2[pq]                     # T2
+        feat[pq, 3] = freq[pq]                   # freq
+        feat[pq, 4] = readout[pq]               # readout
+        feat[pq, 5] = single_q_err[pq]           # single_q_err
+        feat[pq, 6] = avg_two                   # avg_two_q_err
+        feat[pq, 7] = deg_norm                   # degree
+        feat[pq, 8] = na_t1                     # neighbor avg T1
+        feat[pq, 9] = na_t2                     # neighbor avg T2
+        feat[pq, 10] = na_freq                  # neighbor avg freq
+        feat[pq, 11] = max_zz                   # max ZZ
+        feat[pq, 12] = na_readout               # neighbor avg readout
+        feat[pq, 15] = freq_det                # freq_detuning
+    return feat
+
+
+def _build_coupling_template(
+    coupling_map: list,
+    two_q_err: np.ndarray,
+    zz: np.ndarray,
+    t1: np.ndarray,
+    t2: np.ndarray,
+    freq: np.ndarray,
+    readout: np.ndarray,
+    single_q_err: np.ndarray,
+    adj: np.ndarray,
+) -> tuple:
+    src, tgt = [], []
+    attrs = []
+    for q1, q2 in coupling_map:
+        t1_gm = float(np.sqrt(t1[q1] * t1[q2]))
+        t2_gm = float(np.sqrt(t2[q1] * t2[q2]))
+        freq_diff = abs(freq[q1] - freq[q2])
+        read_prod = readout[q1] * readout[q2]
+        sq_gm = float(np.sqrt(single_q_err[q1] * single_q_err[q2]))
+        freq_col = 1.0 if freq_diff < 0.02 else 0.0
+        for s, t in [(q1, q2), (q2, q1)]:
+            src.append(s)
+            tgt.append(t)
+            feat = np.zeros(EDGE_FEATURE_DIM, dtype=float)
+            feat[1] = 1.0                     # edge type [0,1,0]
+            feat[3] = two_q_err[s, t]         # two-q error rate
+            feat[4] = zz[s, t]               # ZZ crosstalk
+            feat[5] = t1_gm                  # T1 geom mean
+            feat[6] = t2_gm                  # T2 geom mean
+            feat[7] = freq_diff              # freq diff
+            feat[8] = read_prod              # readout product
+            feat[9] = sq_gm                  # 1q err gm
+            feat[11] = freq_col              # freq collision
+            attrs.append(feat)
+    index = np.asarray([src, tgt], dtype=int) if src else np.empty((2, 0), dtype=int)
+    attr_arr = np.asarray(attrs, dtype=float) if attrs else np.empty((0, EDGE_FEATURE_DIM), dtype=float)
+    return index, attr_arr

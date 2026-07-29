@@ -37,6 +37,64 @@ class ActorCritic(nn.Module):
         return logits, value
 
 
+class EdgeActorCritic(nn.Module):
+    """Per-edge 动作打分 + 注意力池化价值头。
+
+    edge_mlp 对所有候选 SWAP 边共享参数，输入 e_{pq} = [h_p, h_q, h_p-h_q]。
+    价值头用软注意力池化边特征后 + mapping + progress。
+    """
+
+    def __init__(self, edge_feat_dim: int, num_edges: int, num_qubits: int):
+        super().__init__()
+        self.edge_mlp = nn.Sequential(
+            nn.Linear(edge_feat_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, 1),
+        )
+        self.edge_score = nn.Linear(edge_feat_dim, 1)
+        self.critic = nn.Sequential(
+            nn.Linear(edge_feat_dim + num_qubits + 1, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1),
+        )
+
+    def forward(self, edge_feats, map_vec, progress, action_mask=None):
+        B, E, D = edge_feats.shape
+        scores = self.edge_mlp(edge_feats).squeeze(-1)
+        attn_raw = self.edge_score(edge_feats)
+
+        if action_mask is not None:
+            scores = scores.masked_fill(~action_mask, -1e9)
+            attn_raw = attn_raw.masked_fill(~action_mask.unsqueeze(-1), -1e9)
+
+        attn_w = torch.softmax(attn_raw, dim=1)
+        pooled = (edge_feats * attn_w).sum(dim=1)
+        v_in = torch.cat([pooled, map_vec, progress], dim=-1)
+        value = self.critic(v_in).squeeze(-1)
+        return scores, value
+
+
+class RewardNormalizer:
+    """EMA running statistics for reward normalization."""
+
+    def __init__(self, eps: float = 1e-8, alpha: float = 0.01):
+        self.mean = 0.0
+        self.var = 1.0
+        self.eps = eps
+        self.alpha = alpha
+
+    def update(self, x):
+        batch_mean = float(np.mean(x))
+        batch_var = float(np.var(x)) if len(x) > 1 else 1.0
+        self.mean = (1 - self.alpha) * self.mean + self.alpha * batch_mean
+        self.var = (1 - self.alpha) * self.var + self.alpha * batch_var
+
+    def normalize(self, x):
+        return (x - self.mean) / (np.sqrt(self.var) + self.eps)
+
+
 class PPOAgent:
     """PPO 智能体，可选 GNN 联合训练。"""
 
@@ -49,10 +107,12 @@ class PPOAgent:
         lam: float = 0.95,
         clip_eps: float = 0.2,
         ent_coef: float = 0.01,
-        vf_coef: float = 0.5,
+        vf_coef: float = 0.1,
         device: str = "cpu",
         gnn: Optional[SubGNN] = None,
         num_qubits: Optional[int] = None,
+        num_edges: Optional[int] = None,
+        coupling_map: Optional[list] = None,
     ):
         self.gamma = gamma
         self.lam = lam
@@ -62,27 +122,51 @@ class PPOAgent:
         self.device = device
 
         self.gnn = gnn
+        self.num_qubits = num_qubits
+        self.num_edges = num_edges
+        self.coupling_map = coupling_map
+        self.rew_norm = RewardNormalizer()
+
+        params = []
         if gnn is not None:
             self.gnn.to("cpu")
-            ac_in = self.gnn.out_dim + num_qubits + 1
-        else:
-            ac_in = obs_dim
-
-        self.ac = ActorCritic(ac_in, action_dim).to(device)
-
-        params = list(self.ac.parameters())
-        if self.gnn is not None:
+            edge_feat_dim = self.gnn.encoder.out_dim * 3
+            self.edge_feat_dim = edge_feat_dim
+            self.ac = EdgeActorCritic(edge_feat_dim, num_edges, num_qubits).to(device)
             params += list(self.gnn.parameters())
+        else:
+            self.ac = ActorCritic(obs_dim, action_dim).to(device)
+        params += list(self.ac.parameters())
         self.optimizer = torch.optim.Adam(params, lr=lr)
 
     # ---- 交互 ----
     @torch.no_grad()
-    def act(self, obs: np.ndarray):
+    def act(self, obs: np.ndarray, deterministic: bool = False):
+        mask = None
+        if isinstance(self.ac, EdgeActorCritic):
+            mask = torch.zeros(self.num_edges, dtype=torch.bool, device=self.device)
+            mask[:len(self.coupling_map)] = True
+        logits, value = self._forward_obs(obs, action_mask=mask.unsqueeze(0) if mask is not None else None)
+        if deterministic:
+            action = logits[0].argmax(-1).item()
+            logp = 0.0
+        else:
+            dist = torch.distributions.Categorical(logits=logits)
+            action = dist.sample()
+            logp = dist.log_prob(action).item()
+        return int(action.item()), logp, float(value.item())
+
+    @torch.no_grad()
+    def _forward_obs(self, obs, action_mask=None):
+        if isinstance(self.ac, EdgeActorCritic):
+            eff_dim = self.edge_feat_dim
+            n_ef = self.num_edges * eff_dim
+            ef = torch.tensor(obs[:n_ef], dtype=torch.float32, device=self.device).reshape(1, self.num_edges, eff_dim)
+            mv = torch.tensor(obs[n_ef:n_ef + self.num_qubits], dtype=torch.float32, device=self.device).unsqueeze(0)
+            pg = torch.tensor(obs[-1:], dtype=torch.float32, device=self.device).unsqueeze(0)
+            return self.ac(ef, mv, pg, action_mask=action_mask)
         obs_t = torch.tensor(obs, dtype=torch.float32, device=self.device).unsqueeze(0)
-        logits, value = self.ac(obs_t)
-        dist = torch.distributions.Categorical(logits=logits)
-        action = dist.sample()
-        return int(action.item()), dist.log_prob(action).item(), float(value.item())
+        return self.ac(obs_t)
 
     # ---- 训练 ----
     def _build_obs(self, graph_data_list, map_vec_list, progress_vec_list):
@@ -94,6 +178,35 @@ class PPOAgent:
             obs_list.append(torch.cat([emb.to(self.device), mv_t, pg_t], dim=-1))
         return torch.cat(obs_list, dim=0)
 
+    def _build_edge_feats_from_h(self, qubit_h, coupling_map=None):
+        if coupling_map is None:
+            coupling_map = self.coupling_map
+        edge_list = []
+        for p, q in coupling_map:
+            h_p = qubit_h[p:p+1]
+            h_q = qubit_h[q:q+1]
+            diff = h_p - h_q
+            edge_list.append(torch.cat([h_p, h_q, diff], dim=-1))
+        return torch.cat(edge_list, dim=0)
+
+    def _build_edge_obs(self, graph_data_list, map_vec_list, progress_list, coupling_maps=None):
+        all_ef, all_mv, all_pg = [], [], []
+        for i, (gd, mv, pg) in enumerate(zip(graph_data_list, map_vec_list, progress_list)):
+            qubit_h = self.gnn.node_embeddings(gd)
+            cmap = coupling_maps[i] if coupling_maps is not None else self.coupling_map
+            ef = self._build_edge_feats_from_h(qubit_h.to(self.device), cmap)
+            # pad to self.num_edges (max_edges) for consistent batching
+            if ef.shape[0] < self.num_edges:
+                pad = torch.zeros(self.num_edges - ef.shape[0], ef.shape[1],
+                                  device=ef.device, dtype=ef.dtype)
+                ef = torch.cat([ef, pad], dim=0)
+            mv_t = torch.tensor(mv, dtype=torch.float32, device=self.device).unsqueeze(0)
+            pg_t = torch.tensor(pg, dtype=torch.float32, device=self.device).unsqueeze(0)
+            all_ef.append(ef.unsqueeze(0))
+            all_mv.append(mv_t)
+            all_pg.append(pg_t)
+        return torch.cat(all_ef, dim=0), torch.cat(all_mv, dim=0), torch.cat(all_pg, dim=0)
+
     def update(self, batch, epochs: int = 4, batch_size: int = 64):
         acts = torch.tensor(np.array(batch["act"]), dtype=torch.long, device=self.device)
         old_logp = torch.tensor(np.array(batch["logp"]), dtype=torch.float32, device=self.device)
@@ -101,29 +214,44 @@ class PPOAgent:
         ret = torch.tensor(np.array(batch["ret"]), dtype=torch.float32, device=self.device)
 
         adv = (adv - adv.mean()) / (adv.std() + 1e-8)
+        ret = (ret - ret.mean()) / (ret.std() + 1e-8)
 
-        if self.gnn is not None:
-            obs_all = self._build_obs(batch["graph_data"], batch["map_vec"], batch["progress"])
-            obs_all = obs_all.detach()
-        else:
-            obs_all = torch.tensor(np.array(batch["obs"]), dtype=torch.float32, device=self.device)
+        is_edge = isinstance(self.ac, EdgeActorCritic)
+        n = acts.shape[0]
 
-        n = obs_all.shape[0]
         log_data = {"pl": [], "vl": [], "ent": [], "kl": [], "grad": []}
+        if not is_edge and self.gnn is None:
+            obs_all = torch.tensor(np.array(batch["obs"]), dtype=torch.float32, device=self.device)
         for _ in range(epochs):
             idx = np.random.permutation(n)
             for start in range(0, n, batch_size):
                 sel = idx[start:start + batch_size]
-                if self.gnn is not None:
+                if is_edge:
+                    cmaps = ([batch["coupling_map"][i] for i in sel]
+                             if "coupling_map" in batch else None)
+                    ef, mv, pg = self._build_edge_obs(
+                        [batch["graph_data"][i] for i in sel],
+                        [batch["map_vec"][i] for i in sel],
+                        [batch["progress"][i] for i in sel],
+                        coupling_maps=cmaps,
+                    )
+                    if cmaps is not None:
+                        mask = torch.zeros(ef.shape[0], self.num_edges, dtype=torch.bool, device=self.device)
+                        for i, cmap in enumerate(cmaps):
+                            mask[i, :len(cmap)] = True
+                    else:
+                        mask = None
+                    logits, value = self.ac(ef, mv, pg, action_mask=mask)
+                elif self.gnn is not None:
                     obs = self._build_obs(
                         [batch["graph_data"][i] for i in sel],
                         [batch["map_vec"][i] for i in sel],
                         [batch["progress"][i] for i in sel],
                     )
+                    logits, value = self.ac(obs)
                 else:
-                    obs = obs_all[sel]
+                    logits, value = self.ac(obs_all[sel])
 
-                logits, value = self.ac(obs)
                 dist = torch.distributions.Categorical(logits=logits)
                 new_logp = dist.log_prob(acts[sel])
                 entropy = dist.entropy().mean()
@@ -155,15 +283,21 @@ class PPOAgent:
         return {k: float(np.mean(v)) for k, v in log_data.items()}
 
     def save(self, path: str):
-        state = {"ac": self.ac.state_dict()}
+        state = {
+            "ac": self.ac.state_dict(),
+            "rew_norm": {"mean": self.rew_norm.mean, "var": self.rew_norm.var},
+        }
         if self.gnn is not None:
             state["gnn"] = self.gnn.state_dict()
         torch.save(state, path)
 
     def load(self, path: str):
-        state = torch.load(path, map_location=self.device)
+        state = torch.load(path, map_location=self.device, weights_only=False)
         if "ac" in state:
             self.ac.load_state_dict(state["ac"])
+            if "rew_norm" in state:
+                self.rew_norm.mean = state["rew_norm"]["mean"]
+                self.rew_norm.var = state["rew_norm"]["var"]
             if self.gnn is not None and "gnn" in state:
                 self.gnn.load_state_dict({k: v.to("cpu") for k, v in state["gnn"].items()})
         elif "shared.0.weight" in state:
@@ -171,8 +305,33 @@ class PPOAgent:
         else:
             raise ValueError(f"Unknown checkpoint keys: {list(state.keys())[:5]}")
 
+    def save_checkpoint(self, path: str, extra_state: Optional[dict] = None):
+        state = {
+            "ac": self.ac.state_dict(),
+            "optimizer": self.optimizer.state_dict(),
+            "rew_norm": {"mean": self.rew_norm.mean, "var": self.rew_norm.var},
+        }
+        if self.gnn is not None:
+            state["gnn"] = self.gnn.state_dict()
+        if extra_state is not None:
+            for k, v in extra_state.items():
+                state[k] = v.item() if hasattr(v, "item") else v
+        torch.save(state, path)
+
+    def load_checkpoint(self, path: str):
+        state = torch.load(path, map_location=self.device, weights_only=False)
+        self.ac.load_state_dict(state["ac"])
+        if self.gnn is not None and "gnn" in state:
+            self.gnn.load_state_dict({k: v.to("cpu") for k, v in state["gnn"].items()})
+        if "optimizer" in state:
+            self.optimizer.load_state_dict(state["optimizer"])
+        if "rew_norm" in state:
+            self.rew_norm.mean = state["rew_norm"]["mean"]
+            self.rew_norm.var = state["rew_norm"]["var"]
+        return state
+
     @staticmethod
-    def compute_gae(rewards, values, dones, bootstrap, gamma, lam):
+    def compute_gae(rewards, values, dones, bootstrap, gamma, lam, clip_return=None):
         """广义优势估计 (GAE-lambda)。
 
         dones[t] = True 表示 episode 在步 t 结束（无论是 done 还是 truncated），
@@ -194,4 +353,6 @@ class PPOAgent:
             last_adv = delta + gamma * lam * next_nonterminal * last_adv
             advantages[t] = last_adv
         returns = advantages + np.array(values)
+        if clip_return is not None:
+            returns = np.clip(returns, -clip_return, clip_return)
         return advantages, returns

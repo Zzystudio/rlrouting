@@ -24,6 +24,7 @@ class GATEncoder(nn.Module):
         assert hidden_dim % heads == 0, "hidden_dim must be divisible by heads"
         self.num_layers = num_layers
         self.dropout = dropout
+        self.out_dim = out_dim
 
         self.convs = nn.ModuleList()
         self.norms = nn.ModuleList()
@@ -139,6 +140,14 @@ class SubGNN(nn.Module):
         if batch is None:
             batch = torch.zeros(x.size(0), dtype=torch.long, device=x.device)
         return self.encoder.graph_embedding(x, ei, ea, batch)
+
+    def node_embeddings(self, data) -> torch.Tensor:
+        from ..graph.circuit_dag import RoutingGraphData as RGD
+        assert isinstance(data, RGD), "node_embeddings expects RoutingGraphData"
+        pyg = data.to_pyg("full")
+        h = self.encoder.forward(pyg.x, pyg.edge_index, pyg.edge_attr)
+        qubit_h = h[-data.num_physical:]  # last P nodes = qubit nodes
+        return qubit_h
 
 
 def _to_tensor(arr: np.ndarray) -> torch.Tensor:

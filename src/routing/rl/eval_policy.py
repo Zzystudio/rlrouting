@@ -58,21 +58,34 @@ class SummaryStats:
 #  Hardware helpers
 # ---------------------------------------------------------------------------
 
+def _lists_to_dict(raw, coupling_map):
+    if raw is None or isinstance(raw, (int, float, dict)):
+        return raw
+    result = {}
+    for item in raw:
+        q1, q2, v = int(item[0]), int(item[1]), float(item[2])
+        result[(q1, q2)] = v
+        result[(q2, q1)] = v
+    return result
+
+
 def load_topo(path: str) -> tuple:
     with open(path) as f:
         topo = json.load(f)
     coupling_map = [tuple(e) for e in topo['coupling_map']]
     dp = topo['device_params']
+    tqe = _lists_to_dict(dp.get('two_q_gate_error', 0.01), coupling_map)
+    cs = _lists_to_dict(topo.get('crosstalk_strength'), coupling_map)
     config = NoiseConfig(
         t1_times=dp['t1_times'],
         t2_times=dp['t2_times'],
         freq_ghz=dp['freq_ghz'],
-        single_q_gate_error=dp['single_q_gate_error'],
-        two_q_gate_error=dp['two_q_gate_error'],
+        single_q_gate_error=dp.get('single_q_gate_error', 0.001),
+        two_q_gate_error=tqe,
         coupling_map=coupling_map,
         readout_error=dp['readout_error'],
         shots=dp.get('shots', 1024),
-        crosstalk_strength=topo.get('crosstalk_strength'),
+        crosstalk_strength=cs,
     )
     hw = HardwareFeatures.from_noise_config(config)
     return config, hw, coupling_map
@@ -99,9 +112,14 @@ def load_split(path: str) -> list[str]:
         return [line.strip() for line in f if line.strip()]
 
 
-def load_qc(data_dir: str, rel_path: str):
+def load_qc(data_dir: str, rel_path: str, seed: int = 0):
     with open(os.path.join(data_dir, rel_path), 'rb') as f:
-        return pickle.load(f)
+        qc = pickle.load(f)
+    if qc.num_parameters > 0:
+        import numpy as np
+        rng = np.random.default_rng(seed)
+        qc = qc.assign_parameters({p: rng.uniform(0, 2 * np.pi) for p in qc.parameters})
+    return qc
 
 
 # ---------------------------------------------------------------------------
@@ -125,6 +143,7 @@ def evaluate_circuit(
     max_episode_steps: int = 200,
     deterministic: bool = True,
     seed: int = 0,
+    noise_config: Optional[NoiseConfig] = None,
 ) -> CircuitMetrics:
     import torch
     env = RoutingEnv(
@@ -132,6 +151,7 @@ def evaluate_circuit(
         max_episode_steps=max_episode_steps,
         random_init=False, seed=seed,
         gnn=agent.gnn, use_gnn=agent.gnn is not None,
+        noise_config=noise_config if reward_mode != 'routing' else None,
     )
 
     obs, _ = env.reset()
@@ -141,9 +161,7 @@ def evaluate_circuit(
     step = 0
     while not done and not truncated:
         with torch.no_grad():
-            obs_t = torch.tensor(obs, dtype=torch.float32,
-                                 device=agent.device).unsqueeze(0)
-            logits, _ = agent.ac(obs_t)
+            logits, _ = agent._forward_obs(obs)
             action = logits.argmax(-1).item() if deterministic \
                      else torch.distributions.Categorical(logits=logits).sample().item()
         obs, reward, done, truncated, info = env.step(action)
@@ -161,6 +179,7 @@ def evaluate_circuit(
         wall_time_ms=wall_time_ms,
         terminal_xz=info.get('terminal_XZ', None),
         truncated_remaining=info.get('truncated_remaining', 0),
+        fidelity=info.get('fidelity', None),
     )
 
 
@@ -175,12 +194,14 @@ def evaluate_random(
     reward_mode: str = 'routing',
     max_episode_steps: int = 200,
     seed: int = 0,
+    noise_config: Optional[NoiseConfig] = None,
 ) -> CircuitMetrics:
     env = RoutingEnv(
         dag, hw, coupling_map, reward_mode=reward_mode,
         max_episode_steps=max_episode_steps,
         random_init=False, seed=seed,
         use_gnn=False,
+        noise_config=noise_config if reward_mode != 'routing' else None,
     )
 
     obs, _ = env.reset()
@@ -205,6 +226,7 @@ def evaluate_random(
         wall_time_ms=wall_time_ms,
         terminal_xz=info.get('terminal_XZ', None),
         truncated_remaining=info.get('truncated_remaining', 0),
+        fidelity=info.get('fidelity', None),
     )
 
 
@@ -215,11 +237,33 @@ def evaluate_random(
 def evaluate_greedy(
     qc,
     config: NoiseConfig,
+    reward_mode: str = 'routing',
 ) -> CircuitMetrics:
+    from sim.sim import NoiseSimulator
+    from qiskit_aer import AerSimulator
+
     dag = CircuitDAG.from_circuit(qc)
     t0 = time.perf_counter()
-    _, info = greedy_route(qc, config)
+    phys, info = greedy_route(qc, config)
     wall_time_ms = (time.perf_counter() - t0) * 1000
+
+    fid = None
+    if reward_mode != 'routing':
+        meas = phys.copy()
+        meas.measure_all()
+        noise_sim = NoiseSimulator(config)
+        meas_t = noise_sim._transpile(meas)
+        shots = config.shots
+
+        ideal_sim = AerSimulator()
+        ideal_job = ideal_sim.run(meas_t, shots=shots)
+        ideal_counts = ideal_job.result().get_counts()
+
+        noisy_counts = noise_sim.run(meas_t, shots=shots, skip_transpile=True)
+
+        all_outcomes = set(ideal_counts.keys()) | set(noisy_counts.keys())
+        overlap = sum(min(ideal_counts.get(k, 0), noisy_counts.get(k, 0)) for k in all_outcomes)
+        fid = overlap / shots
 
     return CircuitMetrics(
         circuit_path='',
@@ -230,6 +274,7 @@ def evaluate_greedy(
         episode_steps=0,
         wall_time_ms=wall_time_ms,
         terminal_xz=None,
+        fidelity=fid,
     )
 
 
@@ -393,6 +438,8 @@ def main():
         device=args.device,
         gnn=shared_gnn,
         num_qubits=sample_dag.num_logical_qubits,
+        num_edges=len(coupling_map),
+        coupling_map=coupling_map,
     )
     agent.load(args.model)
     agent.ac.eval()
@@ -416,6 +463,7 @@ def main():
                 max_episode_steps=args.max_episode_steps,
                 deterministic=args.deterministic,
                 seed=args.seed + i,
+                noise_config=config if args.reward_mode != 'routing' else None,
             )
             m.circuit_path = rel_path
             if args.verbose:
@@ -427,8 +475,9 @@ def main():
     agent_metrics = evaluate_agent_on_circuits()
     agent_stats = aggregate(agent_metrics)
 
-    print_header()
-    print_report('PPO', agent_stats)
+    show_fid = args.reward_mode != 'routing'
+    print_header(show_fidelity=show_fid)
+    print_report('PPO', agent_stats, show_fidelity=show_fid)
 
     if args.baselines:
         # Random
@@ -442,6 +491,7 @@ def main():
                 reward_mode=args.reward_mode,
                 max_episode_steps=args.max_episode_steps,
                 seed=args.seed + i + 1000,
+                noise_config=config if args.reward_mode != 'routing' else None,
             )
             m.circuit_path = rel_path
             if args.verbose:
@@ -449,23 +499,22 @@ def main():
                 print(f'{tag} swaps={m.num_swaps} steps={m.episode_steps} {m.wall_time_ms:.0f}ms')
             random_metrics.append(m)
         random_stats = aggregate(random_metrics)
-        print_report('Random', random_stats)
+        print_report('Random', random_stats, show_fidelity=show_fid)
 
         # Greedy
         greedy_metrics = []
         for i, rel_path in enumerate(rel_paths):
             _progress(i, len(rel_paths), 'Greedy')
             qc = load_qc(args.data_dir, rel_path)
-            m = evaluate_greedy(qc, config)
+            m = evaluate_greedy(qc, config, reward_mode=args.reward_mode)
             m.circuit_path = rel_path
             if args.verbose:
                 print(f'OK swaps={m.num_swaps} {m.wall_time_ms:.0f}ms')
             greedy_metrics.append(m)
         greedy_stats = aggregate(greedy_metrics)
-        print_report('Greedy', greedy_stats)
+        print_report('Greedy', greedy_stats, show_fidelity=show_fid)
 
     print()
-    print('Fidelity: (not computed -- simulator stub)')
 
     # ---- Save per-circuit results ----
     if args.out:

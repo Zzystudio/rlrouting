@@ -6,6 +6,8 @@ import gymnasium as gym
 import numpy as np
 import torch
 
+from qiskit import QuantumCircuit
+
 from ..graph.circuit_dag import CircuitDAG, build_routing_graph
 from ..gnn.encoder import SubGNN
 from ..graph.features import HardwareFeatures
@@ -43,7 +45,7 @@ class RoutingEnv(gym.Env):
         invalid_penalty: float = 1.0,
         eta_err: float = 0.5,
         eta_xtalk: float = 0.02,
-        eta_xz_step: float = 0.1,
+        eta_xz_step: float = 0.0,
         cnot_cost: float = 0.1,
 
         # --- 终端奖励参数 (Stage 2 & 3) ---
@@ -57,10 +59,12 @@ class RoutingEnv(gym.Env):
         max_episode_steps: int = 200,
         unfinished_penalty: float = 0.5,
 
+        max_num_edges: Optional[int] = None,
         random_init: bool = True,
         use_gnn: bool = True,
         gnn: Optional[SubGNN] = None,
         seed: int = 0,
+        noise_config=None,
     ):
         super().__init__()
         self.dag = dag
@@ -68,6 +72,7 @@ class RoutingEnv(gym.Env):
         self.coupling_map = coupling_map
         self.num_edges = len(coupling_map)
         self.num_qubits = dag.num_logical_qubits
+        self.noise_config = noise_config
 
         self.reward_mode = reward_mode
         self.gate_base_reward = gate_base_reward or _GATE_BASE_REWARD_DEFAULT.copy()
@@ -87,6 +92,7 @@ class RoutingEnv(gym.Env):
         self.random_init = random_init
         self.max_episode_steps = max_episode_steps
         self.unfinished_penalty = unfinished_penalty
+        self.max_num_edges = max_num_edges or self.num_edges
         self._rng = np.random.default_rng(seed)
 
         if gnn is not None:
@@ -96,7 +102,12 @@ class RoutingEnv(gym.Env):
             self._gnn.eval()
         else:
             self._gnn = None
-        self._gnn_dim = (self._gnn.out_dim if self._gnn is not None else 0)
+        if self._gnn is not None:
+            self._edge_feat_dim = self._gnn.encoder.out_dim * 3
+            self._gnn_dim = self._edge_feat_dim * self.max_num_edges
+        else:
+            self._edge_feat_dim = 0
+            self._gnn_dim = 0
 
         self.action_space = gym.spaces.Discrete(self.num_edges)
         obs_dim = self._gnn_dim + self.num_qubits + 1
@@ -120,6 +131,7 @@ class RoutingEnv(gym.Env):
         self._swap_counter = 0
         self._episode_step = 0
         self._xz_errors = np.zeros((n, 2), dtype=float)
+        self._phys_circuit = QuantumCircuit(self.hw.num_qubits)
         self._update()
         self._auto_execute_batch()
         return self._obs(), {}
@@ -139,6 +151,7 @@ class RoutingEnv(gym.Env):
             self.mapping[lp] = q
         else:
             self.mapping[lp], self.mapping[lq] = self.mapping[lq], self.mapping[lp]
+        self._phys_circuit.swap(p, q)
 
     def _update(self):
         changed = True
@@ -150,6 +163,9 @@ class RoutingEnv(gym.Env):
                 if all(p in self.executed for p in g.predecessors):
                     if not g.is_two_qubit:
                         self.executed.add(g.index)
+                        if not g.is_measure:
+                            pq = [self.mapping[q] for q in g.qubits]
+                            self._phys_circuit.append(g.operation, pq)
                         changed = True
         self.executable_2q = []
         for g in self.dag.gates:
@@ -185,8 +201,19 @@ class RoutingEnv(gym.Env):
             self._last_map_vec = map_vec
             self._last_progress = progress
             with torch.no_grad():
-                emb = self._gnn(graph_data).cpu().numpy().flatten()
-            return np.concatenate([emb, map_vec, progress]).astype(np.float32)
+                qubit_h = self._gnn.node_embeddings(graph_data).cpu().numpy()
+            edge_feats_list = []
+            for p, q in self.coupling_map:
+                h_p = qubit_h[p]
+                h_q = qubit_h[q]
+                edge_feats_list.extend([h_p, h_q, h_p - h_q])
+            edge_feats = np.concatenate(edge_feats_list).astype(np.float32)
+            obs = np.concatenate([edge_feats, map_vec, progress]).astype(np.float32)
+            # 多拓扑 padding：若当前拓扑边数少于 max，补零
+            if self.max_num_edges > self.num_edges:
+                pad_len = (self.max_num_edges - self.num_edges) * self._edge_feat_dim
+                obs = np.pad(obs, (0, pad_len), constant_values=0)
+            return obs
         return np.concatenate([map_vec, progress]).astype(np.float32)
 
     # ------------------------------------------------------------------
@@ -274,6 +301,10 @@ class RoutingEnv(gym.Env):
         while self.executable_2q:
             gate_idx = min(self.executable_2q)
             self.executed.add(gate_idx)
+            g = self.dag.gates[gate_idx]
+            if not g.is_measure:
+                pq = [self.mapping[q] for q in g.qubits]
+                self._phys_circuit.append(g.operation, pq)
             r_exec += self._step_reward_execute(True, gate_idx)
             r_prop += self._step_reward_propagate(gate_idx)
             self._update()
@@ -285,7 +316,31 @@ class RoutingEnv(gym.Env):
     def _get_terminal_reward_value(self) -> float:
         if self.fidelity_fn is not None:
             return self.fidelity_fn(self.dag, self.mapping, self.executed)
+        if self.noise_config is not None:
+            return self._compute_aer_fidelity()
         return 0.0
+
+    def _compute_aer_fidelity(self) -> float:
+        from qiskit_aer import AerSimulator
+        from sim.sim import NoiseSimulator
+
+        shots = self.noise_config.shots
+
+        meas = self._phys_circuit.copy()
+        meas.measure_all()
+
+        noise_sim = NoiseSimulator(self.noise_config)
+        meas_t = noise_sim._transpile(meas)
+
+        noisy_counts = noise_sim.run(meas_t, shots=shots, skip_transpile=True)
+
+        ideal_sim = AerSimulator()
+        ideal_job = ideal_sim.run(meas_t, shots=shots)
+        ideal_counts = ideal_job.result().get_counts()
+
+        all_outcomes = set(ideal_counts.keys()) | set(noisy_counts.keys())
+        overlap = sum(min(ideal_counts.get(k, 0), noisy_counts.get(k, 0)) for k in all_outcomes)
+        return overlap / shots
 
     def _terminal_reward(self, info: dict) -> float:
         info["num_swaps"] = self._swap_counter
