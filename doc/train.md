@@ -925,3 +925,209 @@ SABRE 在每个 SWAP 候选上评估影响；PPO 在 argmax 下一旦选错只�
 | **分拓扑训练** | **P1** | 三种拓扑独立训练 | 消除跨拓扑干扰 |
 | **课程学习** | **P2** | λ_fid 从 0 阶梯增长，前 50% 步纯路由 | 先学路由能力，后微调噪声偏好 |
 | **Aer 加速** | **P2** | 缓存 NoiseSimulator，增加 shots 降低方差 | 加速评估，稳定 value 训练 |
+
+---
+
+## 下一阶段实现计划
+
+### 目标
+
+在 v4 基础上整合 SABRE 启发式信号和搜索能力，使 PPO 在 SWAP 效率和保真度上全面追平并超越 SABRE。
+
+### 阶段一：观测增强 + 奖励塑形 + 死锁检测（P0）
+
+#### 1A：观测中加入 SABRE 距离特征
+
+**文件**：`src/routing/rl/env.py`
+
+在 `_obs()` 中，对每条 coupling edge `(p,q)` 追加以下标量到 edge 特征向量：
+
+| 特征 | 维度 | 含义 | 计算方式 |
+|------|------|------|---------|
+| `front_dist_before` | 1 | 当前 front_layer 所有门的距离和 | `Σ D[π(g.q₁)][π(g.q₂)]` for gate in front_layer |
+| `front_dist_after` | 1 | 假设执行 SWAP(p,q) 后的距离和 | 临时交换 mapping 后重新计算 |
+| `dist_improvement` | 1 | 归一化距离改善 | `(before - after) / before` |
+| `num_improved` | 1 | 距离缩短的 front_layer 门数 | count |
+| `num_worsened` | 1 | 距离增加的 front_layer 门数 | count |
+
+> `front_layer` = 所有前置门已执行但自身未执行的 2Q 门。计算量：O(E × |F|)。5 qubit 下每步 <0.1ms。
+
+**观测维度变化**：
+```
+edge_feat_dim: 144 → 144 + 5 = 149
+obs_dim: 4×144 + 5 + 1 = 582 → 4×149 + 5 + 1 = 602
+```
+
+#### 1B：距离减少作为即时奖励
+
+**文件**：`src/routing/rl/env.py`
+
+在 `step()` 中，每次 SWAP 后计算 front_layer 距离和的减少量，作为密集成形奖励：
+
+```python
+# 在 _apply_swap(p,q) 之后
+dist_before = self._front_layer_dist()
+self._apply_swap(p, q)
+self._auto_execute_batch()
+dist_after = self._front_layer_dist()
+r_dist = -eta_dist * (dist_after - dist_before) / max(dist_before, 1)  # eta_dist=1.0
+```
+
+这个奖励与是否完成电路无关，每步都有信号，能显著缓解 PPO 在长电路上的 credit assignment 困难。
+
+#### 1C：死锁检测与动作掩码（Action Masking）
+
+**文件**：`src/routing/rl/env.py`
+
+在 `step()` 中检测死锁模式：
+
+```
+检测条件：
+  - 当前 SWAP 后 mapping 与 N 步前的 mapping 相同（周期检测）
+  - 或：最近 K 步 SWAP 包含同一对 qubit 的来回交换（如 SWAP(1,2) → SWAP(2,1)）
+```
+
+实现：
+
+```python
+# env 维护 _swap_history: List[Tuple[int,int]]
+step_history: list = env._swap_history  # 记录最近 K 步的 SWAP 边
+
+# 死锁检测
+def _detect_deadlock(self, history, lookback=4):
+    if len(history) < lookback:
+        return set()
+    # 检测周期：最近 lookback 步 mapping 是否重复
+    unique_mappings = set(tuple(m) for m in history[-lookback:])
+    if len(unique_mappings) < len(history[-lookback:]):
+        return history[-1]  # 最后一条边是死锁边
+    return set()
+
+def _deadlock_mask(self, history):
+    prohibited = set()
+    # 检测来回交换：SWAP(p,q) 后紧跟 SWAP(q,p)
+    if len(history) >= 2:
+        last = history[-1]
+        second_last = history[-2]
+        if set(last) == set(second_last):
+            prohibited.add(last)  # 禁止再次选择这条边
+    return prohibited
+```
+
+Action mask 传入 `EdgeActorCritic.forward()`，将禁止动作的 logit 设为 `-inf`。
+
+**预期效果**：消除 ring 上的截断、消除 line/ring 上的无效来回震荡。
+
+### 阶段二：SABRE 行为克隆辅助训练（P1）
+
+#### 1D：SABRE 监督信号
+
+**文件**：`src/routing/rl/train_agent.py` + `src/routing/rl/agent.py`
+
+在训练过程中，对每个路由状态动态计算 SABRE 的优选动作，作为辅助监督信号：
+
+```python
+# 在 env.step() 之前或收集 rollout 时
+def get_sabre_action(env, coupling_map, front_layer, mapping, hw):
+    best_edge, best_score = None, float('inf')
+    for i, (p, q) in enumerate(coupling_map):
+        tmp = mapping.copy()
+        # 执行假设 SWAP
+        inv = [0] * len(mapping)
+        for k, v in enumerate(tmp):
+            inv[v] = k
+        tmp[inv[p]], tmp[inv[q]] = tmp[inv[q]], tmp[inv[p]]
+        # 计算 front_layer 距离和
+        score = sum(hw.dist[tmp[g.qubits[0]], tmp[g.qubits[1]]]
+                    for g in front_layer)
+        if score < best_score:
+            best_score = score
+            best_edge = i
+    return best_edge
+```
+
+辅助损失：
+
+```python
+# agent.py update()
+L_bc = cross_entropy(policy_logits, sabre_labels)  # sabre_labels shape: [batch]
+L_total = L_ppo + lambda_bc * L_bc  # lambda_bc: 1.0 → 0.0 线性衰减
+```
+
+**预期效果**：训练初期 policy 快速学会 SABRE 水平的路由，然后通过 PPO 探索超越 SABRE。
+
+### 阶段三：Beam Search / MCTS 推理（P0）
+
+#### 3A：1 步 Beam Search 推理
+
+**文件**：`src/routing/rl/eval_policy.py`（新增 `evaluate_with_beam_search()`）
+
+```python
+def evaluate_with_beam_search(env, agent, beam_width=3):
+    obs, _ = env.reset()
+    while not done and not truncated:
+        logits, _ = agent._forward_obs(obs)
+        topk_edges = logits.topk(beam_width).indices[0]  # 取 top-K
+
+        best_action, best_value = None, -float('inf')
+        for action in topk_edges:
+            # 浅拷贝环境状态
+            clone_mapping = env.mapping.copy()
+            clone_executed = env.executed.copy()
+            # 模拟一步
+            env_clone = env._clone(mapping=clone_mapping, executed=clone_executed)
+            _, _, done_c, _, _ = env_clone.step(action.item())
+            obs_c = env_clone._obs()
+            with torch.no_grad():
+                _, v = agent._forward_obs(obs_c)
+            if v.item() > best_value:
+                best_value = v.item()
+                best_action = action
+
+        obs, reward, done, truncated, info = env.step(best_action.item())
+```
+
+> 环境浅拷贝只复制 mapping + executed set + phys_circuit，不重建 GNN / NoiseSimulator。
+
+#### 3B：K 步 Beam Search（后续扩展）
+
+在 1 步有效的基础上扩展：
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `beam_width` | 3 | 每步保留的最优路径数 |
+| `beam_depth` | 3 | 前瞻深度（每步模拟步数） |
+| `value_weight` | 1.0 | V(s) 在路径评分中的权重 |
+| `fidelity_at_leaf` | True | 仅对叶子节点做 Aer 仿真 |
+
+叶节点评估：
+
+```
+score(path) = -num_swaps + lambda_fid * fidelity(path)   # 噪声感知评分
+```
+
+### 完整实现路线图
+
+| 阶段 | 内容 | 文件 | 工作量 | 依赖 |
+|------|------|------|--------|------|
+| **1A** | 观测加 SABRE 距离特征 | `env.py:183-217` | ~30 行 | — |
+| **1B** | 距离减少奖励塑形 | `env.py ~360` | ~15 行 | 1A |
+| **1C** | 死锁检测 + action masking | `env.py`, `agent.py` | ~40 行 | — |
+| **2** | 评估验证 1A+1B+1C → 重新训练 | `train_agent.py` | 命令 | 1A+1B+1C |
+| **1D** | SABRE 行为克隆辅助损失 | `agent.py`, `train_agent.py` | ~30 行 | 2 评估结果 |
+| **3A** | 1 步 Beam Search 推理 | `eval_policy.py` | ~50 行 | — |
+| **3B** | K 步 Beam Search / MCTS | `eval_policy.py` + 新模块 | ~300 行 | 3A 验证有效 |
+| **3C** | MCTS 训练目标（AlphaZero） | `train_agent.py`, `mcts.py` | ~500 行 | 3B 验证有效 |
+
+### 预期效果
+
+| 改进 | SWAPs (line) | SWAPs (cross) | SWAPs (ring) | 截断率 |
+|------|-------------|--------------|-------------|-------|
+| Current v4 | 8.0 | 3.9 | 4.4 | ~3% (2/30 on ring) |
+| + 1A+1B (观测+奖励) | ~7.0 | ~3.7 | ~4.0 | ~0% |
+| + 1C (deadlock mask) | ~6.8 | ~3.7 | ~3.9 | 0% |
+| + 1D (SABRE cloning) | ~6.7 | ~3.7 | ~3.8 | 0% |
+| + 3A (beam search) | ~6.5 | ~3.6 | ~3.7 | 0% |
+| Target (SABRE) | 6.7 | 3.8 | 4.0 | 0% |
+
+> 目标：在 SWAP 数上追平或超越 SABRE（6.7/3.8/4.0），同时保持 v4 的噪声感知优势。**核心思路**：用 SABRE 的信号教 PPO 基础路由能力，用 PPO 的噪声感知优化超越纯启发式。用 action masking 消除死锁，用 beam search 填补搜索缺口。
