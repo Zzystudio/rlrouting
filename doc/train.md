@@ -928,7 +928,201 @@ SABRE 在每个 SWAP 候选上评估影响；PPO 在 argmax 下一旦选错只�
 
 ---
 
-## 下一阶段实现计划
+## Phase 1：SABRE 特征 + 距离奖励 + 死锁掩码实现与训练（2026.07.30）
+
+### 目标
+
+在 v4 基础上整合 SABRE 启发式信息，通过观测增强、距离奖励和死锁掩码使 PPO 学会 SABRE 风格的路由策略。
+
+### 实现改动
+
+| 文件 | 改动 | 目的 |
+|------|------|------|
+| `env.py` | `_obs()` 对每条 edge 追加 5 个 SABRE 特征：`front_dist_before`、`front_dist_after`、`dist_improvement`、`num_improved`、`num_worsened` | 让 PPO 直接获取 SABRE 所用的距离信息 |
+| `env.py` | `step()` 中每次 SWAP 后计算 `r_dist = η·(d_before - d_after)/max(d_before,1)` 作为即时奖励 (η=1.0) | 缓解长电路 credit assignment 困难 |
+| `env.py` | 新增 `_deadlock_mask` 检测来回 SWAP 震荡，传入 action mask | 消除截断 |
+| `agent.py` | `EdgeActorCritic.forward()` 新增 `action_mask` 参数，masked logit 设为 -1e9 | 支持动作屏蔽 |
+| `agent.py` | 加入 `--phase` 参数，reward 计算公式在 `noise_aware` 模式中动态调整 | 课程学习控制 |
+| `train_agent.py` | rollout 收集传入 `action_mask`，`loss_mse_only` 模式 (phase=1 阶段 critic 只做 MSE) | 防止 value head 在路由阶段受噪声干扰 |
+
+### 观测维度
+
+```
+edge_feat_dim: 144 → 149（SABRE 5 维）
+obs_dim: 4×149 + 5 + 1 = 602
+```
+
+### 训练命令
+
+#### Phase 1：SABRE 特征 + 纯路由
+
+```bash
+cd src
+python3 -m routing.rl.train_agent \
+  --topo-list ../traindata/topo/cross_5q.json,../traindata/topo/ring_5q.json,../traindata/topo/ibmq_5_line.json \
+  --reward-mode routing \
+  --timesteps 100000 \
+  --out ../models/policy_phase1.pt \
+  --phase 1
+```
+
+#### Phase 2：噪声感知微调
+
+```bash
+cd src
+python3 -m routing.rl.train_agent \
+  --topo-list ../traindata/topo/cross_5q.json,../traindata/topo/ring_5q.json,../traindata/topo/ibmq_5_line.json \
+  --reward-mode noise_aware \
+  --timesteps 100000 \
+  --load ../models/policy_phase1.pt \
+  --out ../models/policy_phase1_noiseaware.pt \
+  --phase 2
+```
+
+### Phase 1 训练日志
+
+```
+step=   256  rew=+4.279  swp=5.4  ent=1.379  pl=-0.082  vl=5.671  gn=0.298
+step=  5000  rew=+5.867  swp=4.8  ent=0.997  pl=-0.022  vl=0.699  gn=0.076
+step= 10000  rew=+5.272  swp=4.8  ent=0.874  pl=-0.011  vl=0.553  gn=0.094
+step= 15000  rew=+5.294  swp=4.8  ent=0.832  pl=-0.004  vl=1.442  gn=0.409
+step= 20000  rew=+5.573  swp=4.6  ent=0.813  pl=-0.008  vl=0.166  gn=0.144
+step= 25000  rew=+5.461  swp=4.7  ent=0.814  pl=-0.004  vl=0.254  gn=0.047
+step= 30000  rew=+5.521  swp=4.7  ent=0.808  pl=-0.004  vl=7.166  gn=0.093
+...
+step= 45000  rew=+5.462  swp=4.6  ent=0.794  pl=-0.002  vl=0.107  gn=0.029  ← 收敛
+```
+
+**关键观察**：
+
+1. **entropy 快速收敛**：从 1.38（ln4≈1.386）降至 ~0.79，收敛速度比 v4 更快（v4 在 100K 步降至 0.47，Phase 1 在 45K 步就稳定在 0.79 附近）。SABRE 距离特征的强信号加速了策略学习。
+2. **vl 收敛到低位**：0.10–0.25（v4 在 100K 步降至 0.25，Phase 1 更早收敛）。MSE-only critic 没有 fidelity 噪声干扰。
+3. **swp 稳定在 4.6**：三拓扑混合训练下，平均 SWAP 数在 45K 步后稳定在约 4.6。
+4. **trunc 全程 0%**：死锁掩码有效消除了截断。
+
+### Phase 2（噪声感知）训练日志
+
+```
+step=   256  rew=+29.353  swp=13.2  trunc=0%  ent=0.791  pl=-0.007  vl=0.060  gn=0.016  fid=0.7810
+step= 10000  rew=+28.515  swp=13.8  trunc=0%  ent=0.786  pl=-0.011  vl=0.289  gn=0.009  fid=0.7807
+step= 20000  rew=+28.664  swp=14.4  trunc=0%  ent=0.775  pl=-0.004  vl=0.270  gn=0.013  fid=0.7732
+step= 40000  rew=+28.955  swp=12.9  trunc=0%  ent=0.779  pl=-0.009  vl=0.278  gn=0.027  fid=0.7801
+step= 60000  rew=+29.380  swp=12.8  trunc=0%  ent=0.780  pl=-0.016  vl=0.247  gn=0.224  fid=0.7792
+step= 80000  rew=+29.625  swp=12.0  trunc=0%  ent=0.790  pl=-0.015  vl=0.260  gn=0.008  fid=0.7796
+step=100000  rew=+28.449  swp=12.4  trunc=0%  ent=0.786  pl=-0.007  vl=0.261  gn=0.016  fid=0.7814
+```
+
+**关键观察**：
+
+1. **从 Phase 1 checkpoiont 加载后直接收敛**：ent 从第 256 步起即为 0.79（约等于 Phase 1 终值），全程稳定，未出现 v2/v4 中 ent 回弹或阶段切换时的 reward 崩溃。
+2. **vl 极度稳定**：全程 0.06–0.29（v4 为 0.25–0.65），Aer 保真度的噪声被路由信号压制。
+3. **trunc=0% 全程**：死锁掩码在噪声感知模式同样有效。
+4. **fid 稳定在 0.78 左右**：三拓扑平均 fidelity 在 100K 步内保持稳定，无明显波动。
+
+### 评估结果（Phase 2，100K 步，noise_aware）
+
+**设置**：stage1_phase3（random circuits），三拓扑各 20 circuits，deterministic（argmax），max_episode_steps=200，identity init。
+
+| 拓扑 | 方法 | 完成率 | SWAPs (mean±std) | Fidelity |
+|------|------|--------|-------------------|----------|
+| cross_5q | **PPO** | **100%** | **3.2 ± 1.1** | **0.9453** |
+| cross_5q | SABRE | 100% | 3.0 ± 1.0 | 0.9327 |
+| cross_5q | Greedy | 100% | 4.6 ± 1.8 | — |
+| ring_5q | **PPO** | **100%** | **4.5 ± 2.9** | **0.9419** |
+| ring_5q | SABRE | 100% | 3.5 ± 1.5 | 0.9371 |
+| ring_5q | Greedy | 100% | 4.9 ± 1.8 | — |
+| ibmq_5_line | **PPO** | **100%** | **6.7 ± 3.5** | **0.9557** |
+| ibmq_5_line | SABRE | 100% | 5.5 ± 1.5 | 0.9228 |
+| ibmq_5_line | Greedy | 100% | 10.4 ± 2.9 | — |
+
+### 结论
+
+1. **Phase 1 + Phase 2 联合训练有效**：SABRE 特征 + 距离奖励 + 死锁掩码使 PPO 学会高效路由，Phase 2 微调时直接继承此能力。
+2. **PPO 在 line/cross 上保真度首次超越 SABRE**：line fidelity 0.9557 vs 0.9228（+3.29pp），cross 0.9453 vs 0.9327（+1.26pp）。噪声感知微调带来的保真度优势超过 SABRE 的 SWAP 效率优势。
+3. **完成率 100% 三拓扑**：死锁掩码消除了所有截断。
+4. **SWAP 数仍有差距**：PPO 4.5/6.7 vs SABRE 3.5/5.5（ring/line），但在 cross 上已经很接近（3.2 vs 3.0）。
+5. **确定性推理 100% 完成**：argmax 不再卡死，说明 action masking 有效收敛了策略。
+
+---
+
+## Beam Search 推理评估（2026.07.30）
+
+### 动机
+
+SABRE 每步对所有候选 SWAP 执行「假设评估」——这本质上是 1 步展开的 beam search。PPO 的 argmax 推理是前馈的，一旦策略网络近似误差选择次优动作，无法像 SABRE 一样通过搜索来修正。
+
+1 步 beam search 是 PPO 推理时加入搜索能力的最轻量方案：在 policy logits top-K 上克隆环境、执行虚拟 step、用 critic V(s') 评分，选评分最高的动作执行。
+
+### 实现
+
+在 `RoutingEnv` 中添加 `clone()` 方法（env.py:326-380），在 `eval_policy.py` 中添加 `evaluate_circuit_beam()` 函数。
+
+```python
+# clone 方法：深拷贝所有可变状态
+def clone(self):
+    new = RoutingEnv.__new__(RoutingEnv)
+    new.dag = self.dag
+    new.hw = self.hw
+    ...
+    new.mapping = self.mapping.copy()
+    new.executed = set(self.executed)
+    new._swap_history = list(self._swap_history)
+    new._xz_errors = {k: v.copy() for k, v in self._xz_errors.items()}
+    new._phys_circuit = self._phys_circuit.copy()
+    ...
+```
+
+### 评估设置
+
+- **模型**：`models/policy_phase1_noiseaware.pt`（Phase 1 + Phase 2，100K 步）
+- **拓扑**：cross_5q / ring_5q / ibmq_5_line
+- **数据集**：stage1_phase1（random circuits），各拓扑 20 circuits（line 10 circuits）
+- **策略**：deterministic argmax vs beam width=3
+- **对比基线**：Greedy、SABRE
+- **奖励模式**：routing（纯路由，无终端保真度）
+
+### 结果对比
+
+| 拓扑 | 电路数 | PPO argmax | PPO beam3 | SABRE | Greedy |
+|------|--------|-----------|-----------|-------|--------|
+| ring_5q | 10 | 1.6 | **1.2** | 1.0 | 1.1 |
+| cross_5q | 20 | 2.0 | **1.3** | 1.2 | 1.8 |
+| ibmq_5_line | 20 | 2.8 (100%) | **2.3** (95%) | 2.0 | 3.1 |
+
+#### Gap 闭合率
+
+| 拓扑 | argmax gap | beam3 gap | 闭合率 |
+|------|-----------|----------|--------|
+| ring_5q | 0.6 (1.6→1.0) | 0.2 (1.2→1.0) | **67%** |
+| cross_5q | 0.8 (2.0→1.2) | 0.1 (1.3→1.2) | **88%** |
+| ibmq_5_line | 0.8 (2.8→2.0) | 0.3 (2.3→2.0) | **63%** |
+
+### 分析
+
+1. **Beam search 在所有拓扑上一致改进**：SWAP 数降低 0.3–0.7，且闭合率均在 60% 以上。
+2. **cross 上最接近 SABRE**（1.3 vs 1.2，闭合 88%）：星形拓扑路由决策空间小（4 条边），critic V(s') 容易评估短 horizon 收益。
+3. **line 上闭合率最低**（63%）：线性拓扑需要多步规划，1 步 lookahead 不足以评估长期影响。beam depth > 1 可能更有效。
+4. **line 上 beam3 完成率 95%**：1 条电路被截断（共 20 条），说明 beam search 虽然改善了路由效率但未完全消除截断。argmax 在 line 上 100% 完成（得益于 action masking），beam search 的克隆步骤可能导致 action mask 状态不一致。
+
+### 时间开销
+
+| 拓扑 | argmax/ckt | beam3/ckt | SABRE/ckt | beam3 开销 |
+|------|-----------|----------|-----------|-----------|
+| ring_5q | ~0.5ms | ~20ms | ~2ms | 40× |
+| cross_5q | ~0.5ms | ~23ms | ~2ms | 46× |
+| ibmq_5_line | ~0.6ms | ~232ms | ~1.4ms | 165× |
+
+Beam search 的额外开销源自每个搜索分支的 GNN 前向推理（`_obs()` 调用 `node_embeddings()`）。line 上 edge 数少（4 条），episode 步数多（~3 步），导致 beam search 占比更高。
+
+### 下一步优化方向
+
+| 方向 | 预期 |
+|------|------|
+| **beam depth=2** | 对 line 等需要多步规划的场景可能进一步缩小差距 |
+| **共享 GNN 前向缓存** | 减少 beam search 中冗余的 GNN 推理 |
+| **SABRE 特征替换 V(s') 评分** | 用 `delta_frontier_dist` 替代 critic 评分，更直接且更便宜 |
+
+---
 
 ### 目标
 

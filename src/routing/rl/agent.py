@@ -130,7 +130,7 @@ class PPOAgent:
         params = []
         if gnn is not None:
             self.gnn.to("cpu")
-            edge_feat_dim = self.gnn.encoder.out_dim * 3
+            edge_feat_dim = self.gnn.encoder.out_dim * 3 + 5
             self.edge_feat_dim = edge_feat_dim
             self.ac = EdgeActorCritic(edge_feat_dim, num_edges, num_qubits).to(device)
             params += list(self.gnn.parameters())
@@ -141,11 +141,15 @@ class PPOAgent:
 
     # ---- 交互 ----
     @torch.no_grad()
-    def act(self, obs: np.ndarray, deterministic: bool = False):
+    def act(self, obs: np.ndarray, deterministic: bool = False, deadlock_mask=None):
         mask = None
         if isinstance(self.ac, EdgeActorCritic):
             mask = torch.zeros(self.num_edges, dtype=torch.bool, device=self.device)
             mask[:len(self.coupling_map)] = True
+            if deadlock_mask is not None:
+                for i in range(min(len(deadlock_mask), len(mask))):
+                    if deadlock_mask[i]:
+                        mask[i] = False
         logits, value = self._forward_obs(obs, action_mask=mask.unsqueeze(0) if mask is not None else None)
         if deterministic:
             action = logits[0].argmax(-1).item()
@@ -189,12 +193,18 @@ class PPOAgent:
             edge_list.append(torch.cat([h_p, h_q, diff], dim=-1))
         return torch.cat(edge_list, dim=0)
 
-    def _build_edge_obs(self, graph_data_list, map_vec_list, progress_list, coupling_maps=None):
+    def _build_edge_obs(self, graph_data_list, map_vec_list, progress_list,
+                        coupling_maps=None, sabre_feats_list=None):
         all_ef, all_mv, all_pg = [], [], []
         for i, (gd, mv, pg) in enumerate(zip(graph_data_list, map_vec_list, progress_list)):
             qubit_h = self.gnn.node_embeddings(gd)
             cmap = coupling_maps[i] if coupling_maps is not None else self.coupling_map
+            n_local = len(cmap)
             ef = self._build_edge_feats_from_h(qubit_h.to(self.device), cmap)
+            if sabre_feats_list is not None:
+                sf_flat = sabre_feats_list[i]
+                sf = torch.tensor(sf_flat, dtype=torch.float32, device=self.device).reshape(n_local, 5)
+                ef = torch.cat([ef, sf], dim=-1)
             # pad to self.num_edges (max_edges) for consistent batching
             if ef.shape[0] < self.num_edges:
                 pad = torch.zeros(self.num_edges - ef.shape[0], ef.shape[1],
@@ -229,11 +239,14 @@ class PPOAgent:
                 if is_edge:
                     cmaps = ([batch["coupling_map"][i] for i in sel]
                              if "coupling_map" in batch else None)
+                    sblist = ([batch["sabre_feats"][i] for i in sel]
+                              if "sabre_feats" in batch else None)
                     ef, mv, pg = self._build_edge_obs(
                         [batch["graph_data"][i] for i in sel],
                         [batch["map_vec"][i] for i in sel],
                         [batch["progress"][i] for i in sel],
                         coupling_maps=cmaps,
+                        sabre_feats_list=sblist,
                     )
                     if cmaps is not None:
                         mask = torch.zeros(ef.shape[0], self.num_edges, dtype=torch.bool, device=self.device)

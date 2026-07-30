@@ -55,6 +55,9 @@ class RoutingEnv(gym.Env):
         lambda_fid: float = 5.0,
         fidelity_fn: Optional[Callable] = None,
 
+        # --- 距离塑形奖励 (Phase 1) ---
+        eta_dist: float = 1.0,
+
         # --- Episode 截断 ---
         max_episode_steps: int = 200,
         unfinished_penalty: float = 0.5,
@@ -81,6 +84,7 @@ class RoutingEnv(gym.Env):
         self.eta_err = eta_err
         self.eta_xtalk = eta_xtalk
         self.eta_xz_step = eta_xz_step
+        self.eta_dist = eta_dist
         self.cnot_cost = cnot_cost
 
         self.lambda_kl = lambda_kl
@@ -103,7 +107,7 @@ class RoutingEnv(gym.Env):
         else:
             self._gnn = None
         if self._gnn is not None:
-            self._edge_feat_dim = self._gnn.encoder.out_dim * 3
+            self._edge_feat_dim = self._gnn.encoder.out_dim * 3 + 5
             self._gnn_dim = self._edge_feat_dim * self.max_num_edges
         else:
             self._edge_feat_dim = 0
@@ -130,6 +134,7 @@ class RoutingEnv(gym.Env):
         self.executed: set = set()
         self._swap_counter = 0
         self._episode_step = 0
+        self._swap_history: list = []
         self._xz_errors = np.zeros((n, 2), dtype=float)
         self._phys_circuit = QuantumCircuit(self.hw.num_qubits)
         self._update()
@@ -202,11 +207,13 @@ class RoutingEnv(gym.Env):
             self._last_progress = progress
             with torch.no_grad():
                 qubit_h = self._gnn.node_embeddings(graph_data).cpu().numpy()
+            sabre_feats = self._sabre_edge_features()
+            self._last_sabre_feats = sabre_feats
             edge_feats_list = []
-            for p, q in self.coupling_map:
+            for i, (p, q) in enumerate(self.coupling_map):
                 h_p = qubit_h[p]
                 h_q = qubit_h[q]
-                edge_feats_list.extend([h_p, h_q, h_p - h_q])
+                edge_feats_list.extend([h_p, h_q, h_p - h_q, sabre_feats[i]])
             edge_feats = np.concatenate(edge_feats_list).astype(np.float32)
             obs = np.concatenate([edge_feats, map_vec, progress]).astype(np.float32)
             # 多拓扑 padding：若当前拓扑边数少于 max，补零
@@ -237,6 +244,132 @@ class RoutingEnv(gym.Env):
                 if self.hw.adj[p, nb] > 0 and nb in occupied:
                     total += float(self.hw.zz[p, nb])
         return total
+
+    # ------------------------------------------------------------------
+    #  SABRE 启发式特征 (Phase 1)
+    # ------------------------------------------------------------------
+    def _ready_2q_gates(self):
+        """返回所有前置门已执行但自身未执行的 2Q 门（front_layer，不论是否相邻）。"""
+        ready = []
+        for g in self.dag.gates:
+            if g.index in self.executed:
+                continue
+            if not g.is_two_qubit:
+                continue
+            if all(p in self.executed for p in g.predecessors):
+                ready.append(g)
+        return ready
+
+    def _front_layer_dist(self, mapping=None):
+        """当前 front_layer 各门 qubit 对之间的距离和。"""
+        if mapping is None:
+            mapping = self.mapping
+        ready = self._ready_2q_gates()
+        if not ready:
+            return 0.0
+        total = 0.0
+        for g in ready:
+            qa, qb = g.qubits
+            pa, pb = mapping[qa], mapping[qb]
+            total += self.hw.dist[pa, pb]
+        return total
+
+    def _sabre_edge_features(self):
+        """为每条 coupling edge 计算 5 维 SABRE 启发式特征。"""
+        n_ready = max(len(self._ready_2q_gates()), 1)
+        dist_before = self._front_layer_dist()
+        feats = np.zeros((self.num_edges, 5), dtype=np.float32)
+
+        for i, (p, q) in enumerate(self.coupling_map):
+            tmp_map = self.mapping.copy()
+            inv = {phys: log for log, phys in enumerate(tmp_map)}
+            lp, lq = inv.get(p), inv.get(q)
+            if lp is not None and lq is not None:
+                tmp_map[lp], tmp_map[lq] = tmp_map[lq], tmp_map[lp]
+            elif lp is not None:
+                tmp_map[lp] = q
+            elif lq is not None:
+                tmp_map[lq] = p
+
+            dist_after = self._front_layer_dist(tmp_map)
+            feats[i, 0] = dist_before / max(self.num_qubits, 1)
+            feats[i, 1] = dist_after / max(self.num_qubits, 1)
+            feats[i, 2] = (dist_before - dist_after) / max(dist_before, 1e-8)
+
+            improved = 0
+            worsened = 0
+            for g in self._ready_2q_gates():
+                qa, qb = g.qubits
+                d_b = self.hw.dist[self.mapping[qa], self.mapping[qb]]
+                d_a = self.hw.dist[tmp_map[qa], tmp_map[qb]]
+                if d_a < d_b - 1e-8:
+                    improved += 1
+                elif d_a > d_b + 1e-8:
+                    worsened += 1
+            feats[i, 3] = improved / n_ready
+            feats[i, 4] = worsened / n_ready
+
+        return feats
+
+    # ------------------------------------------------------------------
+    #  死锁检测 (Phase 1)
+    # ------------------------------------------------------------------
+    def get_deadlock_mask(self, lookback: int = 2):
+        """返回 (num_edges,) bool 数组，True = 该边因死锁被禁止。"""
+        mask = np.zeros(self.num_edges, dtype=bool)
+        if len(self._swap_history) >= lookback:
+            recent = set(self._swap_history[-lookback:])
+            if len(recent) == 1:
+                mask[list(recent)[0]] = True
+        return mask
+
+    # ------------------------------------------------------------------
+    #  Env 克隆 (用于 Beam Search 推理)
+    # ------------------------------------------------------------------
+    def clone(self):
+        """轻量浅拷贝当前环境状态，供 beam search 模拟使用。"""
+        new = object.__new__(RoutingEnv)
+        # 不可变引用（所有 env 共享，不修改）
+        new.dag = self.dag
+        new.hw = self.hw
+        new.coupling_map = self.coupling_map
+        new.num_edges = self.num_edges
+        new.num_qubits = self.num_qubits
+        new.noise_config = self.noise_config
+        new.reward_mode = self.reward_mode
+        new.gate_base_reward = self.gate_base_reward
+        new.swap_cost = self.swap_cost
+        new.invalid_penalty = self.invalid_penalty
+        new.eta_err = self.eta_err
+        new.eta_xtalk = self.eta_xtalk
+        new.eta_xz_step = self.eta_xz_step
+        new.eta_dist = self.eta_dist
+        new.cnot_cost = self.cnot_cost
+        new.lambda_kl = self.lambda_kl
+        new.lambda_ce = self.lambda_ce
+        new.lambda_tvd = self.lambda_tvd
+        new.lambda_fid = self.lambda_fid
+        new.fidelity_fn = self.fidelity_fn
+        new.random_init = self.random_init
+        new.max_episode_steps = self.max_episode_steps
+        new.unfinished_penalty = self.unfinished_penalty
+        new.max_num_edges = self.max_num_edges
+        new._rng = self._rng
+        new._gnn = self._gnn
+        new._edge_feat_dim = self._edge_feat_dim
+        new._gnn_dim = self._gnn_dim
+        new.action_space = self.action_space
+        new.observation_space = self.observation_space
+        # 可变状态（用 copy 隔离）
+        new.mapping = self.mapping.copy()
+        new.executed = self.executed.copy()
+        new._swap_counter = self._swap_counter
+        new._episode_step = self._episode_step
+        new._swap_history = self._swap_history.copy()
+        new._xz_errors = self._xz_errors.copy()
+        new._phys_circuit = self._phys_circuit.copy()
+        new.executable_2q = self.executable_2q.copy()
+        return new
 
     # ------------------------------------------------------------------
     #  步级奖励组件
@@ -358,13 +491,22 @@ class RoutingEnv(gym.Env):
     # ------------------------------------------------------------------
     def step(self, action: int):
         p, q = self.coupling_map[action]
+
+        dist_before = self._front_layer_dist() if self.eta_dist != 0 else 0.0
+
         self._apply_swap(p, q)
         self._swap_counter += 1
         self._episode_step += 1
+        self._swap_history.append(action)
 
         r_exec, r_prop = self._auto_execute_batch()
 
         reward = r_exec + r_prop
+        if self.eta_dist != 0:
+            dist_after = self._front_layer_dist()
+            r_dist = -self.eta_dist * (dist_after - dist_before) / max(dist_before, 1e-8)
+            reward += r_dist
+
         done = len(self.executed) == self.dag.num_gates
         truncated = False
         info: dict = {}

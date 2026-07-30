@@ -144,6 +144,7 @@ def evaluate_circuit(
     deterministic: bool = True,
     seed: int = 0,
     noise_config: Optional[NoiseConfig] = None,
+    use_deadlock_mask: bool = True,
 ) -> CircuitMetrics:
     import torch
     env = RoutingEnv(
@@ -161,10 +162,102 @@ def evaluate_circuit(
     step = 0
     while not done and not truncated:
         with torch.no_grad():
-            logits, _ = agent._forward_obs(obs)
+            mask = None
+            if use_deadlock_mask and hasattr(env, 'get_deadlock_mask') and agent.gnn is not None:
+                dm = env.get_deadlock_mask()
+                mask = torch.ones(agent.num_edges, dtype=torch.bool, device=agent.device)
+                mask[:len(coupling_map)] = True
+                for i in range(min(len(dm), len(mask))):
+                    if dm[i]:
+                        mask[i] = False
+                mask = mask.unsqueeze(0)
+            logits, _ = agent._forward_obs(obs, action_mask=mask)
             action = logits.argmax(-1).item() if deterministic \
                      else torch.distributions.Categorical(logits=logits).sample().item()
         obs, reward, done, truncated, info = env.step(action)
+        step += 1
+
+    wall_time_ms = (time.perf_counter() - t0) * 1000
+
+    return CircuitMetrics(
+        circuit_path='',
+        completed=done,
+        num_swaps=env._swap_counter,
+        gates_executed=len(env.executed),
+        total_gates=dag.num_gates,
+        episode_steps=step,
+        wall_time_ms=wall_time_ms,
+        terminal_xz=info.get('terminal_XZ', None),
+        truncated_remaining=info.get('truncated_remaining', 0),
+        fidelity=info.get('fidelity', None),
+    )
+
+
+# ---------------------------------------------------------------------------
+#  Single-circuit evaluation: 1-step Beam Search
+# ---------------------------------------------------------------------------
+
+def evaluate_circuit_beam(
+    dag: CircuitDAG,
+    hw: HardwareFeatures,
+    coupling_map: list,
+    agent: PPOAgent,
+    reward_mode: str = 'routing',
+    max_episode_steps: int = 200,
+    seed: int = 0,
+    noise_config: Optional[NoiseConfig] = None,
+    beam_width: int = 3,
+) -> CircuitMetrics:
+    import torch
+    env = RoutingEnv(
+        dag, hw, coupling_map, reward_mode=reward_mode,
+        max_episode_steps=max_episode_steps,
+        random_init=False, seed=seed,
+        gnn=agent.gnn, use_gnn=agent.gnn is not None,
+        noise_config=noise_config if reward_mode != 'routing' else None,
+    )
+
+    obs, _ = env.reset()
+    t0 = time.perf_counter()
+
+    done, truncated = False, False
+    step = 0
+    while not done and not truncated:
+        with torch.no_grad():
+            # Build base action mask (valid edges + deadlock)
+            mask = torch.zeros(agent.num_edges, dtype=torch.bool, device=agent.device)
+            mask[:len(coupling_map)] = True
+            if hasattr(env, 'get_deadlock_mask'):
+                dm = env.get_deadlock_mask()
+                for i in range(min(len(dm), len(mask))):
+                    if dm[i]:
+                        mask[i] = False
+            mask = mask.unsqueeze(0)
+
+            logits, _ = agent._forward_obs(obs, action_mask=mask)
+            masked_logits = logits[0].clone()
+            masked_logits[~mask[0]] = -1e9
+            k = min(beam_width, (mask[0].sum().item()))
+            topk_scores, topk_indices = masked_logits.topk(k)
+
+            best_action, best_score = topk_indices[0].item(), -float('inf')
+            for i in range(topk_indices.shape[0]):
+                a = topk_indices[i].item()
+                clone = env.clone()
+                _, _, done_c, truncated_c, info_c = clone.step(a)
+                if done_c:
+                    score = 10.0
+                elif truncated_c:
+                    score = -10.0
+                else:
+                    clone_obs = clone._obs()
+                    _, v = agent._forward_obs(clone_obs)
+                    score = v.item()
+                if score > best_score:
+                    best_score = score
+                    best_action = a
+
+        obs, reward, done, truncated, info = env.step(best_action)
         step += 1
 
     wall_time_ms = (time.perf_counter() - t0) * 1000
@@ -443,6 +536,8 @@ def main():
                         help='SABRE swap trials per circuit (default: 20)')
     parser.add_argument('--max-circuits', type=int, default=None,
                         help='limit number of circuits to evaluate')
+    parser.add_argument('--beam-width', type=int, default=0,
+                        help='beam width for 1-step lookahead (0 = argmax)')
     parser.add_argument('--verbose', action='store_true', default=False,
                         help='print per-circuit results')
     parser.add_argument('--out', type=str, default=None,
@@ -507,20 +602,32 @@ def main():
         if args.verbose:
             print(f'  [{i+1}/{total}] {method}...', end=' ', flush=True)
 
+    label = f'PPO_beam{args.beam_width}' if args.beam_width > 0 else 'PPO'
+
     def evaluate_agent_on_circuits():
         results = []
         for i, rel_path in enumerate(rel_paths):
-            _progress(i, len(rel_paths), 'PPO')
+            _progress(i, len(rel_paths), label)
             qc = load_qc(args.data_dir, rel_path)
             dag = CircuitDAG.from_circuit(qc)
-            m = evaluate_circuit(
-                dag, hw, coupling_map, agent,
-                reward_mode=args.reward_mode,
-                max_episode_steps=args.max_episode_steps,
-                deterministic=args.deterministic,
-                seed=args.seed + i,
-                noise_config=config if args.reward_mode != 'routing' else None,
-            )
+            if args.beam_width > 0:
+                m = evaluate_circuit_beam(
+                    dag, hw, coupling_map, agent,
+                    reward_mode=args.reward_mode,
+                    max_episode_steps=args.max_episode_steps,
+                    seed=args.seed + i,
+                    noise_config=config if args.reward_mode != 'routing' else None,
+                    beam_width=args.beam_width,
+                )
+            else:
+                m = evaluate_circuit(
+                    dag, hw, coupling_map, agent,
+                    reward_mode=args.reward_mode,
+                    max_episode_steps=args.max_episode_steps,
+                    deterministic=args.deterministic,
+                    seed=args.seed + i,
+                    noise_config=config if args.reward_mode != 'routing' else None,
+                )
             m.circuit_path = rel_path
             if args.verbose:
                 tag = 'OK' if m.completed else 'TRUNC'
@@ -533,7 +640,7 @@ def main():
 
     show_fid = args.reward_mode != 'routing'
     print_header(show_fidelity=show_fid)
-    print_report('PPO', agent_stats, show_fidelity=show_fid)
+    print_report(label, agent_stats, show_fidelity=show_fid)
 
     if args.baselines:
         # Random

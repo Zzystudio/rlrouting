@@ -148,7 +148,7 @@ def lambda_fid_schedule(progress: float, warmup: float, max_val: float) -> float
 # ---------------------------------------------------------------------------
 #  create_env helper
 # ---------------------------------------------------------------------------
-def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_init, seed, gnn=None, use_gnn=True, max_num_edges=None, noise_config=None, lambda_fid=None):
+def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_init, seed, gnn=None, use_gnn=True, max_num_edges=None, noise_config=None, lambda_fid=None, eta_dist=None):
     kw = dict(
         dag=dag, hw=hw, coupling_map=coupling_map,
         reward_mode=reward_mode,
@@ -166,6 +166,8 @@ def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_ini
         kw["noise_config"] = noise_config
     if lambda_fid is not None:
         kw["lambda_fid"] = lambda_fid
+    if eta_dist is not None:
+        kw["eta_dist"] = eta_dist
     return RoutingEnv(**kw)
 
 
@@ -267,6 +269,8 @@ def main():
                         help="T1/T2 时间扰动幅度（默认 0.05）")
     parser.add_argument("--noise-perturb-other", type=float, default=0.10,
                         help="freq/readout 等其它参数扰动幅度（默认 0.10）")
+    parser.add_argument("--eta-dist", type=float, default=1.0,
+                        help="距离减少奖励系数（0=禁用，默认 1.0）")
     args = parser.parse_args()
 
     import torch
@@ -321,7 +325,8 @@ def main():
                      gnn=shared_gnn, use_gnn=use_gnn,
                      max_num_edges=max_edges,
                      noise_config=noise_config if args.reward_mode != "routing" else None,
-                     lambda_fid=0.0 if args.reward_mode != "routing" else None)
+                     lambda_fid=0.0 if args.reward_mode != "routing" else None,
+                     eta_dist=args.eta_dist)
 
     agent = PPOAgent(
         obs_dim=int(np.prod(env.observation_space.shape)),
@@ -355,6 +360,7 @@ def main():
         ep_buffer["map_vec"] = []
         ep_buffer["progress"] = []
         ep_buffer["coupling_map"] = []
+        ep_buffer["sabre_feats"] = []
     else:
         ep_buffer["obs"] = []
     ep_total_reward = 0.0
@@ -384,10 +390,12 @@ def main():
                 ep_buffer["map_vec"].append(env._last_map_vec)
                 ep_buffer["progress"].append(env._last_progress)
                 ep_buffer["coupling_map"].append(coupling_map)
+                ep_buffer["sabre_feats"].append(env._last_sabre_feats.flatten())
             else:
                 ep_buffer["obs"].append(obs)
 
-            action, logp, val = agent.act(obs)
+            deadlock_mask = env.get_deadlock_mask()
+            action, logp, val = agent.act(obs, deadlock_mask=deadlock_mask)
             next_obs, reward, done, truncated, info = env.step(action)
 
             episode_end = done or truncated
@@ -454,7 +462,8 @@ def main():
                                  gnn=shared_gnn, use_gnn=use_gnn,
                                  max_num_edges=max_edges,
                                  noise_config=noise_config if args.reward_mode != "routing" else None,
-                                 lambda_fid=cur_lambda_fid)
+                                 lambda_fid=cur_lambda_fid,
+                                 eta_dist=args.eta_dist)
                 obs, _ = env.reset()
                 ep_total_reward = 0.0
 
@@ -489,6 +498,7 @@ def main():
             train_batch["progress"] = ep_buffer["progress"]
             if "coupling_map" in ep_buffer and len(ep_buffer["coupling_map"]) > 0:
                 train_batch["coupling_map"] = ep_buffer["coupling_map"]
+            train_batch["sabre_feats"] = ep_buffer["sabre_feats"]
         else:
             train_batch["obs"] = ep_buffer["obs"]
         if use_gnn:
