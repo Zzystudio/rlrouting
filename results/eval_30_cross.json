@@ -1,0 +1,548 @@
+{
+  "PPO": [
+    {
+      "completed": true,
+      "num_swaps": 4,
+      "wall_time_ms": 27319.601915951353,
+      "fidelity": 0.6484375
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 30622.588475001976,
+      "fidelity": 0.810546875
+    },
+    {
+      "completed": true,
+      "num_swaps": 2,
+      "wall_time_ms": 27148.440065036993,
+      "fidelity": 0.724609375
+    },
+    {
+      "completed": true,
+      "num_swaps": 2,
+      "wall_time_ms": 29754.128636966925,
+      "fidelity": 0.775390625
+    },
+    {
+      "completed": true,
+      "num_swaps": 6,
+      "wall_time_ms": 30159.54674099339,
+      "fidelity": 0.7333984375
+    },
+    {
+      "completed": true,
+      "num_swaps": 4,
+      "wall_time_ms": 30438.087978982367,
+      "fidelity": 0.6171875
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 27999.50767098926,
+      "fidelity": 0.5244140625
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 29388.93267296953,
+      "fidelity": 0.693359375
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 26875.353325041942,
+      "fidelity": 0.5810546875
+    },
+    {
+      "completed": true,
+      "num_swaps": 4,
+      "wall_time_ms": 31841.360619000625,
+      "fidelity": 0.654296875
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 27346.927765989676,
+      "fidelity": 0.8134765625
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 27636.490410019178,
+      "fidelity": 0.712890625
+    },
+    {
+      "completed": true,
+      "num_swaps": 2,
+      "wall_time_ms": 29403.15465000458,
+      "fidelity": 0.74609375
+    },
+    {
+      "completed": true,
+      "num_swaps": 4,
+      "wall_time_ms": 31007.878881006036,
+      "fidelity": 0.740234375
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 30136.007505992893,
+      "fidelity": 0.7236328125
+    },
+    {
+      "completed": true,
+      "num_swaps": 2,
+      "wall_time_ms": 28654.12047598511,
+      "fidelity": 0.755859375
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 27220.061144966166,
+      "fidelity": 0.6904296875
+    },
+    {
+      "completed": true,
+      "num_swaps": 4,
+      "wall_time_ms": 30305.816193984356,
+      "fidelity": 0.439453125
+    },
+    {
+      "completed": true,
+      "num_swaps": 4,
+      "wall_time_ms": 30699.403984996025,
+      "fidelity": 0.7080078125
+    },
+    {
+      "completed": true,
+      "num_swaps": 6,
+      "wall_time_ms": 28923.566534998827,
+      "fidelity": 0.7099609375
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 28359.33816898614,
+      "fidelity": 0.7255859375
+    },
+    {
+      "completed": true,
+      "num_swaps": 4,
+      "wall_time_ms": 30764.446904999204,
+      "fidelity": 0.763671875
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 30196.316537971143,
+      "fidelity": 0.630859375
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 31250.567846989725,
+      "fidelity": 0.537109375
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 28880.344015022274,
+      "fidelity": 0.638671875
+    },
+    {
+      "completed": true,
+      "num_swaps": 6,
+      "wall_time_ms": 28424.071712011937,
+      "fidelity": 0.5888671875
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 29799.5277440059,
+      "fidelity": 0.61328125
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 32236.4443600527,
+      "fidelity": 0.6474609375
+    },
+    {
+      "completed": true,
+      "num_swaps": 4,
+      "wall_time_ms": 28087.662084028125,
+      "fidelity": 0.65625
+    },
+    {
+      "completed": true,
+      "num_swaps": 2,
+      "wall_time_ms": 29060.252722993027,
+      "fidelity": 0.7412109375
+    }
+  ],
+  "Greedy": [
+    {
+      "completed": true,
+      "num_swaps": 8,
+      "wall_time_ms": 15557.217797031626,
+      "fidelity": 0.5439453125
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 11166.568982996978,
+      "fidelity": 0.8046875
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 11575.40115097072,
+      "fidelity": 0.6875
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 12341.710982029326,
+      "fidelity": 0.751953125
+    },
+    {
+      "completed": true,
+      "num_swaps": 6,
+      "wall_time_ms": 11107.51917498419,
+      "fidelity": 0.712890625
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 11228.246661019512,
+      "fidelity": 0.615234375
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 12921.881123969797,
+      "fidelity": 0.5888671875
+    },
+    {
+      "completed": true,
+      "num_swaps": 6,
+      "wall_time_ms": 10929.301130992826,
+      "fidelity": 0.671875
+    },
+    {
+      "completed": true,
+      "num_swaps": 8,
+      "wall_time_ms": 10887.06917403033,
+      "fidelity": 0.5068359375
+    },
+    {
+      "completed": true,
+      "num_swaps": 6,
+      "wall_time_ms": 10804.442242020741,
+      "fidelity": 0.6904296875
+    },
+    {
+      "completed": true,
+      "num_swaps": 2,
+      "wall_time_ms": 10736.162101966329,
+      "fidelity": 0.7841796875
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 12177.011933003087,
+      "fidelity": 0.7197265625
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 10557.531313970685,
+      "fidelity": 0.734375
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 12032.07488800399,
+      "fidelity": 0.736328125
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 10770.117721986026,
+      "fidelity": 0.7861328125
+    },
+    {
+      "completed": true,
+      "num_swaps": 4,
+      "wall_time_ms": 12537.942669994663,
+      "fidelity": 0.6962890625
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 10805.10833801236,
+      "fidelity": 0.7216796875
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 11984.559565025847,
+      "fidelity": 0.51171875
+    },
+    {
+      "completed": true,
+      "num_swaps": 4,
+      "wall_time_ms": 12876.231105998158,
+      "fidelity": 0.787109375
+    },
+    {
+      "completed": true,
+      "num_swaps": 6,
+      "wall_time_ms": 10959.601773007307,
+      "fidelity": 0.7265625
+    },
+    {
+      "completed": true,
+      "num_swaps": 6,
+      "wall_time_ms": 12618.410972994752,
+      "fidelity": 0.7705078125
+    },
+    {
+      "completed": true,
+      "num_swaps": 8,
+      "wall_time_ms": 11303.769396967255,
+      "fidelity": 0.78125
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 11139.586641977075,
+      "fidelity": 0.59765625
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 11396.77870000014,
+      "fidelity": 0.5205078125
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 10693.977185990661,
+      "fidelity": 0.6826171875
+    },
+    {
+      "completed": true,
+      "num_swaps": 7,
+      "wall_time_ms": 12154.929649026599,
+      "fidelity": 0.5673828125
+    },
+    {
+      "completed": true,
+      "num_swaps": 7,
+      "wall_time_ms": 10916.75223695347,
+      "fidelity": 0.6025390625
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 12194.821169949137,
+      "fidelity": 0.64453125
+    },
+    {
+      "completed": true,
+      "num_swaps": 4,
+      "wall_time_ms": 10938.132922980003,
+      "fidelity": 0.693359375
+    },
+    {
+      "completed": true,
+      "num_swaps": 2,
+      "wall_time_ms": 12995.086938026361,
+      "fidelity": 0.72265625
+    }
+  ],
+  "SABRE": [
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 10957.44216896128,
+      "fidelity": 0.6142578125
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 12573.733071971219,
+      "fidelity": 0.79296875
+    },
+    {
+      "completed": true,
+      "num_swaps": 2,
+      "wall_time_ms": 11091.142538003623,
+      "fidelity": 0.693359375
+    },
+    {
+      "completed": true,
+      "num_swaps": 2,
+      "wall_time_ms": 10942.130037001334,
+      "fidelity": 0.7529296875
+    },
+    {
+      "completed": true,
+      "num_swaps": 4,
+      "wall_time_ms": 10835.394063033164,
+      "fidelity": 0.7490234375
+    },
+    {
+      "completed": true,
+      "num_swaps": 4,
+      "wall_time_ms": 12277.325974020641,
+      "fidelity": 0.5830078125
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 11116.160542995203,
+      "fidelity": 0.5771484375
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 11022.815539035946,
+      "fidelity": 0.677734375
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 12009.849523019511,
+      "fidelity": 0.6181640625
+    },
+    {
+      "completed": true,
+      "num_swaps": 4,
+      "wall_time_ms": 12230.290892010089,
+      "fidelity": 0.6728515625
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 10903.554502991028,
+      "fidelity": 0.806640625
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 10897.337528993376,
+      "fidelity": 0.7119140625
+    },
+    {
+      "completed": true,
+      "num_swaps": 2,
+      "wall_time_ms": 12985.317138954997,
+      "fidelity": 0.7529296875
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 10846.883228980005,
+      "fidelity": 0.736328125
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 10734.80739997467,
+      "fidelity": 0.73046875
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 10604.075662966352,
+      "fidelity": 0.7294921875
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 12041.057622991502,
+      "fidelity": 0.736328125
+    },
+    {
+      "completed": true,
+      "num_swaps": 4,
+      "wall_time_ms": 10876.764815999195,
+      "fidelity": 0.404296875
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 12100.132077990565,
+      "fidelity": 0.8115234375
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 10564.474781043828,
+      "fidelity": 0.75
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 11863.57104103081,
+      "fidelity": 0.7685546875
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 12198.305577971041,
+      "fidelity": 0.7685546875
+    },
+    {
+      "completed": true,
+      "num_swaps": 5,
+      "wall_time_ms": 10861.895221052691,
+      "fidelity": 0.638671875
+    },
+    {
+      "completed": true,
+      "num_swaps": 4,
+      "wall_time_ms": 10633.264901989605,
+      "fidelity": 0.5703125
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 12549.382263037842,
+      "fidelity": 0.6767578125
+    },
+    {
+      "completed": true,
+      "num_swaps": 6,
+      "wall_time_ms": 12366.517652000766,
+      "fidelity": 0.560546875
+    },
+    {
+      "completed": true,
+      "num_swaps": 6,
+      "wall_time_ms": 11158.858078997582,
+      "fidelity": 0.6328125
+    },
+    {
+      "completed": true,
+      "num_swaps": 3,
+      "wall_time_ms": 11025.229136983398,
+      "fidelity": 0.6884765625
+    },
+    {
+      "completed": true,
+      "num_swaps": 4,
+      "wall_time_ms": 12560.312892019283,
+      "fidelity": 0.7236328125
+    },
+    {
+      "completed": true,
+      "num_swaps": 2,
+      "wall_time_ms": 10897.672985040117,
+      "fidelity": 0.7841796875
+    }
+  ]
+}

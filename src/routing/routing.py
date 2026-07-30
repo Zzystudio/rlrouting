@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import List, Optional, Tuple
 
 from .graph.circuit_dag import CircuitDAG
@@ -85,6 +86,38 @@ def greedy_route(
         "num_swaps": num_swaps,
         "num_physical_gates": phys.num_nonlocal_gates
         if hasattr(phys, "num_nonlocal_gates") else None,
+    }
+    return phys, info
+
+
+def sabre_route(
+    circuit,
+    config,
+    heuristic: str = "decay",
+    swap_trials: int = 20,
+    seed: int = 0,
+):
+    """使用 Qiskit SabreSwap 做路由，返回 (物理电路, 信息字典)。"""
+    from qiskit.transpiler import PassManager, CouplingMap
+    from qiskit.transpiler.passes import SabreSwap as QiskitSabreSwap
+
+    coupling_list = list(config.coupling_map)
+    cm = CouplingMap(coupling_list)
+
+    sabre = QiskitSabreSwap(coupling_map=cm, heuristic=heuristic, trials=swap_trials, seed=seed)
+    pm = PassManager(sabre)
+
+    t0 = time.perf_counter()
+    phys = pm.run(circuit)
+    wall_time_ms = (time.perf_counter() - t0) * 1000
+
+    num_swaps = sum(1 for inst, qargs, cargs in phys.data if inst.name == "swap")
+
+    info = {
+        "num_swaps": num_swaps,
+        "num_physical_gates": phys.num_nonlocal_gates
+        if hasattr(phys, "num_nonlocal_gates") else None,
+        "wall_time_ms": wall_time_ms,
     }
     return phys, info
 

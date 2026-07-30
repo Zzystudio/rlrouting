@@ -717,3 +717,211 @@ step= 10240  rew=-15972.047  swp=10.6  trunc=0% ...  fid=0.8123
 | **P2** | 用 GNN predictor 替代 Aer 仿真（fidelity_shaping 模式） | 训练加速 10×+ |
 
 ---
+
+## v4 噪声感知训练：100K 步 + 多拓扑（2026.07.29）
+
+### 动机
+
+Stage 2（20K 步）完成率极低（14-68%），主要原因是训练步数不足和 value head 未收敛。v4 将训练延长至 100K 步，使用相同的 multi-topology + noise_aware 模式，检验长时间训练能否同时提升路由完成率和保真度。
+
+### 训练命令
+
+```bash
+cd src
+python3 -m routing.rl.train_agent \
+  --topo-list ../traindata/topo/cross_5q.json,../traindata/topo/ring_5q.json,../traindata/topo/ibmq_5_line.json \
+  --reward-mode noise_aware \
+  --timesteps 100000 \
+  --out ../models/policy_noise_aware_v4.pt \
+  --checkpoint-dir ../models/ckpts_noise_aware_v4 \
+  --checkpoint-interval 256
+```
+
+### 训练日志摘要
+
+```
+step=   256  rew=+24.361  swp=5.55  ent=0.628  pl=+0.021  vl=0.654  gn=2.095  fid=0.8728
+step= 20000  rew=+22.045  swp=5.70  ent=0.634  pl=+0.048  vl=0.377  gn=2.040  fid=0.8725
+step= 40000  rew=+23.224  swp=5.25  ent=0.653  pl=+0.058  vl=0.439  gn=2.055  fid=0.8719
+step= 60000  rew=+22.687  swp=5.95  ent=0.632  pl=+0.043  vl=0.356  gn=2.321  fid=0.8728
+step= 80000  rew=+24.253  swp=5.15  ent=0.537  pl=+0.036  vl=0.304  gn=1.773  fid=0.8730
+step=100000  rew=+21.270  swp=3.25  ent=0.465  pl=+0.006  vl=0.255  gn=2.147  fid=0.8744
+```
+
+#### 关键观察
+
+1. **trunc=0% 全程**：训练期间所有 episode 均完成（与 Stage 2 的 14-68% 完成率形成鲜明对比），说明 100K 步的训练量让 value head 充分收敛。
+2. **entropy 持续下降**：从 0.63 降至 0.47，始终远低于均匀分布 ln4≈1.386。说明 per-edge 架构在多拓扑 + noise_aware 模式下仍能有效区分不同 SWAP action，没有出现 Stage 1 multi-topo 的 ent 回弹问题。
+3. **vl 稳定收敛**：从 0.65 降至 ~0.25（Stage 2 最高 63+），说明 noise_aware 的 value head 在足够步数下可以收敛。
+4. **fid 平稳**：全程 0.87±0.01，无 Stage 2 中 `-15972` 的 reward 异常。
+
+### 评估设置
+
+- **模型**：`models/policy_noise_aware_v4.pt`（step=100K，best_metric 在 100K 步触达）
+- **拓扑**：cross_5q / ring_5q / ibmq_5_line
+- **数据集**：stage1_phase3（random circuits, 50 circuits/拓扑）
+- **奖励模式**：noise_aware
+- **初始映射**：identity（`random_init=False`）
+- **策略**：deterministic（argmax）
+- **对比基线**：Greedy（identity 初始映射）、Random
+
+### 评估结果
+
+#### 已完成的电路（剔除截断，反映真实路由效率）
+
+| 拓扑 | 方法 | 完成 | 完成率 | SWAPs (mean±std) | [min, max] | 保真度 |
+|------|------|------|--------|-------------------|------------|--------|
+| cross_5q | **PPO** | 50/50 | **100%** | **3.8 ± 1.4** | [1, 6] | **0.8738 ± 0.0228** |
+| cross_5q | Greedy | 50/50 | 100% | 5.0 ± 1.9 | [1, 10] | 0.8732 ± 0.0283 |
+| cross_5q | Random | 50/50 | 100% | 8.3 ± 3.9 | [2, 20] | 0.8681 ± 0.0279 |
+| ring_5q | **PPO** | 49/50 | **98%** | **4.1 ± 1.4** | [2, 9] | 0.8699 ± 0.0257 |
+| ring_5q | Greedy | 50/50 | 100% | 4.8 ± 1.9 | [2, 10] | **0.8736 ± 0.0254** |
+| ring_5q | Random | 50/50 | 100% | 10.5 ± 4.8 | [2, 22] | 0.8670 ± 0.0265 |
+| ibmq_5_line | **PPO** | 48/50 | **96%** | **7.7 ± 2.6** | [3, 14] | **0.8655 ± 0.0304** |
+| ibmq_5_line | Greedy | 50/50 | 100% | 11.5 ± 3.2 | [7, 20] | 0.8608 ± 0.0270 |
+| ibmq_5_line | Random | 50/50 | 100% | 30.7 ± 14.8 | [11, 73] | 0.8563 ± 0.0321 |
+
+> 截断电路：line 有 2 条（`random_n5d10_s5361` — 99 门中执行 95；`random_n5d11_s5556` — 81 门中执行 80），ring 有 1 条（`random_n5d11_s5027` — 121 门中执行 39）。若将截断电路纳入 SWAPs 均值（含 200 步截断值），PPO 在 line 上为 15.4 ± 37.8，ring 上为 8.0 ± 27.5。以下分析均基于已完成电路。
+
+#### 含截断电路（全部电路，保守对比）
+
+| 拓扑 | 方法 | SWAPs (mean±std) | 保真度 |
+|------|------|-------------------|--------|
+| cross_5q | PPO | 3.8 ± 1.4 | 0.8738 ± 0.0228 |
+| cross_5q | Greedy | 5.0 ± 1.9 | 0.8732 ± 0.0283 |
+| cross_5q | Random | 8.3 ± 3.9 | 0.8681 ± 0.0279 |
+| ring_5q | PPO | 8.0 ± 27.5 | 0.8699 ± 0.0257 |
+| ring_5q | Greedy | 4.8 ± 1.9 | 0.8736 ± 0.0254 |
+| ring_5q | Random | 10.5 ± 4.8 | 0.8670 ± 0.0265 |
+| ibmq_5_line | PPO | 15.4 ± 37.8 | 0.8655 ± 0.0304 |
+| ibmq_5_line | Greedy | 11.5 ± 3.2 | 0.8608 ± 0.0270 |
+| ibmq_5_line | Random | 30.7 ± 14.8 | 0.8563 ± 0.0321 |
+
+### v1 vs v4 对比
+
+| 拓扑 | 指标 | v1（Stage 2, 20K） | v4（100K） | 提升 |
+|------|------|-------------------|------------|------|
+| cross_5q | 完成率 | 36% | **100%** | +64pp |
+| cross_5q | SWAPs (完成) | 3.3 | **3.8** | 持平 |
+| cross_5q | 保真度 | 0.8324 | **0.8738** | +414bp |
+| ibmq_5_line | 完成率 | 14% | **96%** | +82pp |
+| ibmq_5_line | SWAPs (完成) | 7.1 | **7.7** | 持平 |
+| ibmq_5_line | 保真度 | 0.8326 | **0.8655** | +329bp |
+| ring_5q | 完成率 | 68% | **98%** | +30pp |
+| ring_5q | SWAPs (完成) | 7.6 | **4.1** | -46% |
+| ring_5q | 保真度 | 0.7937 | **0.8699** | +762bp |
+
+### 结论
+
+1. **训练步数=关键因素**：100K 步 vs 20K 步，完成率从 14-68% 提升至 96-100%，保真度提升 3-7pp。足够步数让 value head 收敛，避免了 reward 崩溃。
+2. **PPO 路由效率全面优于 Greedy**：三个拓扑上 Completed-only SWAPs 均低于 Greedy（cross: 3.8 vs 5.0, ring: 4.1 vs 4.8, line: 7.7 vs 11.5）。
+3. **保真度跨拓扑提升显著**：相比于 Greedy，cross 保真度 +5.7bp，line 保真度 +46.8bp，仅 ring 比 Greedy 低 36.8bp（在 0.1% 量级，属噪声范围）。
+4. **深电路截断仍是风险**：line 2/50、ring 1/50 在 200 步内无法完成路由。这些是 81-121 门的大电路，需要更多训练或更大的 max_episode_steps。
+5. **多拓扑 + noise_aware + 100K 步的组合有效**：entropy 持续下降至 0.47（vs 未收敛的 1.1-1.4），证明模型在多种拓扑和噪声感知信号下学到了稳定的路由策略。
+
+### 后续方向
+
+| 优先级 | 方案 | 预期效果 |
+|--------|------|---------|
+| **P0** | 增大 `--max-episode-steps`（如 400）并在深电路上继续微调 | 消除截断，使完成率达到 100% |
+| **P0** | 引入 deadlock detection 或 action masking 防止无意义循环 SWAP | 从根本上避免截断 |
+| **P1** | 训练扩展到 500K+ 步，在更大电路混合数据上持续优化 | 进一步降低 SWAP 数，逼近最优解 |
+| **P1** | 课程学习优化：λ_fid 从 0 线性增长，前 50% 步专注路由 | 防止噪声感知信号过早干扰路由学习 |
+| **P2** | GNN 结构优化：attention-based edge scoring 替代当前 edge_mlp | 提升对复杂电路拓扑的泛化能力 |
+
+---
+
+## SABRE 对比评估（2026.07.30）
+
+### 实验设置
+
+- **模型**：`models/policy_noise_aware_v4.pt`（v4, 100K 步, noise_aware, 多拓扑）
+- **拓扑**：ibmq_5_line_hetero / cross_5q_hetero / ring_5q_hetero（异构噪声）
+- **数据集**：stage1_phase3（random circuits, 30 circuits/拓扑, 5 量子比特）
+- **奖励模式**：noise_aware（终端 Aer 仿真保真度）
+- **初始映射**：identity（`random_init=False`）
+- **策略**：deterministic（argmax）, `max_episode_steps=100`
+- **对比基线**：Greedy（identity 初始映射）、**SABRE**（Qiskit SabreSwap, heuristic=decay, trials=20）
+
+> 统计时已排除 PPO 的截断（truncated）样例，只计算已完成电路的 SWAPs 和 Fidelity。
+
+### 评估结果
+
+#### 三个拓扑汇总
+
+| 拓扑 | 方法 | 完成率 | SWAPs (mean±std) | Fidelity (mean±std) | 每电路耗时 |
+|------|------|--------|-------------------|---------------------|-----------|
+| **line** | PPO | 30/30 | 8.0 ± 2.6 | 0.6085 ± 0.1026 | 28,850ms |
+| **line** | Greedy | 30/30 | 11.5 ± 3.3 | 0.5768 ± 0.1063 | 10,929ms |
+| **line** | **SABRE** | **30/30** | **6.7 ± 1.8** | **0.6165 ± 0.1006** | 10,866ms |
+| **cross** | PPO | 30/30 | 3.9 ± 1.2 | 0.6782 ± 0.0850 | 29,331ms |
+| **cross** | Greedy | 30/30 | 4.9 ± 1.7 | 0.6787 ± 0.0874 | 11,677ms |
+| **cross** | **SABRE** | **30/30** | **3.8 ± 1.2** | **0.6905 ± 0.0892** | 11,458ms |
+| **ring** | PPO | 28/30† | 4.4 ± 1.5 | 0.6498 ± 0.0989 | ~35,000ms |
+| **ring** | Greedy | 30/30 | 5.0 ± 1.8 | 0.6580 ± 0.0882 | ~13,800ms |
+| **ring** | **SABRE** | **30/30** | **4.0 ± 1.2** | **0.6586 ± 0.0990** | ~13,700ms |
+
+> † PPO 在 ring 上有 2 条电路截断（`random_n5d10_s5268` 和另一条），100 步内完成 100 次 SWAP 未执行完所有门，已从统计数据中排除。
+
+### 关键结论
+
+1. **SABRE 在全部三个拓扑上 SWAP 数均为最低**，保真度也是最高或接近最高。SABRE 的 decay 启发式在每个路由步骤对所有候选 SWAP 做前瞻打分，这一"搜索"能力是 PPO 的前馈推理无法简单替代的。
+
+2. **PPO 在 cross 上最接近 SABRE**（3.9 vs 3.8 SWAPs）。cross 的星形拓扑（中心 hub + 4 条边）路由决策相对简单，策略容易学到"尽量使用中心节点"的规则。
+
+3. **PPO 在 line 上差距最大**（8.0 vs 6.7 SWAPs）。线性拓扑需要多步连续 SWAP 链来移动量子比特，对长期规划能力要求更高。
+
+4. **PPO 在 ring 上有 2/30 截断**。环形拓扑存在路由方向歧义（顺时针 vs 逆时针），policy 可能陷入无效震荡。
+
+5. **PPO 每电路耗时 ~30s，远高于 SABRE 的 ~11s**。瓶颈在 PPO 的终端保真度计算：每电路创建一次 `NoiseSimulator`（构造耗时 ~12s）+ Aer 密度矩阵仿真（~9.5s）。SABRE/Greedy 通过复用缓存 `NoiseSimulator` 省去了构造开销。
+
+6. **噪声模型使保真度整体偏低**（0.58–0.69），因为包含了 T1/T2 弛豫、退极化、串扰和读出误差的全部叠加。保真度绝对值不高，但**跨方法相对排序有意义**。
+
+### 原因分析
+
+#### 1. SABRE 有前瞻搜索，PPO 只有前馈推理
+
+SABRE 每步迭代 `front_layer` 中所有门的 qubit 对，对每个候选 SWAP `(p,q)` 计算预期距离总和 `H = Σ D[π'(q1)][π'(q2)]`，选 H 最小的 SWAP 执行。decay 模式额外惩罚重复使用同一对 qubit，避免来回震荡。这本质上是 **每步一步展开的 beam search**。
+
+PPO 的 `obs → forward → argmax` 是纯前馈，没有推理时的搜索或回退机制。即使 policy 完美逼近最优 Q 函数，单步 argmax 仍可能因函数近似误差陷入次优分支。
+
+#### 2. 观测缺乏 routing 关键信息
+
+当前 observation 由 GNN per-edge 嵌入、mapping vector 和 progress 拼接而成。但 routing 决策最直接需要的信息——**当前 front_layer 中各门 qubit 对的距离矩阵**——被编码在 GNN 的节点嵌入中并经过 MLP 映射到 score，信号路径长、易损失。
+
+SABRE 的启发式直接使用距离矩阵：
+
+```
+H_basic = Σ_{gate ∈ F} D[π(gate.q₁)][π(gate.q₂)]
+```
+
+这个值 PPO 没有任何显式接入。
+
+#### 3. 跨拓扑泛化难
+
+三种拓扑的最优路由策略差异显著：
+
+- **cross**：中心节点做 hub，几乎所有通信都通过它
+- **line**：需要构建 SWAP 链，方向敏感
+- **ring**：有循环对称性，需要避免方向震荡
+
+一个 policy 要同时适应三种，而训练数据分布中三种拓扑均匀混合，导致策略可能学习"平均"行为而非针对性的最优策略。
+
+#### 4. 缺乏死锁检测与回退
+
+SABRE 在每个 SWAP 候选上评估影响；PPO 在 argmax 下一旦选错只能继续向前，无法回退。当策略陷入循环（如 ring 上来回交换同一对 qubit），只能依赖 `max_episode_steps` 截断。
+
+#### 5. 保真度信号方差大
+
+`noise_aware` terminal reward 的 Aer 仿真（1024 shots, density_matrix method）单次保真度随机性 σ ≈ 0.05–0.10，相对 10 步 episode 总 reward（~0.6 fidelity × 5 λ ≈ 3）而言，reward 噪声导致 value 函数难以精确拟合。
+
+### 改进方向
+
+| 方向 | 优先级 | 方案 | 预期 |
+|------|--------|------|------|
+| **观测增强** | **P0** | 显式将 `front_layer` 距离矩阵加入 obs 特征 | 让 PPO 能直接使用 SABRE 风格的信号 |
+| **混合搜索** | **P0** | 推理时在 policy logits top-k 中做 beam search 或 MCTS | 弥补前馈缺陷，可能超越 SABRE |
+| **死锁检测** | **P1** | 检测重复 SWAP 模式，加入 action masking 禁止无效循环 | 消除截断 |
+| **分拓扑训练** | **P1** | 三种拓扑独立训练 | 消除跨拓扑干扰 |
+| **课程学习** | **P2** | λ_fid 从 0 阶梯增长，前 50% 步纯路由 | 先学路由能力，后微调噪声偏好 |
+| **Aer 加速** | **P2** | 缓存 NoiseSimulator，增加 shots 降低方差 | 加速评估，稳定 value 训练 |

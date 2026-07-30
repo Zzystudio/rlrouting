@@ -17,7 +17,7 @@ from routing.graph.features import HardwareFeatures
 from routing.rl.env import RoutingEnv
 from routing.rl.agent import PPOAgent
 from routing.gnn.encoder import SubGNN
-from routing.routing import greedy_route
+from routing.routing import greedy_route, sabre_route
 
 
 # ---------------------------------------------------------------------------
@@ -279,6 +279,56 @@ def evaluate_greedy(
 
 
 # ---------------------------------------------------------------------------
+#  SABRE baseline
+# ---------------------------------------------------------------------------
+
+def evaluate_sabre(
+    qc,
+    config: NoiseConfig,
+    reward_mode: str = 'routing',
+    heuristic: str = 'decay',
+    swap_trials: int = 20,
+    seed: int = 0,
+) -> CircuitMetrics:
+    dag = CircuitDAG.from_circuit(qc)
+    t0 = time.perf_counter()
+    phys, info = sabre_route(qc, config, heuristic=heuristic, swap_trials=swap_trials, seed=seed)
+    wall_time_ms = (time.perf_counter() - t0) * 1000
+
+    fid = None
+    if reward_mode != 'routing':
+        from sim.sim import NoiseSimulator
+        from qiskit_aer import AerSimulator
+        meas = phys.copy()
+        meas.measure_all()
+        noise_sim = NoiseSimulator(config)
+        meas_t = noise_sim._transpile(meas)
+        shots = config.shots
+
+        ideal_sim = AerSimulator()
+        ideal_job = ideal_sim.run(meas_t, shots=shots)
+        ideal_counts = ideal_job.result().get_counts()
+
+        noisy_counts = noise_sim.run(meas_t, shots=shots, skip_transpile=True)
+
+        all_outcomes = set(ideal_counts.keys()) | set(noisy_counts.keys())
+        overlap = sum(min(ideal_counts.get(k, 0), noisy_counts.get(k, 0)) for k in all_outcomes)
+        fid = overlap / shots
+
+    return CircuitMetrics(
+        circuit_path='',
+        completed=True,
+        num_swaps=info['num_swaps'],
+        gates_executed=dag.num_gates,
+        total_gates=dag.num_gates,
+        episode_steps=0,
+        wall_time_ms=wall_time_ms,
+        terminal_xz=None,
+        fidelity=fid,
+    )
+
+
+# ---------------------------------------------------------------------------
 #  Aggregate stats
 # ---------------------------------------------------------------------------
 
@@ -287,11 +337,12 @@ def aggregate(metrics: List[CircuitMetrics]) -> SummaryStats:
     completed = [m for m in metrics if m.completed]
     comp_rate = len(completed) / n if n > 0 else 0.0
 
-    swaps = np.array([m.num_swaps for m in metrics], dtype=float)
-    steps = np.array([m.episode_steps for m in metrics], dtype=float)
+    completed_n = len(completed) if completed else 1
+    swaps = np.array([m.num_swaps for m in completed], dtype=float) if completed else np.zeros(1)
+    steps = np.array([m.episode_steps for m in completed], dtype=float) if completed else np.zeros(1)
     times = np.array([m.wall_time_ms for m in metrics], dtype=float)
-    xz_vals = [m.terminal_xz for m in metrics if m.terminal_xz is not None]
-    fid_vals = [m.fidelity for m in metrics if m.fidelity is not None]
+    xz_vals = [m.terminal_xz for m in completed if m.terminal_xz is not None]
+    fid_vals = [m.fidelity for m in completed if m.fidelity is not None]
 
     return SummaryStats(
         n=n,
@@ -384,7 +435,12 @@ def main():
                         default=True,
                         help='use argmax for action selection')
     parser.add_argument('--baselines', action='store_true', default=False,
-                        help='also run random and greedy baselines')
+                        help='also run random, greedy, and SABRE baselines')
+    parser.add_argument('--sabre-heuristic', type=str, default='decay',
+                        choices=['basic', 'decay', 'lookahead'],
+                        help='SABRE heuristic (default: decay)')
+    parser.add_argument('--sabre-trials', type=int, default=20,
+                        help='SABRE swap trials per circuit (default: 20)')
     parser.add_argument('--max-circuits', type=int, default=None,
                         help='limit number of circuits to evaluate')
     parser.add_argument('--verbose', action='store_true', default=False,
@@ -514,6 +570,25 @@ def main():
         greedy_stats = aggregate(greedy_metrics)
         print_report('Greedy', greedy_stats, show_fidelity=show_fid)
 
+        # SABRE
+        sabre_metrics = []
+        for i, rel_path in enumerate(rel_paths):
+            _progress(i, len(rel_paths), 'SABRE')
+            qc = load_qc(args.data_dir, rel_path)
+            m = evaluate_sabre(
+                qc, config,
+                reward_mode=args.reward_mode,
+                heuristic=args.sabre_heuristic,
+                swap_trials=args.sabre_trials,
+                seed=args.seed + i + 2000,
+            )
+            m.circuit_path = rel_path
+            if args.verbose:
+                print(f'OK swaps={m.num_swaps} {m.wall_time_ms:.0f}ms')
+            sabre_metrics.append(m)
+        sabre_stats = aggregate(sabre_metrics)
+        print_report('SABRE', sabre_stats, show_fidelity=show_fid)
+
     print()
 
     # ---- Save per-circuit results ----
@@ -539,6 +614,7 @@ def main():
         if args.baselines:
             out['random'] = [_asdict(m) for m in random_metrics]
             out['greedy'] = [_asdict(m) for m in greedy_metrics]
+            out['sabre'] = [_asdict(m) for m in sabre_metrics]
         with open(args.out, 'w') as f:
             json.dump(out, f, indent=2)
         print(f'Results saved to {args.out}')
