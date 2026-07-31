@@ -18,6 +18,7 @@ from routing.graph.circuit_dag import CircuitDAG
 from routing.graph.features import HardwareFeatures
 from routing.rl.env import RoutingEnv
 from routing.rl.agent import PPOAgent, EdgeActorCritic
+from routing.rl.mcts import MCTS, episode_outcome
 from routing.gnn.encoder import SubGNN
 
 
@@ -216,6 +217,73 @@ def perturb_noise_config(
 
 
 # ---------------------------------------------------------------------------
+#  AlphaZero helpers
+# ---------------------------------------------------------------------------
+
+def collect_self_play_data(agent, env, mcts, mcts_c_puct,
+                           dirichlet_alpha, dirichlet_eps,
+                           temperature, max_edges):
+    ep_states = []
+    done, truncated = False, False
+    coupling_map = env.coupling_map
+
+    while not done and not truncated:
+        best_action, pi_mcts = mcts.search(
+            env,
+            add_dirichlet_noise=True,
+            dirichlet_alpha=dirichlet_alpha,
+            dirichlet_eps=dirichlet_eps,
+        )
+        pi_padded = np.zeros(max_edges, dtype=np.float32)
+        n_local = len(coupling_map)
+        pi_padded[:n_local] = pi_mcts[:n_local]
+
+        sabre_flat = env._last_sabre_feats.flatten()
+        sabre_padded = np.zeros(max_edges * 5, dtype=np.float32)
+        sabre_padded[:len(sabre_flat)] = sabre_flat
+
+        ep_states.append({
+            "graph_data":   env._last_graph_data,
+            "map_vec":      env._last_map_vec.copy(),
+            "progress":     env._last_progress.copy(),
+            "sabre_feats":  sabre_padded,
+            "coupling_map": list(coupling_map),
+            "pi_mcts":      pi_padded,
+        })
+
+        if temperature > 0:
+            counts = pi_mcts ** (1.0 / max(temperature, 1e-8))
+            counts_sum = counts.sum()
+            if counts_sum < 1e-8:
+                action = int(best_action)
+            else:
+                action = int(np.random.choice(len(pi_mcts), p=counts / counts_sum))
+        else:
+            action = int(best_action)
+
+        _, _, done, truncated, info = env.step(action)
+
+    z = episode_outcome(env, done, truncated, info)
+
+    for state_dict in ep_states:
+        state_dict["z"] = z
+
+    return ep_states
+
+
+def _collate_az_batch(samples):
+    return {
+        "graph_data":   [s["graph_data"] for s in samples],
+        "map_vec":      np.array([s["map_vec"] for s in samples]),
+        "progress":     np.array([s["progress"] for s in samples]),
+        "sabre_feats":  np.array([s["sabre_feats"] for s in samples]),
+        "coupling_map": [s["coupling_map"] for s in samples],
+        "pi_mcts":      np.array([s["pi_mcts"] for s in samples]),
+        "z":            np.array([s["z"] for s in samples]),
+    }
+
+
+# ---------------------------------------------------------------------------
 #  Main
 # ---------------------------------------------------------------------------
 def main():
@@ -271,6 +339,25 @@ def main():
                         help="freq/readout 等其它参数扰动幅度（默认 0.10）")
     parser.add_argument("--eta-dist", type=float, default=1.0,
                         help="距离减少奖励系数（0=禁用，默认 1.0）")
+    parser.add_argument("--mode", type=str, default="ppo",
+                        choices=["ppo", "alphazero"],
+                        help="训练模式: ppo / alphazero")
+    parser.add_argument("--mcts-simulations", type=int, default=50,
+                        help="自对弈每步 MCTS 仿真次数")
+    parser.add_argument("--mcts-c-puct", type=float, default=1.4,
+                        help="MCTS PUCT 探索常数")
+    parser.add_argument("--self-play-episodes", type=int, default=8,
+                        help="每次 Update 前自对弈的 episode 数")
+    parser.add_argument("--self-play-temp", type=float, default=1.0,
+                        help="自对弈动作采样温度（初期 1.0，后期退火 0.1）")
+    parser.add_argument("--dirichlet-alpha", type=float, default=0.3,
+                        help="Dirichlet 噪声 concentration")
+    parser.add_argument("--dirichlet-eps", type=float, default=0.25,
+                        help="Dirichlet 噪声混合权重")
+    parser.add_argument("--alphazero-train-steps", type=int, default=100,
+                        help="每次自对弈后的梯度步数")
+    parser.add_argument("--alphazero-batch-size", type=int, default=128)
+    parser.add_argument("--alphazero-buffer-size", type=int, default=10000)
     args = parser.parse_args()
 
     import torch
@@ -342,6 +429,116 @@ def main():
     if args.load:
         agent.load(args.load)
         print(f"Loaded pretrained model: {args.load}")
+
+    # ------------------------------------------------------------------
+    #  AlphaZero training mode
+    # ------------------------------------------------------------------
+    if args.mode == "alphazero":
+        print(f"AlphaZero mode: {args.mcts_simulations} sims, "
+              f"{args.self_play_episodes} self-play eps, "
+              f"{args.alphazero_train_steps} train steps/cycle")
+        mcts = MCTS(agent, num_simulations=args.mcts_simulations,
+                    c_puct=args.mcts_c_puct, temperature=args.self_play_temp)
+        az_buffer = []
+        total_steps = 0
+        cycle_idx = 0
+        best_metric = None
+        az_metrics_log = {"step": [], "pi_ce": [], "vl": [], "gn": [],
+                          "swp": [], "trunc_pct": [], "fid": []}
+
+        while total_steps < args.timesteps:
+            # --- Phase A: self-play ---
+            new_data = []
+            for _ in range(args.self_play_episodes):
+                obs, _ = env.reset()
+                ep_data = collect_self_play_data(
+                    agent, env, mcts, args.mcts_c_puct,
+                    args.dirichlet_alpha, args.dirichlet_eps,
+                    args.self_play_temp, max_edges,
+                )
+                new_data.extend(ep_data)
+            az_buffer.extend(new_data)
+            if len(az_buffer) > args.alphazero_buffer_size:
+                az_buffer = az_buffer[-args.alphazero_buffer_size:]
+            total_steps += len(new_data)
+
+            # --- Phase B: train ---
+            agent.gnn.train()
+            for _ in range(args.alphazero_train_steps):
+                k = min(args.alphazero_batch_size, len(az_buffer))
+                batch = random.sample(az_buffer, k)
+                train_batch = _collate_az_batch(batch)
+                losses = agent.alphazero_update(train_batch,
+                                                batch_size=args.alphazero_batch_size)
+
+            # --- Phase C: log & checkpoint ---
+            swps = [s["z"] for s in new_data if s["z"] < 0]
+            fids = [s["z"] for s in new_data if s["z"] > 0]
+            n_trunc = sum(1 for s in new_data if s["z"] == -10.0)
+            n_total = len(new_data)
+            avg_swp = -float(np.mean(swps)) if swps else 0.0
+            avg_fid = float(np.mean(fids)) if fids else 0.0
+            trunc_pct = 100.0 * n_trunc / max(1, n_total)
+
+            print(f"step={total_steps:>6d}  "
+                  f"pi_ce={losses['pl']:.3f}  "
+                  f"vl={losses['vl']:.3f}  "
+                  f"gn={losses['gn']:.3f}  "
+                  f"swp={avg_swp:.1f}  "
+                  f"trunc={trunc_pct:.0f}%  "
+                  f"fid={avg_fid:.4f}")
+
+            az_metrics_log["step"].append(total_steps)
+            az_metrics_log["pi_ce"].append(losses["pl"])
+            az_metrics_log["vl"].append(losses["vl"])
+            az_metrics_log["gn"].append(losses["gn"])
+            az_metrics_log["swp"].append(avg_swp)
+            az_metrics_log["trunc_pct"].append(trunc_pct)
+            az_metrics_log["fid"].append(avg_fid)
+
+            # Pick new circuit & topology for next cycle
+            progress = total_steps / args.timesteps
+            split_key = phase_fn(progress)
+            new_dag = pick_circuit(args.data_dir, split_key,
+                                   seed=args.seed + total_steps)
+            if num_topos > 1:
+                topo_idx = random.randrange(num_topos)
+            noise_config, coupling_map = topo_list[topo_idx]
+            if args.noise_perturb > 0 or args.noise_perturb_t1t2 > 0:
+                noise_config = perturb_noise_config(
+                    noise_config,
+                    frac_t1t2=args.noise_perturb_t1t2,
+                    frac_gate=args.noise_perturb,
+                    frac_other=args.noise_perturb_other,
+                )
+            hw = HardwareFeatures.from_noise_config(noise_config)
+            agent.coupling_map = coupling_map
+            env = create_env(new_dag, hw, coupling_map, args.reward_mode,
+                             args.max_episode_steps, args.random_init,
+                             args.seed + total_steps,
+                             gnn=shared_gnn, use_gnn=use_gnn,
+                             max_num_edges=max_edges,
+                             noise_config=noise_config if args.reward_mode != "routing" else None,
+                             eta_dist=args.eta_dist)
+            obs, _ = env.reset()
+
+            # Save best policy (lower avg_swp for routing, higher avg_fid for noise_aware)
+            if args.reward_mode == "routing":
+                metric = avg_swp
+                improved = best_metric is None or metric < best_metric
+            else:
+                metric = avg_fid
+                improved = best_metric is None or metric > best_metric
+            if improved:
+                best_metric = metric
+                agent.save(args.out)
+
+            cycle_idx += 1
+
+        if best_metric is None:
+            agent.save(args.out)
+        print(f"AlphaZero policy saved to {args.out} (best metric={best_metric})")
+        return
 
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
 

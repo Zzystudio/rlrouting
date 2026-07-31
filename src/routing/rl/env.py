@@ -489,7 +489,7 @@ class RoutingEnv(gym.Env):
     # ------------------------------------------------------------------
     #  step
     # ------------------------------------------------------------------
-    def step(self, action: int):
+    def step(self, action: int, compute_obs: bool = True):
         p, q = self.coupling_map[action]
 
         dist_before = self._front_layer_dist() if self.eta_dist != 0 else 0.0
@@ -518,4 +518,6 @@ class RoutingEnv(gym.Env):
             reward += -self.unfinished_penalty * remaining
             info["truncated_remaining"] = remaining
 
+        if not compute_obs:
+            return None, reward, done, truncated, info
         return self._obs(), reward, done, truncated, info

@@ -277,6 +277,61 @@ def evaluate_circuit_beam(
 
 
 # ---------------------------------------------------------------------------
+#  Single-circuit evaluation: MCTS inference
+# ---------------------------------------------------------------------------
+
+def evaluate_circuit_mcts(
+    dag: CircuitDAG,
+    hw: HardwareFeatures,
+    coupling_map: list,
+    agent: PPOAgent,
+    reward_mode: str = 'routing',
+    max_episode_steps: int = 200,
+    seed: int = 0,
+    noise_config: Optional[NoiseConfig] = None,
+    num_simulations: int = 100,
+    c_puct: float = 1.4,
+    temperature: float = 0.0,
+) -> CircuitMetrics:
+    from routing.rl.mcts import MCTS
+
+    env = RoutingEnv(
+        dag, hw, coupling_map, reward_mode=reward_mode,
+        max_episode_steps=max_episode_steps,
+        random_init=False, seed=seed,
+        gnn=agent.gnn, use_gnn=agent.gnn is not None,
+        noise_config=noise_config if reward_mode != 'routing' else None,
+    )
+
+    obs, _ = env.reset()
+    mcts = MCTS(agent, num_simulations=num_simulations,
+                c_puct=c_puct, temperature=temperature)
+    t0 = time.perf_counter()
+
+    done, truncated = False, False
+    step = 0
+    while not done and not truncated:
+        best_action, _ = mcts.search(env)
+        obs, reward, done, truncated, info = env.step(best_action)
+        step += 1
+
+    wall_time_ms = (time.perf_counter() - t0) * 1000
+
+    return CircuitMetrics(
+        circuit_path='',
+        completed=done,
+        num_swaps=env._swap_counter,
+        gates_executed=len(env.executed),
+        total_gates=dag.num_gates,
+        episode_steps=step,
+        wall_time_ms=wall_time_ms,
+        terminal_xz=info.get('terminal_XZ', None),
+        truncated_remaining=info.get('truncated_remaining', 0),
+        fidelity=info.get('fidelity', None),
+    )
+
+
+# ---------------------------------------------------------------------------
 #  Single-circuit evaluation: Random baseline
 # ---------------------------------------------------------------------------
 
@@ -538,6 +593,15 @@ def main():
                         help='limit number of circuits to evaluate')
     parser.add_argument('--beam-width', type=int, default=0,
                         help='beam width for 1-step lookahead (0 = argmax)')
+    parser.add_argument('--search', type=str, default='argmax',
+                        choices=['argmax', 'beam', 'mcts'],
+                        help='inference search method (default: argmax)')
+    parser.add_argument('--mcts-simulations', type=int, default=100,
+                        help='MCTS simulations per decision step (default: 100)')
+    parser.add_argument('--mcts-c-puct', type=float, default=1.4,
+                        help='PUCT exploration constant (default: 1.4)')
+    parser.add_argument('--mcts-temperature', type=float, default=0.0,
+                        help='MCTS action temperature, 0=deterministic (default: 0.0)')
     parser.add_argument('--verbose', action='store_true', default=False,
                         help='print per-circuit results')
     parser.add_argument('--out', type=str, default=None,
@@ -602,7 +666,12 @@ def main():
         if args.verbose:
             print(f'  [{i+1}/{total}] {method}...', end=' ', flush=True)
 
-    label = f'PPO_beam{args.beam_width}' if args.beam_width > 0 else 'PPO'
+    if args.search == 'mcts':
+        label = f'PPO_MCTS({args.mcts_simulations})'
+    elif args.beam_width > 0:
+        label = f'PPO_beam{args.beam_width}'
+    else:
+        label = 'PPO'
 
     def evaluate_agent_on_circuits():
         results = []
@@ -610,7 +679,18 @@ def main():
             _progress(i, len(rel_paths), label)
             qc = load_qc(args.data_dir, rel_path)
             dag = CircuitDAG.from_circuit(qc)
-            if args.beam_width > 0:
+            if args.search == 'mcts':
+                m = evaluate_circuit_mcts(
+                    dag, hw, coupling_map, agent,
+                    reward_mode=args.reward_mode,
+                    max_episode_steps=args.max_episode_steps,
+                    seed=args.seed + i,
+                    noise_config=config if args.reward_mode != 'routing' else None,
+                    num_simulations=args.mcts_simulations,
+                    c_puct=args.mcts_c_puct,
+                    temperature=args.mcts_temperature,
+                )
+            elif args.beam_width > 0:
                 m = evaluate_circuit_beam(
                     dag, hw, coupling_map, agent,
                     reward_mode=args.reward_mode,

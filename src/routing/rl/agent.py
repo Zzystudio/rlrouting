@@ -129,7 +129,7 @@ class PPOAgent:
 
         params = []
         if gnn is not None:
-            self.gnn.to("cpu")
+            self.gnn.to(device)
             edge_feat_dim = self.gnn.encoder.out_dim * 3 + 5
             self.edge_feat_dim = edge_feat_dim
             self.ac = EdgeActorCritic(edge_feat_dim, num_edges, num_qubits).to(device)
@@ -196,8 +196,10 @@ class PPOAgent:
     def _build_edge_obs(self, graph_data_list, map_vec_list, progress_list,
                         coupling_maps=None, sabre_feats_list=None):
         all_ef, all_mv, all_pg = [], [], []
+        # 批量 GNN 前向：全部图拼接一次 forward（GPU 下大幅降低传输/启动开销）
+        qubit_h_list = self.gnn.node_embeddings_batch(graph_data_list)
         for i, (gd, mv, pg) in enumerate(zip(graph_data_list, map_vec_list, progress_list)):
-            qubit_h = self.gnn.node_embeddings(gd)
+            qubit_h = qubit_h_list[i]
             cmap = coupling_maps[i] if coupling_maps is not None else self.coupling_map
             n_local = len(cmap)
             ef = self._build_edge_feats_from_h(qubit_h.to(self.device), cmap)
@@ -292,6 +294,58 @@ class PPOAgent:
                 log_data["ent"].append(entropy.item())
                 log_data["kl"].append(approx_kl.item())
                 log_data["grad"].append(gn.item())
+
+        return {k: float(np.mean(v)) for k, v in log_data.items()}
+
+    def alphazero_update(self, batch: dict, batch_size: int = 128) -> dict:
+        n = len(batch["pi_mcts"])
+        pi_raw = np.array(batch["pi_mcts"])
+        z_raw = np.array(batch["z"])
+
+        z = (z_raw - z_raw.mean()) / (z_raw.std() + 1e-8)
+        pi_t = torch.tensor(pi_raw, device=self.device)
+        z_t = torch.tensor(z, dtype=torch.float32, device=self.device)
+
+        log_data = {"pl": [], "vl": [], "gn": []}
+        indices = np.arange(n)
+
+        for start in range(0, n, batch_size):
+            sel = indices[start:start + batch_size]
+            cmaps = [batch["coupling_map"][i] for i in sel]
+            sblist = [batch["sabre_feats"][i][:len(cmaps[i]) * 5] for i in sel] if "sabre_feats" in batch else None
+            ef, mv, pg = self._build_edge_obs(
+                [batch["graph_data"][i] for i in sel],
+                [batch["map_vec"][i] for i in sel],
+                [batch["progress"][i] for i in sel],
+                coupling_maps=cmaps,
+                sabre_feats_list=sblist,
+            )
+            mask = torch.zeros(ef.shape[0], self.num_edges, dtype=torch.bool, device=self.device)
+            for i, cmap in enumerate(cmaps):
+                mask[i, :len(cmap)] = True
+
+            logits, value = self.ac(ef, mv, pg, action_mask=mask)
+
+            log_probs = F.log_softmax(logits, dim=-1)
+            ce_all = -(pi_t[sel] * log_probs)
+            ce_masked = ce_all[mask]
+            policy_loss = ce_masked.mean()
+
+            value_loss = F.mse_loss(value, z_t[sel])
+
+            loss = policy_loss + self.vf_coef * value_loss
+
+            self.optimizer.zero_grad()
+            loss.backward()
+            all_params = list(self.ac.parameters())
+            if self.gnn is not None:
+                all_params += list(self.gnn.parameters())
+            gn = nn.utils.clip_grad_norm_(all_params, 0.5)
+            self.optimizer.step()
+
+            log_data["pl"].append(policy_loss.item())
+            log_data["vl"].append(value_loss.item())
+            log_data["gn"].append(gn.item())
 
         return {k: float(np.mean(v)) for k, v in log_data.items()}
 
