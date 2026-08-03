@@ -1448,3 +1448,33 @@ density_matrix simulator. Required memory: 16777216M, max memory: 257547M
   `load(strict=False)`、`with_commit=False` 兼容旧架构
 - `train_agent.py`：`--mapping-phase/--mapping-budget`、phase 缓冲、metrics `map_swaps` 列
 - `eval_policy.py`：`--mapping-phase`、commit 掩码、报告新增 Map 列、`CircuitMetrics.mapping_swaps`
+
+### 5q 完整训练（62K 步，`--mapping-min-swaps 2`）
+
+**动机**：冒烟测试发现 agent 倾向立即 commit（map≈0.2），映射阶段形同虚设。
+新增训练旋钮 `--mapping-min-swaps N`：commit 掩码在 `_mapping_swaps < N` 时屏蔽，
+强制每 episode 至少 N 次虚拟 SWAP，让 agent 学习布局质量的距离信号。
+
+**训练**：100K 计划 → 62K 步提前停止（历史记录 v4 显示 ~50K 已收敛，ent 0.653）。
+过程中 `map=3.4`（强制生效），三拓扑 `swp` 逐步降至 SABRE 水平。
+
+**评估**（`models/policy_map_phase1.pt`，argmax，200 circuits/拓扑）：
+
+| 拓扑 | split | PPO SWAPs | SABRE | 旧 PPO argmax（10-20 circuits） |
+|------|-------|-----------|-------|------------------------------|
+| cross_5q | phase1 | **1.1** | 1.2 | 2.0 |
+| ring_5q | phase1 | 1.0 | 1.0 | 1.6 |
+| ibmq_5_line | phase1 | 2.0 | 1.9 | 2.8 |
+| cross_5q | phase3 | 3.7 | 3.8 | — |
+| ring_5q | phase3 | 3.3 | 3.3 | — |
+| ibmq_5_line | phase3 | 6.8 | 6.3 | — |
+
+**结论**：
+
+1. **5q 布局不敏感**：评估时（无强制）Map 仅 0.1-0.7，agent 仍倾向立即 commit ——
+   identity 初始布局在 5q 上已接近最优，虚拟 SWAP 的价值信号太小，强制训练学到的
+   布局偏好无法迁移到推理。映射阶段在 5q 上无收益（对 SABRE 持平或略好，但非映射功劳）。
+2. **步数确认**：62K 步性能 ≥ 旧 100K 步模型（phase1 上 1.1/1.0/2.0 vs 2.0/1.6/2.8），
+   5q 场景 50K 步足够，100K 是浪费。
+3. **下一步**：映射阶段应在布局真正重要的场景验证 —— 大电路（n8-12）+ random-init，
+   或深度较深、identity 明显次优的电路。

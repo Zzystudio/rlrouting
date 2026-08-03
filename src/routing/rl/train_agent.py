@@ -288,6 +288,9 @@ def main():
                         help="启用映射阶段（虚拟 SWAP 学初始布局 + commit 动作）")
     parser.add_argument("--mapping-budget", type=int, default=None,
                         help="映射阶段最大虚拟 SWAP 次数（默认 n-1）")
+    parser.add_argument("--mapping-min-swaps", type=int, default=0,
+                        help="训练时强制每 episode 至少 N 次虚拟 SWAP 才能 commit "
+                             "(0=不强制；建议 2-3 让 agent 学习布局质量)")
     args = parser.parse_args()
 
     import torch
@@ -429,8 +432,11 @@ def main():
 
             deadlock_mask = env.get_deadlock_mask()
             combined_mask = deadlock_mask | env.get_unmapped_mask()
+            commit_allowed = env.mapping_phase and (
+                env._mapping_swaps >= args.mapping_min_swaps
+            )
             action, logp, val = agent.act(obs, deadlock_mask=combined_mask,
-                                          mapping_phase=env.mapping_phase)
+                                          mapping_phase=commit_allowed)
             next_obs, reward, done, truncated, info = env.step(action)
 
             episode_end = done or truncated
@@ -511,7 +517,7 @@ def main():
             if use_gnn:
                 mask = torch.zeros(agent.num_edges + 1, dtype=torch.bool, device=agent.device)
                 mask[:len(agent.coupling_map)] = True
-                if env.mapping_phase:
+                if env.mapping_phase and env._mapping_swaps >= args.mapping_min_swaps:
                     mask[agent.num_edges] = True
                 last_val = agent._forward_obs(obs, action_mask=mask.unsqueeze(0))[1]
             else:
