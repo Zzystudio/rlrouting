@@ -109,6 +109,7 @@ def model_and_agent():
         random_init=False, seed=0,
         gnn=gnn, use_gnn=True,
         max_num_edges=max_edges,
+        mapping_phase=False,
     )
     agent = PPOAgent(
         obs_dim=int(np.prod(env.observation_space.shape)),
@@ -118,6 +119,7 @@ def model_and_agent():
         num_qubits=NUM_QUBITS,
         num_edges=max_edges,
         coupling_map=cm,
+        with_commit=False,
     )
     agent.load(MODEL_PATH)
     env.close()
@@ -143,6 +145,7 @@ def evaluate_ppo(dag, hw, coupling_map, config, agent, seed, max_num_edges) -> R
         gnn=agent.gnn, use_gnn=agent.gnn is not None,
         noise_config=config,
         max_num_edges=max_num_edges,
+        mapping_phase=False,
     )
     obs, _ = env.reset()
     t0 = time.perf_counter()

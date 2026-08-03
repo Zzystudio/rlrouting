@@ -64,6 +64,8 @@ class RoutingEnv(gym.Env):
 
         max_num_edges: Optional[int] = None,
         max_num_qubits: Optional[int] = None,
+        mapping_budget: Optional[int] = None,
+        mapping_phase: bool = True,
         random_init: bool = True,
         use_gnn: bool = True,
         gnn: Optional[SubGNN] = None,
@@ -99,6 +101,8 @@ class RoutingEnv(gym.Env):
         self.max_episode_steps = max_episode_steps
         self.unfinished_penalty = unfinished_penalty
         self.max_num_edges = max_num_edges or self.num_edges
+        self.mapping_budget = mapping_budget if mapping_budget is not None else max(1, self.num_qubits - 1)
+        self.enable_mapping_phase = mapping_phase
         self._rng = np.random.default_rng(seed)
 
         if gnn is not None:
@@ -115,8 +119,13 @@ class RoutingEnv(gym.Env):
             self._edge_feat_dim = 0
             self._gnn_dim = 0
 
-        self.action_space = gym.spaces.Discrete(self.num_edges)
-        obs_dim = self._gnn_dim + self.max_num_qubits + 1
+        if self.enable_mapping_phase:
+            self.action_space = gym.spaces.Discrete(self.num_edges + 1)
+            self.commit_action = self.num_edges
+        else:
+            self.action_space = gym.spaces.Discrete(self.num_edges)
+            self.commit_action = -1
+        obs_dim = self._gnn_dim + self.max_num_qubits + (2 if self.enable_mapping_phase else 1)
         self.observation_space = gym.spaces.Box(
             -np.inf, np.inf, (obs_dim,), dtype=np.float32
         )
@@ -133,6 +142,8 @@ class RoutingEnv(gym.Env):
             self.mapping = perm
         else:
             self.mapping = list(range(n))
+        self.mapping_phase = self.enable_mapping_phase
+        self._mapping_swaps = 0
         self.executed: set = set()
         self._swap_counter = 0
         self._episode_step = 0
@@ -140,7 +151,9 @@ class RoutingEnv(gym.Env):
         self._xz_errors = np.zeros((n, 2), dtype=float)
         self._phys_circuit = QuantumCircuit(self.hw.num_qubits)
         self._update()
-        self._auto_execute_batch()
+        if not self.enable_mapping_phase:
+            self._auto_execute_batch()
+        # 映射阶段：门在 commit 前不执行（_auto_execute_batch 由 commit 触发）
         return self._obs(), {}
 
     # ------------------------------------------------------------------
@@ -159,6 +172,20 @@ class RoutingEnv(gym.Env):
         else:
             self.mapping[lp], self.mapping[lq] = self.mapping[lq], self.mapping[lp]
         self._phys_circuit.swap(p, q)
+
+    def _apply_virtual_swap(self, p: int, q: int):
+        """映射阶段虚拟 SWAP：仅重排初始映射，不写入物理线路、不计入 SWAP 数。"""
+        inv = {phys: log for log, phys in enumerate(self.mapping)}
+        lp = inv.get(p)
+        lq = inv.get(q)
+        if lp is None and lq is None:
+            return
+        if lp is None:
+            self.mapping[lq] = p
+        elif lq is None:
+            self.mapping[lp] = q
+        else:
+            self.mapping[lp], self.mapping[lq] = self.mapping[lq], self.mapping[lp]
 
     def _update(self):
         changed = True
@@ -199,6 +226,7 @@ class RoutingEnv(gym.Env):
         progress = np.array(
             [len(self.executed) / max(1, self.dag.num_gates)], dtype=np.float32
         )
+        phase = np.array([1.0 if self.mapping_phase else 0.0], dtype=np.float32)
         if self._gnn is not None:
             executed_mask = np.zeros(self.dag.num_gates, dtype=bool)
             for idx in self.executed:
@@ -224,8 +252,13 @@ class RoutingEnv(gym.Env):
             if self.max_num_edges > self.num_edges:
                 pad_len = (self.max_num_edges - self.num_edges) * self._edge_feat_dim
                 edge_feats = np.pad(edge_feats, (0, pad_len), constant_values=0)
-            obs = np.concatenate([edge_feats, map_vec, progress]).astype(np.float32)
+            if self.enable_mapping_phase:
+                obs = np.concatenate([edge_feats, map_vec, progress, phase]).astype(np.float32)
+            else:
+                obs = np.concatenate([edge_feats, map_vec, progress]).astype(np.float32)
             return obs
+        if self.enable_mapping_phase:
+            return np.concatenate([map_vec, progress, phase]).astype(np.float32)
         return np.concatenate([map_vec, progress]).astype(np.float32)
 
     # ------------------------------------------------------------------
@@ -369,6 +402,9 @@ class RoutingEnv(gym.Env):
         new.max_episode_steps = self.max_episode_steps
         new.unfinished_penalty = self.unfinished_penalty
         new.max_num_edges = self.max_num_edges
+        new.mapping_budget = self.mapping_budget
+        new.commit_action = self.commit_action
+        new.enable_mapping_phase = self.enable_mapping_phase
         new._rng = self._rng
         new._gnn = self._gnn
         new._edge_feat_dim = self._edge_feat_dim
@@ -377,6 +413,8 @@ class RoutingEnv(gym.Env):
         new.observation_space = self.observation_space
         # 可变状态（用 copy 隔离）
         new.mapping = self.mapping.copy()
+        new.mapping_phase = self.mapping_phase
+        new._mapping_swaps = self._mapping_swaps
         new.executed = self.executed.copy()
         new._swap_counter = self._swap_counter
         new._episode_step = self._episode_step
@@ -492,6 +530,7 @@ class RoutingEnv(gym.Env):
 
     def _terminal_reward(self, info: dict) -> float:
         info["num_swaps"] = self._swap_counter
+        info["mapping_swaps"] = self._mapping_swaps
         if self.reward_mode == "routing":
             info["terminal_XZ"] = float(np.sum(self._xz_errors))
             return 0.0
@@ -501,17 +540,61 @@ class RoutingEnv(gym.Env):
             return self.lambda_fid * fid
         return 0.0
 
+    def _end_step(self, reward: float, info: dict):
+        """统一收尾：done / truncated 判定与终端奖励。"""
+        info["mapping_swaps"] = self._mapping_swaps
+        done = len(self.executed) == self.dag.num_gates
+        truncated = False
+        if done:
+            reward += self._terminal_reward(info)
+        elif self._episode_step >= self.max_episode_steps:
+            truncated = True
+            remaining = self.dag.num_gates - len(self.executed)
+            reward += -self.unfinished_penalty * remaining
+            info["truncated_remaining"] = remaining
+        return self._obs(), reward, done, truncated, info
+
+    def _step_mapping(self, action: int):
+        """映射阶段：虚拟 SWAP 重排初始布局；commit 动作（>= num_edges）结束阶段。"""
+        info: dict = {}
+        reward = 0.0
+        if action >= self.num_edges:
+            self.mapping_phase = False
+            r_exec, r_prop = self._auto_execute_batch()
+            reward += r_exec + r_prop
+        else:
+            p, q = self.coupling_map[action]
+            dist_before = self._front_layer_dist() if self.eta_dist != 0 else 0.0
+            self._apply_virtual_swap(p, q)
+            self._mapping_swaps += 1
+            self._swap_history.append(action)
+            if self.eta_dist != 0:
+                dist_after = self._front_layer_dist()
+                reward += -self.eta_dist * (dist_after - dist_before) / max(dist_before, 1e-8)
+            if self._mapping_swaps >= self.mapping_budget:
+                self.mapping_phase = False
+                r_exec, r_prop = self._auto_execute_batch()
+                reward += r_exec + r_prop
+        return self._end_step(reward, info)
+
     # ------------------------------------------------------------------
     #  step
     # ------------------------------------------------------------------
     def step(self, action: int):
+        self._episode_step += 1
+        if self.mapping_phase:
+            return self._step_mapping(action)
+
+        if action >= self.num_edges:
+            # 非映射阶段出现 commit 动作：视为无效（正常流程下会被掩码禁止）
+            return self._end_step(-self.invalid_penalty, {})
+
         p, q = self.coupling_map[action]
 
         dist_before = self._front_layer_dist() if self.eta_dist != 0 else 0.0
 
         self._apply_swap(p, q)
         self._swap_counter += 1
-        self._episode_step += 1
         self._swap_history.append(action)
 
         r_exec, r_prop = self._auto_execute_batch()
@@ -522,15 +605,4 @@ class RoutingEnv(gym.Env):
             r_dist = -self.eta_dist * (dist_after - dist_before) / max(dist_before, 1e-8)
             reward += r_dist
 
-        done = len(self.executed) == self.dag.num_gates
-        truncated = False
-        info: dict = {}
-        if done:
-            reward += self._terminal_reward(info)
-        elif self._episode_step >= self.max_episode_steps:
-            truncated = True
-            remaining = self.dag.num_gates - len(self.executed)
-            reward += -self.unfinished_penalty * remaining
-            info["truncated_remaining"] = remaining
-
-        return self._obs(), reward, done, truncated, info
+        return self._end_step(reward, {})

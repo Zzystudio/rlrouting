@@ -54,6 +54,7 @@ rlrouting/
 | 距离即时奖励 | `env.py:step()` | `r_dist = η·Δd / max(d_before,1)` 每步都有信号，缓解长电路 credit assignment |
 | 死锁掩码 | `env.py:get_deadlock_mask()` | 检测来回 SWAP 震荡 → action mask 禁止无效循环，消除截断 |
 | Phase 课程学习 | `train_agent.py` | Phase 1 纯路由 + SABRE 特征 → Phase 2 噪声感知微调 |
+| 映射阶段 | `env.py:_step_mapping()` | 虚拟 SWAP 学初始布局 + commit 动作，布局与路由联合训练（动作空间 `num_edges+1`，观测含 phase） |
 | Beam search 推理 | `eval_policy.py` | 1 步 lookahead: top-K → clone → step → V(s') 评分 |
 | Action masking | `agent.py` | 支持动态屏蔽无效/死锁动作 |
 
@@ -92,7 +93,7 @@ rlrouting/
   PYTHONPATH=src python3 -m pytest test/ -q
   ```
 
-- **Train Phase 1**（SABRE 特征 + 纯路由）:
+- **Train Phase 1**（SABRE 特征 + 纯路由 + 映射阶段）:
   ```bash
   cd src
   python3 -m routing.rl.train_agent \
@@ -102,6 +103,8 @@ rlrouting/
     --out ../models/policy_phase1.pt \
     --phase 1
   ```
+  默认启用 `--mapping-phase`（映射阶段：虚拟 SWAP 学初始布局 + commit 动作，动作空间 `num_edges+1`）；
+  旧行为用 `--no-mapping-phase`（兼容旧 checkpoint）。
 
 - **Train Phase 2**（噪声感知微调）:
   ```bash

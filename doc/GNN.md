@@ -379,18 +379,26 @@ SubGNN(node_dim, edge_dim, subgraph='full',
 **状态**（observation vector）：
 
 ```
-obs = [GNN embedding (384-d) |  normalized mapping (M-d) |  progress (1-d)]
+obs = [GNN embedding (384-d) |  normalized mapping (M-d) |  progress (1-d) |  phase (1-d)]
 ```
 
 - `GNN embedding`：来自 SubGNN 编码器的图嵌入向量
 - `normalized mapping`：`mapping[i] / num_physical_qubits`，长度 = logical qubits 数
 - `progress`：`executed_gates / total_gates`
+- `phase`：映射阶段标志（1 = 映射阶段，0 = 路由阶段；`mapping_phase=False` 时无此维）
 
-**动作空间**：`Discrete(num_edges)`
+**动作空间**：`Discrete(num_edges + 1)`（映射阶段启用时）
 
 | 动作 | 含义 |
 |------|------|
 | `0 … E-1` | 在 `coupling_map[action]` 上执行 SWAP |
+| `E`（commit） | 仅映射阶段有效：结束映射阶段，开始执行路由 |
+
+**映射阶段（mapping phase）**：episode 从映射阶段开始，agent 可执行任意次**虚拟 SWAP**
+（只重排初始映射 `M_t`，不写入物理线路、不计入 SWAP 数，最多 `mapping_budget = n-1` 次），
+以学习最优初始布局；commit 动作（或预算耗尽）后进入正常路由。映射阶段的 SWAP 奖励为
+front-layer 距离塑形项（`r_dist`，与路由阶段同式），虚拟 SWAP 同样计入 `_swap_history`
+以支持死锁掩码。
 
 每次 SWAP 后环境自动检查并执行所有可执行的双比特门，直至无可执行门为止。
 

@@ -93,6 +93,7 @@ def test_fidelity_shaping_step_zero():
 def test_swap_penalty():
     env = _env(reward_mode="routing", swap_cost=0.3)
     obs, _ = env.reset()
+    env.step(env.commit_action)  # 结束映射阶段
     pre_executed = len(env.executed)
     obs, reward, done, truncated, info = env.step(0)
     if len(env.executed) == pre_executed:
@@ -107,9 +108,11 @@ def test_swap_counter():
     done = False
     swap_count = 0
     while not done:
+        was_mapping = env.mapping_phase
         action = env.action_space.sample()
         obs, reward, done, _, info = env.step(action)
-        swap_count += 1
+        if not was_mapping and action < env.num_edges:
+            swap_count += 1
     assert done
     assert info["num_swaps"] == swap_count
 
@@ -217,3 +220,60 @@ def test_unequal_physical_logical_qubits():
     assert env2.mapping == [0, 1, 3], f"setup failed: {env2.mapping}"
     env2._apply_swap(3, 4)
     assert env2.mapping == [0, 1, 4], f"one-sided swap (3->4) failed: {env2.mapping}"
+
+
+def test_mapping_phase_virtual_swap_no_execution():
+    from qiskit import QuantumCircuit
+    qc = QuantumCircuit(4)
+    qc.cx(0, 1)
+    qc.cx(1, 2)
+    qc.cx(3, 0)
+    qc.cx(2, 3)
+    dag = CircuitDAG.from_circuit(qc)
+    from sim.sim import NoiseConfig
+    coupling = [(i, i + 1) for i in range(3)]
+    config = NoiseConfig(
+        t1_times=[50.0] * 4, t2_times=[70.0] * 4, freq_ghz=[5.0] * 4,
+        single_q_gate_error=0.001, two_q_gate_error=0.01,
+        coupling_map=coupling, readout_error=[0.02] * 4,
+    )
+    hw = HardwareFeatures.from_noise_config(config)
+    env = RoutingEnv(dag, hw, coupling, reward_mode="routing",
+                     random_init=False, seed=2, use_gnn=False)
+    obs, _ = env.reset()
+    assert env.mapping_phase
+    assert obs[-1] == 1.0
+    assert len(env.executed) == 0, "mapping phase must not execute 2q gates"
+    env.step(0)
+    assert env._mapping_swaps == 1
+    assert len(env.executed) == 0, "mapping phase must not execute gates"
+    obs, reward, done, truncated, info = env.step(env.commit_action)
+    assert not env.mapping_phase
+    assert obs[-1] == 0.0
+    assert len(env.executed) > 0 or done
+
+
+def test_mapping_budget_auto_commit():
+    env = _env(reward_mode="routing", mapping_budget=2)
+    env.reset()
+    env.step(0)
+    assert env.mapping_phase
+    env.step(1)
+    assert not env.mapping_phase, "budget exhausted should auto-commit"
+    assert env._mapping_swaps == 2
+
+
+def test_mapping_phase_disabled():
+    env = _env(reward_mode="routing", mapping_phase=False)
+    obs, _ = env.reset()
+    assert not env.mapping_phase
+    assert env.action_space.n == env.num_edges
+    assert obs.shape == env.observation_space.shape
+    done = False
+    steps = 0
+    while not done and steps < 500:
+        action = env.action_space.sample()
+        obs, reward, done, truncated, info = env.step(action)
+        steps += 1
+    assert done
+    assert info["mapping_swaps"] == 0

@@ -30,9 +30,11 @@ class ActorCritic(nn.Module):
         self.actor = nn.Linear(hidden, action_dim)
         self.critic = nn.Linear(hidden, 1)
 
-    def forward(self, x):
+    def forward(self, x, action_mask=None):
         h = self.shared(x)
         logits = self.actor(h)
+        if action_mask is not None:
+            logits = logits.masked_fill(~action_mask, -1e9)
         value = self.critic(h).squeeze(-1)
         return logits, value
 
@@ -41,11 +43,15 @@ class EdgeActorCritic(nn.Module):
     """Per-edge 动作打分 + 注意力池化价值头。
 
     edge_mlp 对所有候选 SWAP 边共享参数，输入 e_{pq} = [h_p, h_q, h_p-h_q]。
-    价值头用软注意力池化边特征后 + mapping + progress。
+    价值头用软注意力池化边特征后 + mapping + progress + phase。
+    with_commit=True 时追加一个 commit logit（映射阶段提交动作）。
     """
 
-    def __init__(self, edge_feat_dim: int, num_edges: int, num_qubits: int):
+    def __init__(self, edge_feat_dim: int, num_edges: int, num_qubits: int,
+                 with_commit: bool = True):
         super().__init__()
+        self.num_edges = num_edges
+        self.with_commit = with_commit
         self.edge_mlp = nn.Sequential(
             nn.Linear(edge_feat_dim, 64),
             nn.ReLU(),
@@ -54,26 +60,41 @@ class EdgeActorCritic(nn.Module):
             nn.Linear(32, 1),
         )
         self.edge_score = nn.Linear(edge_feat_dim, 1)
+        if with_commit:
+            self.commit_head = nn.Linear(edge_feat_dim, 1)
+        critic_in = edge_feat_dim + num_qubits + (2 if with_commit else 1)
         self.critic = nn.Sequential(
-            nn.Linear(edge_feat_dim + num_qubits + 1, 64),
+            nn.Linear(critic_in, 64),
             nn.ReLU(),
             nn.Linear(64, 1),
         )
 
-    def forward(self, edge_feats, map_vec, progress, action_mask=None):
+    def forward(self, edge_feats, map_vec, progress, phase=None, action_mask=None):
         B, E, D = edge_feats.shape
         scores = self.edge_mlp(edge_feats).squeeze(-1)
         attn_raw = self.edge_score(edge_feats)
 
         if action_mask is not None:
-            scores = scores.masked_fill(~action_mask, -1e9)
-            attn_raw = attn_raw.masked_fill(~action_mask.unsqueeze(-1), -1e9)
+            edge_mask = action_mask[..., :E]
+            scores = scores.masked_fill(~edge_mask, -1e9)
+            attn_raw = attn_raw.masked_fill(~edge_mask.unsqueeze(-1), -1e9)
 
         attn_w = torch.softmax(attn_raw, dim=1)
         pooled = (edge_feats * attn_w).sum(dim=1)
-        v_in = torch.cat([pooled, map_vec, progress], dim=-1)
+
+        if self.with_commit:
+            logits = torch.cat([scores, self.commit_head(pooled)], dim=-1)
+        else:
+            logits = scores
+        if action_mask is not None:
+            logits = logits.masked_fill(~action_mask, -1e9)
+
+        if phase is None:
+            v_in = torch.cat([pooled, map_vec, progress], dim=-1)
+        else:
+            v_in = torch.cat([pooled, map_vec, progress, phase], dim=-1)
         value = self.critic(v_in).squeeze(-1)
-        return scores, value
+        return logits, value
 
 
 class RewardNormalizer:
@@ -113,6 +134,7 @@ class PPOAgent:
         num_qubits: Optional[int] = None,
         num_edges: Optional[int] = None,
         coupling_map: Optional[list] = None,
+        with_commit: bool = True,
     ):
         self.gamma = gamma
         self.lam = lam
@@ -120,6 +142,7 @@ class PPOAgent:
         self.ent_coef = ent_coef
         self.vf_coef = vf_coef
         self.device = device
+        self.with_commit = with_commit
 
         self.gnn = gnn
         self.num_qubits = num_qubits
@@ -132,7 +155,8 @@ class PPOAgent:
             self.gnn.to("cpu")
             edge_feat_dim = self.gnn.encoder.out_dim * 3 + 5
             self.edge_feat_dim = edge_feat_dim
-            self.ac = EdgeActorCritic(edge_feat_dim, num_edges, num_qubits).to(device)
+            self.ac = EdgeActorCritic(edge_feat_dim, num_edges, num_qubits,
+                                      with_commit=with_commit).to(device)
             params += list(self.gnn.parameters())
         else:
             self.ac = ActorCritic(obs_dim, action_dim).to(device)
@@ -141,15 +165,29 @@ class PPOAgent:
 
     # ---- 交互 ----
     @torch.no_grad()
-    def act(self, obs: np.ndarray, deterministic: bool = False, deadlock_mask=None):
+    def act(self, obs: np.ndarray, deterministic: bool = False,
+            deadlock_mask=None, mapping_phase: bool = False):
         mask = None
         if isinstance(self.ac, EdgeActorCritic):
-            mask = torch.zeros(self.num_edges, dtype=torch.bool, device=self.device)
+            n = self.num_edges + 1 if self.with_commit else self.num_edges
+            mask = torch.zeros(n, dtype=torch.bool, device=self.device)
             mask[:len(self.coupling_map)] = True
             if deadlock_mask is not None:
                 for i in range(min(len(deadlock_mask), len(mask))):
                     if deadlock_mask[i]:
                         mask[i] = False
+            if self.with_commit:
+                mask[self.num_edges] = mapping_phase
+        else:
+            action_dim = self.ac.actor.out_features
+            mask = torch.zeros(action_dim, dtype=torch.bool, device=self.device)
+            mask[:len(self.coupling_map)] = True
+            if deadlock_mask is not None:
+                for i in range(min(len(deadlock_mask), len(mask))):
+                    if deadlock_mask[i]:
+                        mask[i] = False
+            if self.with_commit and action_dim > len(self.coupling_map):
+                mask[-1] = mapping_phase
         logits, value = self._forward_obs(obs, action_mask=mask.unsqueeze(0) if mask is not None else None)
         if deterministic:
             action = logits[0].argmax(-1).item()
@@ -167,10 +205,14 @@ class PPOAgent:
             n_ef = self.num_edges * eff_dim
             ef = torch.tensor(obs[:n_ef], dtype=torch.float32, device=self.device).reshape(1, self.num_edges, eff_dim)
             mv = torch.tensor(obs[n_ef:n_ef + self.num_qubits], dtype=torch.float32, device=self.device).unsqueeze(0)
+            if self.with_commit:
+                pg = torch.tensor(obs[n_ef + self.num_qubits:n_ef + self.num_qubits + 1], dtype=torch.float32, device=self.device).unsqueeze(0)
+                ph = torch.tensor(obs[n_ef + self.num_qubits + 1:n_ef + self.num_qubits + 2], dtype=torch.float32, device=self.device).unsqueeze(0)
+                return self.ac(ef, mv, pg, ph, action_mask=action_mask)
             pg = torch.tensor(obs[-1:], dtype=torch.float32, device=self.device).unsqueeze(0)
-            return self.ac(ef, mv, pg, action_mask=action_mask)
+            return self.ac(ef, mv, pg, None, action_mask=action_mask)
         obs_t = torch.tensor(obs, dtype=torch.float32, device=self.device).unsqueeze(0)
-        return self.ac(obs_t)
+        return self.ac(obs_t, action_mask=action_mask)
 
     # ---- 训练 ----
     def _build_obs(self, graph_data_list, map_vec_list, progress_vec_list):
@@ -194,8 +236,8 @@ class PPOAgent:
         return torch.cat(edge_list, dim=0)
 
     def _build_edge_obs(self, graph_data_list, map_vec_list, progress_list,
-                        coupling_maps=None, sabre_feats_list=None):
-        all_ef, all_mv, all_pg = [], [], []
+                        coupling_maps=None, sabre_feats_list=None, phase_list=None):
+        all_ef, all_mv, all_pg, all_ph = [], [], [], []
         for i, (gd, mv, pg) in enumerate(zip(graph_data_list, map_vec_list, progress_list)):
             qubit_h = self.gnn.node_embeddings(gd)
             cmap = coupling_maps[i] if coupling_maps is not None else self.coupling_map
@@ -214,10 +256,15 @@ class PPOAgent:
             mv_t = torch.zeros(1, self.num_qubits, dtype=torch.float32, device=self.device)
             mv_t[0, :mv_raw.shape[0]] = mv_raw
             pg_t = torch.tensor(pg, dtype=torch.float32, device=self.device).unsqueeze(0)
+            if phase_list is not None:
+                ph_t = torch.tensor([[float(phase_list[i])]], dtype=torch.float32, device=self.device)
+            else:
+                ph_t = torch.zeros(1, 1, dtype=torch.float32, device=self.device)
             all_ef.append(ef.unsqueeze(0))
             all_mv.append(mv_t)
             all_pg.append(pg_t)
-        return torch.cat(all_ef, dim=0), torch.cat(all_mv, dim=0), torch.cat(all_pg, dim=0)
+            all_ph.append(ph_t)
+        return torch.cat(all_ef, dim=0), torch.cat(all_mv, dim=0), torch.cat(all_pg, dim=0), torch.cat(all_ph, dim=0)
 
     def update(self, batch, epochs: int = 4, batch_size: int = 64):
         acts = torch.tensor(np.array(batch["act"]), dtype=torch.long, device=self.device)
@@ -243,20 +290,29 @@ class PPOAgent:
                              if "coupling_map" in batch else None)
                     sblist = ([batch["sabre_feats"][i] for i in sel]
                               if "sabre_feats" in batch else None)
-                    ef, mv, pg = self._build_edge_obs(
+                    phlist = ([batch["phase"][i] for i in sel]
+                              if "phase" in batch else None)
+                    ef, mv, pg, ph = self._build_edge_obs(
                         [batch["graph_data"][i] for i in sel],
                         [batch["map_vec"][i] for i in sel],
                         [batch["progress"][i] for i in sel],
                         coupling_maps=cmaps,
                         sabre_feats_list=sblist,
+                        phase_list=phlist,
                     )
+                    mask = None
                     if cmaps is not None:
-                        mask = torch.zeros(ef.shape[0], self.num_edges, dtype=torch.bool, device=self.device)
+                        n_a = self.num_edges + 1 if self.with_commit else self.num_edges
+                        mask = torch.zeros(ef.shape[0], n_a, dtype=torch.bool, device=self.device)
                         for i, cmap in enumerate(cmaps):
                             mask[i, :len(cmap)] = True
-                    else:
-                        mask = None
-                    logits, value = self.ac(ef, mv, pg, action_mask=mask)
+                        if self.with_commit and phlist is not None:
+                            for i, phv in enumerate(phlist):
+                                if phv:
+                                    mask[i, self.num_edges] = True
+                    logits, value = self.ac(ef, mv, pg,
+                                            ph if self.with_commit else None,
+                                            action_mask=mask)
                 elif self.gnn is not None:
                     obs = self._build_obs(
                         [batch["graph_data"][i] for i in sel],
@@ -309,7 +365,11 @@ class PPOAgent:
     def load(self, path: str):
         state = torch.load(path, map_location=self.device, weights_only=False)
         if "ac" in state:
-            self.ac.load_state_dict(state["ac"])
+            missing, unexpected = self.ac.load_state_dict(state["ac"], strict=False)
+            if missing:
+                print(f"[load] missing keys (random init): {list(missing)[:5]}")
+            if unexpected:
+                print(f"[load] ignored keys: {list(unexpected)[:5]}")
             if "rew_norm" in state:
                 self.rew_norm.mean = state["rew_norm"]["mean"]
                 self.rew_norm.var = state["rew_norm"]["var"]

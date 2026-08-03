@@ -36,6 +36,7 @@ class CircuitMetrics:
     terminal_xz: Optional[float]
     truncated_remaining: int = 0
     fidelity: Optional[float] = None
+    mapping_swaps: int = 0
 
 
 @dataclass
@@ -52,6 +53,7 @@ class SummaryStats:
     time_std_ms: float
     xz_mean: Optional[float] = None
     fidelity_mean: Optional[float] = None
+    mapping_mean: Optional[float] = None
 
 
 # ---------------------------------------------------------------------------
@@ -157,6 +159,7 @@ def evaluate_circuit(
         noise_config=noise_config if reward_mode != 'routing' else None,
         max_num_qubits=max_num_qubits,
         max_num_edges=max_num_edges,
+        mapping_phase=agent.with_commit,
     )
 
     obs, _ = env.reset()
@@ -171,11 +174,14 @@ def evaluate_circuit(
                 dm = env.get_deadlock_mask()
                 um = env.get_unmapped_mask()
                 combined = dm | um
-                mask = torch.zeros(agent.num_edges, dtype=torch.bool, device=agent.device)
+                n_a = agent.num_edges + 1 if agent.with_commit else agent.num_edges
+                mask = torch.zeros(n_a, dtype=torch.bool, device=agent.device)
                 mask[:len(coupling_map)] = True
                 for i in range(min(len(combined), len(mask))):
                     if combined[i]:
                         mask[i] = False
+                if agent.with_commit:
+                    mask[agent.num_edges] = env.mapping_phase
                 mask = mask.unsqueeze(0)
             logits, _ = agent._forward_obs(obs, action_mask=mask)
             action = logits.argmax(-1).item() if deterministic \
@@ -196,6 +202,7 @@ def evaluate_circuit(
         terminal_xz=info.get('terminal_XZ', None),
         truncated_remaining=info.get('truncated_remaining', 0),
         fidelity=info.get('fidelity', None),
+        mapping_swaps=env._mapping_swaps,
     )
 
 
@@ -225,6 +232,7 @@ def evaluate_circuit_beam(
         noise_config=noise_config if reward_mode != 'routing' else None,
         max_num_qubits=max_num_qubits,
         max_num_edges=max_num_edges,
+        mapping_phase=agent.with_commit,
     )
 
     obs, _ = env.reset()
@@ -234,8 +242,9 @@ def evaluate_circuit_beam(
     step = 0
     while not done and not truncated:
         with torch.no_grad():
-            # Build base action mask (valid edges + deadlock)
-            mask = torch.zeros(agent.num_edges, dtype=torch.bool, device=agent.device)
+            # Build base action mask (valid edges + deadlock + commit)
+            n_a = agent.num_edges + 1 if agent.with_commit else agent.num_edges
+            mask = torch.zeros(n_a, dtype=torch.bool, device=agent.device)
             mask[:len(coupling_map)] = True
             if hasattr(env, 'get_deadlock_mask'):
                 dm = env.get_deadlock_mask()
@@ -243,6 +252,8 @@ def evaluate_circuit_beam(
                 for i in range(min(len(dm), len(mask))):
                     if dm[i] or um[i]:
                         mask[i] = False
+            if agent.with_commit:
+                mask[agent.num_edges] = env.mapping_phase
             mask = mask.unsqueeze(0)
 
             logits, _ = agent._forward_obs(obs, action_mask=mask)
@@ -282,6 +293,7 @@ def evaluate_circuit_beam(
         terminal_xz=info.get('terminal_XZ', None),
         truncated_remaining=info.get('truncated_remaining', 0),
         fidelity=info.get('fidelity', None),
+        mapping_swaps=env._mapping_swaps,
     )
 
 
@@ -445,6 +457,7 @@ def aggregate(metrics: List[CircuitMetrics]) -> SummaryStats:
     times = np.array([m.wall_time_ms for m in metrics], dtype=float)
     xz_vals = [m.terminal_xz for m in completed if m.terminal_xz is not None]
     fid_vals = [m.fidelity for m in completed if m.fidelity is not None]
+    map_vals = [m.mapping_swaps for m in completed]
 
     return SummaryStats(
         n=n,
@@ -459,6 +472,7 @@ def aggregate(metrics: List[CircuitMetrics]) -> SummaryStats:
         time_std_ms=float(np.std(times)),
         xz_mean=float(np.mean(xz_vals)) if xz_vals else None,
         fidelity_mean=float(np.mean(fid_vals)) if fid_vals else None,
+        mapping_mean=float(np.mean(map_vals)) if map_vals else None,
     )
 
 
@@ -472,6 +486,7 @@ def print_header(show_fidelity: bool = False):
         f"{'Time(ms)':>8s}",
         f"{'Comp%':>6s}",
         f"{'SWAPs':>16s}",
+        f"{'Map':>6s}",
         f"{'Steps':>16s}",
         f"{'XZ':>10s}",
     ]
@@ -492,6 +507,7 @@ def print_report(
         f"{stats.time_mean_ms:>8.1f}",
         f"{stats.comp_rate * 100:>5.1f}%",
         f"{stats.swaps_mean:>6.1f} +/- {stats.swaps_std:<5.1f}",
+        f"{stats.mapping_mean:>6.1f}" if stats.mapping_mean is not None else f"{'--':>6s}",
         f"{stats.steps_mean:>6.0f} +/- {stats.steps_std:<5.0f}",
     ]
     if stats.xz_mean is not None:
@@ -533,6 +549,9 @@ def main():
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--no-gnn', action='store_true', default=False,
                         help='model was trained without GNN')
+    parser.add_argument('--mapping-phase', action=argparse.BooleanOptionalAction,
+                        default=True,
+                        help='model was trained with mapping phase (commit action)')
     parser.add_argument('--deterministic', action=argparse.BooleanOptionalAction,
                         default=True,
                         help='use argmax for action selection')
@@ -600,12 +619,13 @@ def main():
     agent_n_edges = (31 if args.max_num_qubits else len(coupling_map))
     agent = PPOAgent(
         obs_dim=int(np.prod(sample_env.observation_space.shape)),
-        action_dim=agent_n_edges,
+        action_dim=agent_n_edges + (1 if args.mapping_phase else 0),
         device=args.device,
         gnn=shared_gnn,
         num_qubits=agent_n_qubits,
         num_edges=agent_n_edges,
         coupling_map=coupling_map,
+        with_commit=args.mapping_phase,
     )
     agent.load(args.model)
     agent.ac.eval()
@@ -725,6 +745,7 @@ def main():
                 'circuit_path': m.circuit_path,
                 'completed': m.completed,
                 'num_swaps': m.num_swaps,
+                'mapping_swaps': m.mapping_swaps,
                 'gates_executed': m.gates_executed,
                 'total_gates': m.total_gates,
                 'episode_steps': m.episode_steps,

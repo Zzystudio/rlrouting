@@ -149,7 +149,7 @@ def lambda_fid_schedule(progress: float, warmup: float, max_val: float) -> float
 # ---------------------------------------------------------------------------
 #  create_env helper
 # ---------------------------------------------------------------------------
-def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_init, seed, gnn=None, use_gnn=True, max_num_edges=None, max_num_qubits=None, noise_config=None, lambda_fid=None, eta_dist=None):
+def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_init, seed, gnn=None, use_gnn=True, max_num_edges=None, max_num_qubits=None, noise_config=None, lambda_fid=None, eta_dist=None, mapping_budget=None, mapping_phase=True):
     kw = dict(
         dag=dag, hw=hw, coupling_map=coupling_map,
         reward_mode=reward_mode,
@@ -171,6 +171,9 @@ def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_ini
         kw["lambda_fid"] = lambda_fid
     if eta_dist is not None:
         kw["eta_dist"] = eta_dist
+    if mapping_budget is not None:
+        kw["mapping_budget"] = mapping_budget
+    kw["mapping_phase"] = mapping_phase
     return RoutingEnv(**kw)
 
 
@@ -280,6 +283,11 @@ def main():
                         help="距离减少奖励系数（0=禁用，默认 1.0）")
     parser.add_argument("--max-num-qubits", type=int, default=None,
                         help="统一观测 qubit 维度（多规模混训时设为最大 n，默认=线路自身 n）")
+    parser.add_argument("--mapping-phase", action=argparse.BooleanOptionalAction,
+                        default=True,
+                        help="启用映射阶段（虚拟 SWAP 学初始布局 + commit 动作）")
+    parser.add_argument("--mapping-budget", type=int, default=None,
+                        help="映射阶段最大虚拟 SWAP 次数（默认 n-1）")
     args = parser.parse_args()
 
     import torch
@@ -343,10 +351,12 @@ def main():
                      max_num_qubits=args.max_num_qubits,
                      noise_config=noise_config if args.reward_mode != "routing" else None,
                      lambda_fid=0.0 if args.reward_mode != "routing" else None,
-                     eta_dist=args.eta_dist)
+                     eta_dist=args.eta_dist,
+                     mapping_budget=args.mapping_budget,
+                     mapping_phase=args.mapping_phase)
 
     agent_n_qubits = args.max_num_qubits or sample_dag.num_logical_qubits
-    agent_action_dim = max_edges
+    agent_action_dim = max_edges + (1 if args.mapping_phase else 0)
     agent = PPOAgent(
         obs_dim=int(np.prod(env.observation_space.shape)),
         action_dim=agent_action_dim,
@@ -357,6 +367,7 @@ def main():
         num_edges=max_edges,
         coupling_map=coupling_map,
         vf_coef=args.vf_coef,
+        with_commit=args.mapping_phase,
     )
     if args.load:
         agent.load(args.load)
@@ -368,7 +379,7 @@ def main():
     ckpt_dir = args.checkpoint_dir or os.path.join(os.path.dirname(args.out) or ".", "ckpts")
     os.makedirs(ckpt_dir, exist_ok=True)
     _metrics_fh = open(os.path.join(ckpt_dir, "metrics.csv"), "w", newline="")
-    _metrics_fields = ["step", "reward", "swaps", "trunc_pct", "pl", "vl", "ent", "kl", "grad", "fid"]
+    _metrics_fields = ["step", "reward", "swaps", "map_swaps", "trunc_pct", "pl", "vl", "ent", "kl", "grad", "fid"]
     _metrics_writer = csv.DictWriter(_metrics_fh, fieldnames=_metrics_fields)
     _metrics_writer.writeheader()
 
@@ -378,6 +389,7 @@ def main():
         ep_buffer["graph_data"] = []
         ep_buffer["map_vec"] = []
         ep_buffer["progress"] = []
+        ep_buffer["phase"] = []
         ep_buffer["coupling_map"] = []
         ep_buffer["sabre_feats"] = []
     else:
@@ -386,6 +398,7 @@ def main():
     ep_rewards = []
     ep_fids = []
     ep_swaps_log = []
+    ep_map_swaps_log = []
     ep_truncated = 0
     ep_completed = 0
 
@@ -408,6 +421,7 @@ def main():
                 ep_buffer["graph_data"].append(env._last_graph_data)
                 ep_buffer["map_vec"].append(env._last_map_vec)
                 ep_buffer["progress"].append(env._last_progress)
+                ep_buffer["phase"].append(1.0 if env.mapping_phase else 0.0)
                 ep_buffer["coupling_map"].append(coupling_map)
                 ep_buffer["sabre_feats"].append(env._last_sabre_feats.flatten())
             else:
@@ -415,7 +429,8 @@ def main():
 
             deadlock_mask = env.get_deadlock_mask()
             combined_mask = deadlock_mask | env.get_unmapped_mask()
-            action, logp, val = agent.act(obs, deadlock_mask=combined_mask)
+            action, logp, val = agent.act(obs, deadlock_mask=combined_mask,
+                                          mapping_phase=env.mapping_phase)
             next_obs, reward, done, truncated, info = env.step(action)
 
             episode_end = done or truncated
@@ -439,6 +454,7 @@ def main():
                 if "fidelity" in info:
                     ep_fids.append(info["fidelity"])
                 ep_swaps_log.append(info.get("num_swaps", 0))
+                ep_map_swaps_log.append(info.get("mapping_swaps", 0))
 
                 # Per-topology tracking
                 topo_steps[topo_idx] += env._episode_step
@@ -485,14 +501,18 @@ def main():
                                  max_num_qubits=args.max_num_qubits,
                                  noise_config=noise_config if args.reward_mode != "routing" else None,
                                  lambda_fid=cur_lambda_fid,
-                                 eta_dist=args.eta_dist)
+                                 eta_dist=args.eta_dist,
+                                 mapping_budget=args.mapping_budget,
+                                 mapping_phase=args.mapping_phase)
                 obs, _ = env.reset()
                 ep_total_reward = 0.0
 
         with torch.no_grad():
             if use_gnn:
-                mask = torch.zeros(agent.num_edges, dtype=torch.bool, device=agent.device)
+                mask = torch.zeros(agent.num_edges + 1, dtype=torch.bool, device=agent.device)
                 mask[:len(agent.coupling_map)] = True
+                if env.mapping_phase:
+                    mask[agent.num_edges] = True
                 last_val = agent._forward_obs(obs, action_mask=mask.unsqueeze(0))[1]
             else:
                 last_val = agent._forward_obs(obs)[1]
@@ -518,6 +538,7 @@ def main():
             train_batch["graph_data"] = ep_buffer["graph_data"]
             train_batch["map_vec"] = ep_buffer["map_vec"]
             train_batch["progress"] = ep_buffer["progress"]
+            train_batch["phase"] = ep_buffer["phase"]
             if "coupling_map" in ep_buffer and len(ep_buffer["coupling_map"]) > 0:
                 train_batch["coupling_map"] = ep_buffer["coupling_map"]
             train_batch["sabre_feats"] = ep_buffer["sabre_feats"]
@@ -530,12 +551,14 @@ def main():
 
         avg_rew = np.mean(ep_rewards[-20:]) if ep_rewards else 0.0
         avg_swaps = np.mean(ep_swaps_log[-20:]) if ep_swaps_log else 0.0
+        avg_map_swaps = np.mean(ep_map_swaps_log[-20:]) if ep_map_swaps_log else 0.0
         total_eps = ep_completed + ep_truncated
         trunc_pct = 100 * ep_truncated / max(1, total_eps)
         parts = [
             f"step={total_steps:>6d}",
             f"rew={avg_rew:+.3f}",
             f"swp={avg_swaps:.1f}",
+            f"map={avg_map_swaps:.1f}",
             f"trunc={trunc_pct:.0f}%",
             f"pl={losses['pl']:.3f}",
             f"vl={losses['vl']:.3f}",
@@ -568,6 +591,7 @@ def main():
             "step": total_steps,
             "reward": avg_rew,
             "swaps": avg_swaps,
+            "map_swaps": avg_map_swaps,
             "trunc_pct": trunc_pct,
             "pl": losses["pl"],
             "vl": losses["vl"],

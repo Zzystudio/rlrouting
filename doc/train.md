@@ -1411,3 +1411,40 @@ density_matrix simulator. Required memory: 16777216M, max memory: 257547M
 
 - 可继续使用：`models/policy_unified_phase1.pt`（Phase 1 路由策略）
 - 阻塞项：Phase 2 噪声感知微调需先解决 20q 保真度计算的内存问题（上述任选其一）
+
+---
+
+## 映射阶段（mapping phase）：布局与路由联合训练（2026.08.03，分支 mapping_routing_joint）
+
+### 背景
+
+初始映射此前只取 identity 或随机（`random_init`），从未被学习；SABRE 基线会用 8 个随机初始映射
+按距离启发式挑最优，PPO 起跑线吃亏。本分支将映射纳入 RL：**把映射看作虚拟 SWAP 动作集合**。
+
+### 设计（doc/plan.md）
+
+- episode 从**映射阶段**开始：agent 执行任意次**虚拟 SWAP**（仅重排初始映射，不写入物理线路、
+  不计入 `num_swaps`，单独记 `_mapping_swaps`），上限 `mapping_budget = n-1`，耗尽自动 commit
+- 动作空间扩为 `Discrete(num_edges + 1)`，最后一个动作 = commit（任何 `action >= num_edges` 均视为 commit，
+  兼容多拓扑 padding 无需索引转换）
+- 映射阶段奖励 = front-layer 距离塑形 `r_dist`（稠密信号）；Phase 2 终端保真度经 GAE 反向塑造布局
+- 观测追加 1 维 phase 标志；commit 仅在映射阶段可用（掩码），死锁/未映射掩码同样作用于映射阶段
+- 兼容开关：`--mapping-phase / --no-mapping-phase`（关闭时完全恢复旧行为，旧 checkpoint 可加载，
+  `agent.load` 改为 strict=False）
+
+### 冒烟测试（4K 步，cross/ring/line_5q 三拓扑）
+
+- 训练/argmax 评估/beam search 全部跑通；`pytest` 21 项通过（含 3 个新增 mapping 测试）
+- 观测：`map_swaps` 从早期 ~1.4 收敛到 ~0.2 —— agent 倾向于直接 commit（对 5q 小线路
+  identity 布局已够好，虚拟 SWAP 的边际收益低于直接路由）。**待完整训练观察**：
+  若大线路（n8-20）上映射使用率仍低，需加课程手段（如训练初期强制至少 k 次虚拟 SWAP，
+  或对"front-layer 距离为 0 时 commit"给一次性 bonus）。
+
+### 新增/修改
+
+- `env.py`：`mapping_phase` 参数、`_step_mapping()`、`_apply_virtual_swap()`、`_end_step()`、
+  phase 观测、`clone()` 扩展、`info["mapping_swaps"]`
+- `agent.py`：`EdgeActorCritic.commit_head`、critic 输入 +phase、掩码含 commit 槽、
+  `load(strict=False)`、`with_commit=False` 兼容旧架构
+- `train_agent.py`：`--mapping-phase/--mapping-budget`、phase 缓冲、metrics `map_swaps` 列
+- `eval_policy.py`：`--mapping-phase`、commit 掩码、报告新增 Map 列、`CircuitMetrics.mapping_swaps`
