@@ -1325,3 +1325,89 @@ score(path) = -num_swaps + lambda_fid * fidelity(path)   # 噪声感知评分
 | Target (SABRE) | 6.7 | 3.8 | 4.0 | 0% |
 
 > 目标：在 SWAP 数上追平或超越 SABRE（6.7/3.8/4.0），同时保持 v4 的噪声感知优势。**核心思路**：用 SABRE 的信号教 PPO 基础路由能力，用 PPO 的噪声感知优化超越纯启发式。用 action masking 消除死锁，用 beam search 填补搜索缺口。
+
+---
+
+## Unified 20q 训练：Phase 1 完成，Phase 2 内存崩溃（2026.07.31）
+
+### 背景
+
+单个统一策略服务所有电路规模（n=8..20）。观测/动作空间按最大规模 padding（`--max-num-qubits 20`，`--max-num-edges 31` 来自 grid_5x4），一个模型覆盖全部电路+拓扑组合。
+
+- **拓扑**（3 个，均为 20 物理比特）：
+  - `line_20q`：20 条边（链）
+  - `ring_20q`：20 条边（环）
+  - `grid_5x4_20q`：31 条边（5×4 网格，定义 obs 最大维度）
+- **训练脚本**：`scripts/train_unified.sh`（Phase 1 = 500K 步，Phase 2 = 300K 步）
+- **参数**：`--split-prefix unified`（初始 split `unified_mixed`）、`--topo-balance episodes`、`--max-episode-steps 400`、`--reward-mode routing`
+- **产物**：`models/policy_unified_phase1.pt`、`models/ckpts_unified/`（100 个 checkpoint + metrics.csv）
+
+### Phase 1（routing，500K 步）— 完成
+
+训练曲线（`models/ckpts_unified/metrics.csv` 采样，共 1954 行）：
+
+```
+step=    256  rew=+0.00   swp=0.0   trunc=0%  ent=2.943  vl=1.001
+step=  41728  rew=+16.28  swp=15.4  trunc=1%  ent=1.512  vl=0.555
+step=  83200  rew=+21.01  swp=18.9  trunc=0%  ent=1.048  vl=0.351
+step= 166144  rew=+36.61  swp=21.9  trunc=0%  ent=0.998  vl=0.158
+step= 249088  rew=+54.87  swp=40.1  trunc=0%  ent=1.287  vl=0.302
+step= 332032  rew=+61.12  swp=52.2  trunc=0%  ent=1.264  vl=0.266
+step= 373504  rew=+79.34  swp=58.3  trunc=0%  ent=1.230  vl=0.309
+step= 456448  rew=+104.40 swp=108.5 trunc=0%  ent=1.731  vl=0.448
+step= 500224  rew=+74.65  swp=52.5  trunc=0%  ent=1.183  vl=0.184  ← 结束
+```
+
+最终各拓扑累计统计（tmux 日志末行，全 500K 步累计）：
+
+| 拓扑 | episodes | trunc | SWAPs (mean±std) | rew |
+|------|----------|-------|-------------------|-----|
+| line_20q | ~5142 | 0% | 44.6 ± 51.1 | +37.2 |
+| ring_20q | ~5229 | 0% | 37.2 ± 35.9 | +37.8 |
+| grid_5x4_20q | ~5121 | 0% | 14.2 ± 13.8 | +36.4 |
+
+观察：
+
+1. **训练稳定**：trunc 全程 ≈0%（死锁掩码有效），ent 从 2.94（远高于均匀 ln(31)≈3.43 附近起步）波动下降至 ~1.18，vl 收敛到 0.18。
+2. **reward 持续增长**：0 → ~75（中后期波动 45~104），SWAPs/episode 同步上升（~15 → ~50）——因为课程逐步引入更深、更大规模的电路，episode 内 2Q 门更多，绝对 reward 和 SWAP 数都变大。
+3. **Phase 1 日志中 `fid=0.0000` 是正常现象**：routing 模式不计算终端保真度，该列只是空列表均值。
+4. 权重保存时间：`policy_unified_phase1.pt` 07-31 17:44，`ckpts_unified/last.pt` 18:15。
+
+### Phase 2（noise_aware）— 启动即崩溃
+
+#### 现象
+
+加载 `policy_unified_phase1.pt` 后，第一个 episode 结束计算终端保真度时直接 OOM 退出：
+
+```
+ERROR:  [Experiment 0] Insufficient memory to run circuit circuit-162 using the
+density_matrix simulator. Required memory: 16777216M, max memory: 257547M
+```
+
+完整 traceback：`env.step()` → `_terminal_reward()` → `_compute_aer_fidelity()` → `NoiseSimulator.run()` → Aer `density_matrix` 模拟器报错。
+
+#### 根因
+
+`sim/sim.py:204` 硬编码 `method='density_matrix'`。密度矩阵内存按 **4^n** 增长：
+
+| n（比特数） | 密度矩阵大小 | 内存（complex128） |
+|--------------|--------------|-------------------|
+| 5（旧实验） | 4^5 = 1024 项 | 16 KB |
+| 12 | 4^12 = 1.7×10^7 项 | 268 MB |
+| 20（本实验） | 4^20 ≈ 1.1×10^12 项 | **≈16 TB**（机器上限 257 GB） |
+
+之前所有 noise_aware 训练都在 5q 上做（16 KB），没有暴露问题；本实验首次把 Phase 2 用到 20q 电路，密度矩阵模拟器直接要求 16 TB。
+
+#### 后续修复方向（未实施）
+
+| 方案 | 思路 |
+|------|------|
+| 按比特数选模拟方法 | n≤12 用 density_matrix，更大时退回 extended_stabilizer / statevector（注意 thermal relaxation 支持有限） |
+| 解析保真度代理 | env 已支持 `fidelity_fn` 回调，n 大时用基于门错误率+电路深度的解析估计替代 Aer |
+| 子集比特模拟 | 终端保真度只在前 k≤12 个比特上测量并做密度矩阵模拟（4^12=268 MB） |
+| 大尺度跳过 Phase 2 | 20q 只保留 Phase 1 纯路由（`scripts/train_large.sh` 已支持 `PHASE2=0`） |
+
+### 当前状态
+
+- 可继续使用：`models/policy_unified_phase1.pt`（Phase 1 路由策略）
+- 阻塞项：Phase 2 噪声感知微调需先解决 20q 保真度计算的内存问题（上述任选其一）

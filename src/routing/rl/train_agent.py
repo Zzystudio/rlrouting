@@ -84,18 +84,19 @@ def load_split(path: str) -> list[str]:
         return [line.strip() for line in f if line.strip()]
 
 
-def build_split_paths(data_dir: str) -> dict:
+def build_split_paths(data_dir: str, prefix: str = "stage1") -> dict:
+    """Split manifests; `prefix` allows per-scale datasets (e.g. large_n10)."""
     return {
-        "stage1_phase1": os.path.join(data_dir, "splits", "stage1_phase1.txt"),
-        "stage1_phase2": os.path.join(data_dir, "splits", "stage1_phase2.txt"),
-        "stage1_phase3": os.path.join(data_dir, "splits", "stage1_phase3.txt"),
-        "stage2_mixed": os.path.join(data_dir, "splits", "stage2_mixed.txt"),
-        "stage3_alg": os.path.join(data_dir, "splits", "stage3_alg.txt"),
+        f"{prefix}_phase1": os.path.join(data_dir, "splits", f"{prefix}_phase1.txt"),
+        f"{prefix}_phase2": os.path.join(data_dir, "splits", f"{prefix}_phase2.txt"),
+        f"{prefix}_phase3": os.path.join(data_dir, "splits", f"{prefix}_phase3.txt"),
+        f"{prefix}_mixed": os.path.join(data_dir, "splits", f"{prefix}_mixed.txt"),
+        f"{prefix}_alg": os.path.join(data_dir, "splits", f"{prefix}_alg.txt"),
     }
 
 
-def pick_circuit(data_dir: str, split_name: str, seed: Optional[int] = None):
-    split_map = build_split_paths(data_dir)
+def pick_circuit(data_dir: str, split_name: str, seed: Optional[int] = None, split_prefix: str = "stage1"):
+    split_map = build_split_paths(data_dir, split_prefix)
     split_path = split_map[split_name]
     paths = load_split(split_path)
     path = random.choice(paths)
@@ -111,29 +112,29 @@ def pick_circuit(data_dir: str, split_name: str, seed: Optional[int] = None):
 # ---------------------------------------------------------------------------
 #  Curriculum phase for Stage 1 — smooth overlap
 # ---------------------------------------------------------------------------
-def stage1_phase(progress: float) -> str:
+def stage1_phase(progress: float, prefix: str = "stage1") -> str:
     if progress < 0.30:
-        return "stage1_phase1"
+        return f"{prefix}_phase1"
     if progress < 0.40:
         p2 = (progress - 0.30) / 0.10
         if random.random() < p2:
-            return "stage1_phase2"
-        return "stage1_phase1"
+            return f"{prefix}_phase2"
+        return f"{prefix}_phase1"
     if progress < 0.60:
-        return "stage1_phase2"
+        return f"{prefix}_phase2"
     if progress < 0.70:
         p3 = (progress - 0.60) / 0.10
         if random.random() < p3:
-            return "stage1_phase3"
-        return "stage1_phase2"
-    return "stage1_phase3"
+            return f"{prefix}_phase3"
+        return f"{prefix}_phase2"
+    return f"{prefix}_phase3"
 
 
-def reward_mode_split(reward_mode: str) -> tuple:
+def reward_mode_split(reward_mode: str, prefix: str) -> tuple:
     mapping = {
-        "routing": ("stage1_phase1", stage1_phase),
-        "noise_aware": ("stage2_mixed", lambda _: "stage2_mixed"),
-        "fidelity_shaping": ("stage3_alg", lambda _: "stage3_alg"),
+        "routing": (f"{prefix}_phase1", lambda p: stage1_phase(p, prefix)),
+        "noise_aware": (f"{prefix}_mixed", lambda _: f"{prefix}_mixed"),
+        "fidelity_shaping": (f"{prefix}_alg", lambda _: f"{prefix}_alg"),
     }
     return mapping[reward_mode]
 
@@ -148,7 +149,7 @@ def lambda_fid_schedule(progress: float, warmup: float, max_val: float) -> float
 # ---------------------------------------------------------------------------
 #  create_env helper
 # ---------------------------------------------------------------------------
-def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_init, seed, gnn=None, use_gnn=True, max_num_edges=None, noise_config=None, lambda_fid=None, eta_dist=None):
+def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_init, seed, gnn=None, use_gnn=True, max_num_edges=None, max_num_qubits=None, noise_config=None, lambda_fid=None, eta_dist=None):
     kw = dict(
         dag=dag, hw=hw, coupling_map=coupling_map,
         reward_mode=reward_mode,
@@ -162,6 +163,8 @@ def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_ini
         kw["use_gnn"] = False
     if max_num_edges is not None:
         kw["max_num_edges"] = max_num_edges
+    if max_num_qubits is not None:
+        kw["max_num_qubits"] = max_num_qubits
     if noise_config is not None:
         kw["noise_config"] = noise_config
     if lambda_fid is not None:
@@ -222,6 +225,10 @@ def main():
     parser = argparse.ArgumentParser(description="Train routing policy with PPO")
     parser.add_argument("--data-dir", type=str, default="../traindata",
                         help="数据集根目录")
+    parser.add_argument("--split-prefix", type=str, default=None,
+                        help="split 文件名前缀，用于按规模区分数据集 "
+                             "(如 large_n10；默认按 reward-mode: "
+                             "routing->stage1, noise_aware->stage2, fidelity_shaping->stage3)")
     parser.add_argument("--topo", type=str, default=None,
                         help="硬件拓扑 JSON 路径（默认使用线性链）")
     parser.add_argument("--topo-list", type=str, default=None,
@@ -271,6 +278,8 @@ def main():
                         help="freq/readout 等其它参数扰动幅度（默认 0.10）")
     parser.add_argument("--eta-dist", type=float, default=1.0,
                         help="距离减少奖励系数（0=禁用，默认 1.0）")
+    parser.add_argument("--max-num-qubits", type=int, default=None,
+                        help="统一观测 qubit 维度（多规模混训时设为最大 n，默认=线路自身 n）")
     args = parser.parse_args()
 
     import torch
@@ -304,10 +313,17 @@ def main():
         topo_names = [f"topo{i}" for i in range(max(1, num_topos))]
 
     # Dataset
-    initial_split_key, phase_fn = reward_mode_split(args.reward_mode)
+    split_prefix = args.split_prefix or {
+        "routing": "stage1",
+        "noise_aware": "stage2",
+        "fidelity_shaping": "stage3",
+    }[args.reward_mode]
+    initial_split_key, phase_fn = reward_mode_split(args.reward_mode, split_prefix)
+    print(f"Split prefix: {split_prefix}  (initial split: {initial_split_key})")
 
     use_gnn = not args.no_gnn
-    sample_dag = pick_circuit(args.data_dir, initial_split_key, seed=args.seed)
+    sample_dag = pick_circuit(args.data_dir, initial_split_key, seed=args.seed,
+                              split_prefix=split_prefix)
 
     if use_gnn:
         shared_gnn = SubGNN(subgraph="full")
@@ -324,17 +340,20 @@ def main():
                      args.max_episode_steps, args.random_init, args.seed,
                      gnn=shared_gnn, use_gnn=use_gnn,
                      max_num_edges=max_edges,
+                     max_num_qubits=args.max_num_qubits,
                      noise_config=noise_config if args.reward_mode != "routing" else None,
                      lambda_fid=0.0 if args.reward_mode != "routing" else None,
                      eta_dist=args.eta_dist)
 
+    agent_n_qubits = args.max_num_qubits or sample_dag.num_logical_qubits
+    agent_action_dim = max_edges
     agent = PPOAgent(
         obs_dim=int(np.prod(env.observation_space.shape)),
-        action_dim=max_edges,
+        action_dim=agent_action_dim,
         lr=args.lr,
         device=args.device,
         gnn=shared_gnn,
-        num_qubits=sample_dag.num_logical_qubits,
+        num_qubits=agent_n_qubits,
         num_edges=max_edges,
         coupling_map=coupling_map,
         vf_coef=args.vf_coef,
@@ -395,7 +414,8 @@ def main():
                 ep_buffer["obs"].append(obs)
 
             deadlock_mask = env.get_deadlock_mask()
-            action, logp, val = agent.act(obs, deadlock_mask=deadlock_mask)
+            combined_mask = deadlock_mask | env.get_unmapped_mask()
+            action, logp, val = agent.act(obs, deadlock_mask=combined_mask)
             next_obs, reward, done, truncated, info = env.step(action)
 
             episode_end = done or truncated
@@ -434,7 +454,8 @@ def main():
 
                 progress = total_steps / args.timesteps
                 split_key = phase_fn(progress)
-                new_dag = pick_circuit(args.data_dir, split_key, seed=args.seed + total_steps)
+                new_dag = pick_circuit(args.data_dir, split_key, seed=args.seed + total_steps,
+                                       split_prefix=split_prefix)
                 # 多拓扑：按 --topo-balance 策略选拓扑
                 if num_topos > 1:
                     if args.topo_balance == "steps":
@@ -461,6 +482,7 @@ def main():
                                  args.seed + total_steps,
                                  gnn=shared_gnn, use_gnn=use_gnn,
                                  max_num_edges=max_edges,
+                                 max_num_qubits=args.max_num_qubits,
                                  noise_config=noise_config if args.reward_mode != "routing" else None,
                                  lambda_fid=cur_lambda_fid,
                                  eta_dist=args.eta_dist)

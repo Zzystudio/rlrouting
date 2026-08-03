@@ -63,6 +63,7 @@ class RoutingEnv(gym.Env):
         unfinished_penalty: float = 0.5,
 
         max_num_edges: Optional[int] = None,
+        max_num_qubits: Optional[int] = None,
         random_init: bool = True,
         use_gnn: bool = True,
         gnn: Optional[SubGNN] = None,
@@ -75,6 +76,7 @@ class RoutingEnv(gym.Env):
         self.coupling_map = coupling_map
         self.num_edges = len(coupling_map)
         self.num_qubits = dag.num_logical_qubits
+        self.max_num_qubits = max_num_qubits or self.num_qubits
         self.noise_config = noise_config
 
         self.reward_mode = reward_mode
@@ -114,7 +116,7 @@ class RoutingEnv(gym.Env):
             self._gnn_dim = 0
 
         self.action_space = gym.spaces.Discrete(self.num_edges)
-        obs_dim = self._gnn_dim + self.num_qubits + 1
+        obs_dim = self._gnn_dim + self.max_num_qubits + 1
         self.observation_space = gym.spaces.Box(
             -np.inf, np.inf, (obs_dim,), dtype=np.float32
         )
@@ -190,6 +192,10 @@ class RoutingEnv(gym.Env):
             [m / max(1, self.num_qubits) for m in self.mapping],
             dtype=np.float32,
         )
+        if self.max_num_qubits > self.num_qubits:
+            pad = np.zeros(self.max_num_qubits - self.num_qubits, dtype=np.float32)
+            map_vec = np.concatenate([map_vec, pad])
+
         progress = np.array(
             [len(self.executed) / max(1, self.dag.num_gates)], dtype=np.float32
         )
@@ -215,11 +221,10 @@ class RoutingEnv(gym.Env):
                 h_q = qubit_h[q]
                 edge_feats_list.extend([h_p, h_q, h_p - h_q, sabre_feats[i]])
             edge_feats = np.concatenate(edge_feats_list).astype(np.float32)
-            obs = np.concatenate([edge_feats, map_vec, progress]).astype(np.float32)
-            # 多拓扑 padding：若当前拓扑边数少于 max，补零
             if self.max_num_edges > self.num_edges:
                 pad_len = (self.max_num_edges - self.num_edges) * self._edge_feat_dim
-                obs = np.pad(obs, (0, pad_len), constant_values=0)
+                edge_feats = np.pad(edge_feats, (0, pad_len), constant_values=0)
+            obs = np.concatenate([edge_feats, map_vec, progress]).astype(np.float32)
             return obs
         return np.concatenate([map_vec, progress]).astype(np.float32)
 
@@ -323,6 +328,15 @@ class RoutingEnv(gym.Env):
                 mask[list(recent)[0]] = True
         return mask
 
+    def get_unmapped_mask(self):
+        """返回 (num_edges,) bool 数组，True = 该边两端均无映射 qubit（无效换边）。"""
+        occupied = {p for p in self.mapping}
+        mask = np.zeros(self.num_edges, dtype=bool)
+        for i, (p, q) in enumerate(self.coupling_map):
+            if p not in occupied and q not in occupied:
+                mask[i] = True
+        return mask
+
     # ------------------------------------------------------------------
     #  Env 克隆 (用于 Beam Search 推理)
     # ------------------------------------------------------------------
@@ -335,6 +349,7 @@ class RoutingEnv(gym.Env):
         new.coupling_map = self.coupling_map
         new.num_edges = self.num_edges
         new.num_qubits = self.num_qubits
+        new.max_num_qubits = self.max_num_qubits
         new.noise_config = self.noise_config
         new.reward_mode = self.reward_mode
         new.gate_base_reward = self.gate_base_reward

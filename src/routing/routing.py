@@ -37,11 +37,11 @@ def greedy_route(
     dag = CircuitDAG.from_circuit(circuit)
     hw = HardwareFeatures.from_noise_config(config)
     coupling_map = list(config.coupling_map)
-    n = circuit.num_qubits
+    n_phys = max(max(e) for e in coupling_map) + 1
 
-    mapping = list(range(n))
+    mapping = list(range(n_phys))
 
-    phys = QuantumCircuit(n, circuit.num_clbits)
+    phys = QuantumCircuit(n_phys, circuit.num_clbits)
     inv = {p: l for l, p in enumerate(mapping)}
 
     def do_swap(p: int, q: int):
@@ -98,17 +98,23 @@ def sabre_route(
     seed: int = 0,
 ):
     """使用 Qiskit SabreSwap 做路由，返回 (物理电路, 信息字典)。"""
+    from qiskit import QuantumCircuit
     from qiskit.transpiler import PassManager, CouplingMap
     from qiskit.transpiler.passes import SabreSwap as QiskitSabreSwap
 
     coupling_list = list(config.coupling_map)
     cm = CouplingMap(coupling_list)
 
+    qc = circuit
+    if circuit.num_qubits < cm.size():
+        qc = QuantumCircuit(cm.size(), circuit.num_clbits)
+        qc.compose(circuit, inplace=True)
+
     sabre = QiskitSabreSwap(coupling_map=cm, heuristic=heuristic, trials=swap_trials, seed=seed)
     pm = PassManager(sabre)
 
     t0 = time.perf_counter()
-    phys = pm.run(circuit)
+    phys = pm.run(qc)
     wall_time_ms = (time.perf_counter() - t0) * 1000
 
     num_swaps = sum(1 for inst, qargs, cargs in phys.data if inst.name == "swap")

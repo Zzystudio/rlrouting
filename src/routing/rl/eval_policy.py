@@ -145,6 +145,8 @@ def evaluate_circuit(
     seed: int = 0,
     noise_config: Optional[NoiseConfig] = None,
     use_deadlock_mask: bool = True,
+    max_num_qubits: Optional[int] = None,
+    max_num_edges: Optional[int] = None,
 ) -> CircuitMetrics:
     import torch
     env = RoutingEnv(
@@ -153,6 +155,8 @@ def evaluate_circuit(
         random_init=False, seed=seed,
         gnn=agent.gnn, use_gnn=agent.gnn is not None,
         noise_config=noise_config if reward_mode != 'routing' else None,
+        max_num_qubits=max_num_qubits,
+        max_num_edges=max_num_edges,
     )
 
     obs, _ = env.reset()
@@ -165,10 +169,12 @@ def evaluate_circuit(
             mask = None
             if use_deadlock_mask and hasattr(env, 'get_deadlock_mask') and agent.gnn is not None:
                 dm = env.get_deadlock_mask()
-                mask = torch.ones(agent.num_edges, dtype=torch.bool, device=agent.device)
+                um = env.get_unmapped_mask()
+                combined = dm | um
+                mask = torch.zeros(agent.num_edges, dtype=torch.bool, device=agent.device)
                 mask[:len(coupling_map)] = True
-                for i in range(min(len(dm), len(mask))):
-                    if dm[i]:
+                for i in range(min(len(combined), len(mask))):
+                    if combined[i]:
                         mask[i] = False
                 mask = mask.unsqueeze(0)
             logits, _ = agent._forward_obs(obs, action_mask=mask)
@@ -207,6 +213,8 @@ def evaluate_circuit_beam(
     seed: int = 0,
     noise_config: Optional[NoiseConfig] = None,
     beam_width: int = 3,
+    max_num_qubits: Optional[int] = None,
+    max_num_edges: Optional[int] = None,
 ) -> CircuitMetrics:
     import torch
     env = RoutingEnv(
@@ -215,6 +223,8 @@ def evaluate_circuit_beam(
         random_init=False, seed=seed,
         gnn=agent.gnn, use_gnn=agent.gnn is not None,
         noise_config=noise_config if reward_mode != 'routing' else None,
+        max_num_qubits=max_num_qubits,
+        max_num_edges=max_num_edges,
     )
 
     obs, _ = env.reset()
@@ -229,8 +239,9 @@ def evaluate_circuit_beam(
             mask[:len(coupling_map)] = True
             if hasattr(env, 'get_deadlock_mask'):
                 dm = env.get_deadlock_mask()
+                um = env.get_unmapped_mask()
                 for i in range(min(len(dm), len(mask))):
-                    if dm[i]:
+                    if dm[i] or um[i]:
                         mask[i] = False
             mask = mask.unsqueeze(0)
 
@@ -244,15 +255,13 @@ def evaluate_circuit_beam(
             for i in range(topk_indices.shape[0]):
                 a = topk_indices[i].item()
                 clone = env.clone()
-                _, _, done_c, truncated_c, info_c = clone.step(a)
-                if done_c:
-                    score = 10.0
-                elif truncated_c:
-                    score = -10.0
+                _, reward_c, done_c, truncated_c, info_c = clone.step(a)
+                clone_obs = clone._obs()
+                _, v = agent._forward_obs(clone_obs)
+                if done_c or truncated_c:
+                    score = reward_c
                 else:
-                    clone_obs = clone._obs()
-                    _, v = agent._forward_obs(clone_obs)
-                    score = v.item()
+                    score = reward_c + agent.gamma * v.item()
                 if score > best_score:
                     best_score = score
                     best_action = a
@@ -509,16 +518,16 @@ def main():
     parser.add_argument('--data-dir', type=str, default='../traindata',
                         help='dataset root directory')
     parser.add_argument('--split', type=str, default='stage1_phase3',
-                        choices=['stage1_phase1', 'stage1_phase2',
-                                 'stage1_phase3', 'stage2_mixed',
-                                 'stage3_alg'],
-                        help='split to evaluate on')
+                        help='split file name in <data-dir>/splits/ '
+                             '(without .txt; e.g. stage1_phase3 or large_n10_test)')
     parser.add_argument('--reward-mode', type=str, default='routing',
                         choices=['routing', 'noise_aware', 'fidelity_shaping'])
     parser.add_argument('--topo', type=str, default=None,
                         help='hardware topology JSON')
     parser.add_argument('--num-qubits', type=int, default=5,
                         help='physical qubits (default linear chain)')
+    parser.add_argument('--max-num-qubits', type=int, default=None,
+                        help='fixed obs qubit dim for unified models (default=num-qubits)')
     parser.add_argument('--max-episode-steps', type=int, default=200)
     parser.add_argument('--device', type=str, default='cpu')
     parser.add_argument('--seed', type=int, default=0)
@@ -529,6 +538,8 @@ def main():
                         help='use argmax for action selection')
     parser.add_argument('--baselines', action='store_true', default=False,
                         help='also run random, greedy, and SABRE baselines')
+    parser.add_argument('--no-random', action='store_true', default=False,
+                        help='skip the random baseline (keep greedy and SABRE)')
     parser.add_argument('--sabre-heuristic', type=str, default='decay',
                         choices=['basic', 'decay', 'lookahead'],
                         help='SABRE heuristic (default: decay)')
@@ -581,15 +592,19 @@ def main():
         max_episode_steps=args.max_episode_steps,
         random_init=False, seed=args.seed,
         gnn=shared_gnn, use_gnn=use_gnn,
+        max_num_edges=(31 if args.max_num_qubits else None),
+        max_num_qubits=args.max_num_qubits,
     )
 
+    agent_n_qubits = args.max_num_qubits or sample_dag.num_logical_qubits
+    agent_n_edges = (31 if args.max_num_qubits else len(coupling_map))
     agent = PPOAgent(
         obs_dim=int(np.prod(sample_env.observation_space.shape)),
-        action_dim=int(sample_env.action_space.n),
+        action_dim=agent_n_edges,
         device=args.device,
         gnn=shared_gnn,
-        num_qubits=sample_dag.num_logical_qubits,
-        num_edges=len(coupling_map),
+        num_qubits=agent_n_qubits,
+        num_edges=agent_n_edges,
         coupling_map=coupling_map,
     )
     agent.load(args.model)
@@ -618,6 +633,8 @@ def main():
                     seed=args.seed + i,
                     noise_config=config if args.reward_mode != 'routing' else None,
                     beam_width=args.beam_width,
+                    max_num_qubits=args.max_num_qubits,
+                    max_num_edges=(31 if args.max_num_qubits else None),
                 )
             else:
                 m = evaluate_circuit(
@@ -627,6 +644,8 @@ def main():
                     deterministic=args.deterministic,
                     seed=args.seed + i,
                     noise_config=config if args.reward_mode != 'routing' else None,
+                    max_num_qubits=args.max_num_qubits,
+                    max_num_edges=(31 if args.max_num_qubits else None),
                 )
             m.circuit_path = rel_path
             if args.verbose:
@@ -645,24 +664,25 @@ def main():
     if args.baselines:
         # Random
         random_metrics = []
-        for i, rel_path in enumerate(rel_paths):
-            _progress(i, len(rel_paths), 'Random')
-            qc = load_qc(args.data_dir, rel_path)
-            dag = CircuitDAG.from_circuit(qc)
-            m = evaluate_random(
-                dag, hw, coupling_map,
-                reward_mode=args.reward_mode,
-                max_episode_steps=args.max_episode_steps,
-                seed=args.seed + i + 1000,
-                noise_config=config if args.reward_mode != 'routing' else None,
-            )
-            m.circuit_path = rel_path
-            if args.verbose:
-                tag = 'OK' if m.completed else 'TRUNC'
-                print(f'{tag} swaps={m.num_swaps} steps={m.episode_steps} {m.wall_time_ms:.0f}ms')
-            random_metrics.append(m)
-        random_stats = aggregate(random_metrics)
-        print_report('Random', random_stats, show_fidelity=show_fid)
+        if not args.no_random:
+            for i, rel_path in enumerate(rel_paths):
+                _progress(i, len(rel_paths), 'Random')
+                qc = load_qc(args.data_dir, rel_path)
+                dag = CircuitDAG.from_circuit(qc)
+                m = evaluate_random(
+                    dag, hw, coupling_map,
+                    reward_mode=args.reward_mode,
+                    max_episode_steps=args.max_episode_steps,
+                    seed=args.seed + i + 1000,
+                    noise_config=config if args.reward_mode != 'routing' else None,
+                )
+                m.circuit_path = rel_path
+                if args.verbose:
+                    tag = 'OK' if m.completed else 'TRUNC'
+                    print(f'{tag} swaps={m.num_swaps} steps={m.episode_steps} {m.wall_time_ms:.0f}ms')
+                random_metrics.append(m)
+            random_stats = aggregate(random_metrics)
+            print_report('Random', random_stats, show_fidelity=show_fid)
 
         # Greedy
         greedy_metrics = []
@@ -719,7 +739,8 @@ def main():
             'agent': [_asdict(m) for m in agent_metrics],
         }
         if args.baselines:
-            out['random'] = [_asdict(m) for m in random_metrics]
+            if not args.no_random:
+                out['random'] = [_asdict(m) for m in random_metrics]
             out['greedy'] = [_asdict(m) for m in greedy_metrics]
             out['sabre'] = [_asdict(m) for m in sabre_metrics]
         with open(args.out, 'w') as f:

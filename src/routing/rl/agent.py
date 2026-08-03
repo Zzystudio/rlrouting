@@ -210,7 +210,9 @@ class PPOAgent:
                 pad = torch.zeros(self.num_edges - ef.shape[0], ef.shape[1],
                                   device=ef.device, dtype=ef.dtype)
                 ef = torch.cat([ef, pad], dim=0)
-            mv_t = torch.tensor(mv, dtype=torch.float32, device=self.device).unsqueeze(0)
+            mv_raw = torch.tensor(mv, dtype=torch.float32, device=self.device)
+            mv_t = torch.zeros(1, self.num_qubits, dtype=torch.float32, device=self.device)
+            mv_t[0, :mv_raw.shape[0]] = mv_raw
             pg_t = torch.tensor(pg, dtype=torch.float32, device=self.device).unsqueeze(0)
             all_ef.append(ef.unsqueeze(0))
             all_mv.append(mv_t)
