@@ -149,12 +149,13 @@ def evaluate_circuit(
     use_deadlock_mask: bool = True,
     max_num_qubits: Optional[int] = None,
     max_num_edges: Optional[int] = None,
+    random_init: bool = False,
 ) -> CircuitMetrics:
     import torch
     env = RoutingEnv(
         dag, hw, coupling_map, reward_mode=reward_mode,
         max_episode_steps=max_episode_steps,
-        random_init=False, seed=seed,
+        random_init=random_init, seed=seed,
         gnn=agent.gnn, use_gnn=agent.gnn is not None,
         noise_config=noise_config if reward_mode != 'routing' else None,
         max_num_qubits=max_num_qubits,
@@ -222,12 +223,13 @@ def evaluate_circuit_beam(
     beam_width: int = 3,
     max_num_qubits: Optional[int] = None,
     max_num_edges: Optional[int] = None,
+    random_init: bool = False,
 ) -> CircuitMetrics:
     import torch
     env = RoutingEnv(
         dag, hw, coupling_map, reward_mode=reward_mode,
         max_episode_steps=max_episode_steps,
-        random_init=False, seed=seed,
+        random_init=random_init, seed=seed,
         gnn=agent.gnn, use_gnn=agent.gnn is not None,
         noise_config=noise_config if reward_mode != 'routing' else None,
         max_num_qubits=max_num_qubits,
@@ -309,11 +311,12 @@ def evaluate_random(
     max_episode_steps: int = 200,
     seed: int = 0,
     noise_config: Optional[NoiseConfig] = None,
+    random_init: bool = False,
 ) -> CircuitMetrics:
     env = RoutingEnv(
         dag, hw, coupling_map, reward_mode=reward_mode,
         max_episode_steps=max_episode_steps,
-        random_init=False, seed=seed,
+        random_init=random_init, seed=seed,
         use_gnn=False,
         noise_config=noise_config if reward_mode != 'routing' else None,
     )
@@ -552,6 +555,9 @@ def main():
     parser.add_argument('--mapping-phase', action=argparse.BooleanOptionalAction,
                         default=True,
                         help='model was trained with mapping phase (commit action)')
+    parser.add_argument('--random-init', action=argparse.BooleanOptionalAction,
+                        default=False,
+                        help='start each episode from a random initial layout')
     parser.add_argument('--deterministic', action=argparse.BooleanOptionalAction,
                         default=True,
                         help='use argmax for action selection')
@@ -655,6 +661,7 @@ def main():
                     beam_width=args.beam_width,
                     max_num_qubits=args.max_num_qubits,
                     max_num_edges=(31 if args.max_num_qubits else None),
+                    random_init=args.random_init,
                 )
             else:
                 m = evaluate_circuit(
@@ -666,6 +673,7 @@ def main():
                     noise_config=config if args.reward_mode != 'routing' else None,
                     max_num_qubits=args.max_num_qubits,
                     max_num_edges=(31 if args.max_num_qubits else None),
+                    random_init=args.random_init,
                 )
             m.circuit_path = rel_path
             if args.verbose:
@@ -695,6 +703,7 @@ def main():
                     max_episode_steps=args.max_episode_steps,
                     seed=args.seed + i + 1000,
                     noise_config=config if args.reward_mode != 'routing' else None,
+                    random_init=args.random_init,
                 )
                 m.circuit_path = rel_path
                 if args.verbose:
