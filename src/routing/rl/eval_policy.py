@@ -264,22 +264,47 @@ def evaluate_circuit_beam(
             k = min(beam_width, (mask[0].sum().item()))
             topk_scores, topk_indices = masked_logits.topk(k)
 
-            best_action, best_score = topk_indices[0].item(), -float('inf')
+            # 批量：先克隆并 step（跳过无用 obs 计算），再批量 GNN forward
+            clones = []
             for i in range(topk_indices.shape[0]):
                 a = topk_indices[i].item()
                 clone = env.clone()
-                _, reward_c, done_c, truncated_c, info_c = clone.step(a)
-                clone_obs = clone._obs()
-                _, v = agent._forward_obs(clone_obs)
-                if done_c or truncated_c:
-                    score = reward_c
-                else:
-                    score = reward_c + agent.gamma * v.item()
-                if score > best_score:
-                    best_score = score
-                    best_action = a
+                _, reward_c, done_c, truncated_c, info_c = clone.step(a, compute_obs=False)
+                clones.append((clone, a, reward_c, done_c, truncated_c))
 
-        obs, reward, done, truncated, info = env.step(best_action)
+            best_action, best_score = topk_indices[0].item(), -float('inf')
+            best_clone_obs = None
+            if agent.gnn is not None:
+                graph_datas = [c.build_graph_data() for c, *_ in clones]
+                qubit_hs = agent.gnn.node_embeddings_batched(graph_datas)
+                for (clone, a, reward_c, done_c, truncated_c), qh in zip(clones, qubit_hs):
+                    clone_obs = clone._obs(qubit_h=qh.cpu().numpy())
+                    _, v = agent._forward_obs(clone_obs)
+                    if done_c or truncated_c:
+                        score = reward_c
+                    else:
+                        score = reward_c + agent.gamma * v.item()
+                    if score > best_score:
+                        best_score = score
+                        best_action = a
+                        best_clone_obs = clone_obs
+            else:
+                for clone, a, reward_c, done_c, truncated_c in clones:
+                    clone_obs = clone._obs()
+                    _, v = agent._forward_obs(clone_obs)
+                    if done_c or truncated_c:
+                        score = reward_c
+                    else:
+                        score = reward_c + agent.gamma * v.item()
+                    if score > best_score:
+                        best_score = score
+                        best_action = a
+                        best_clone_obs = clone_obs
+
+        # 胜出 clone 就是 step 后的环境：跳过 env 的重复 GNN obs
+        obs, reward, done, truncated, info = env.step(best_action, compute_obs=False)
+        if best_clone_obs is not None:
+            obs = best_clone_obs
         step += 1
 
     wall_time_ms = (time.perf_counter() - t0) * 1000

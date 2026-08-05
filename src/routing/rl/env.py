@@ -214,7 +214,20 @@ class RoutingEnv(gym.Env):
     # ------------------------------------------------------------------
     #  观测
     # ------------------------------------------------------------------
-    def _obs(self):
+    def build_graph_data(self):
+        """构建 RoutingGraphData（含 executed / executable 状态），供批量 GNN 推理复用。"""
+        executed_mask = np.zeros(self.dag.num_gates, dtype=bool)
+        for idx in self.executed:
+            executed_mask[idx] = True
+        graph_data = build_routing_graph(
+            self.dag, self.mapping, self.hw, self.coupling_map,
+            executed_mask=executed_mask,
+            executable_2q=set(self.executable_2q),
+        )
+        self._last_graph_data = graph_data
+        return graph_data
+
+    def _obs(self, qubit_h=None):
         map_vec = np.array(
             [m / max(1, self.num_qubits) for m in self.mapping],
             dtype=np.float32,
@@ -228,19 +241,12 @@ class RoutingEnv(gym.Env):
         )
         phase = np.array([1.0 if self.mapping_phase else 0.0], dtype=np.float32)
         if self._gnn is not None:
-            executed_mask = np.zeros(self.dag.num_gates, dtype=bool)
-            for idx in self.executed:
-                executed_mask[idx] = True
-            graph_data = build_routing_graph(
-                self.dag, self.mapping, self.hw, self.coupling_map,
-                executed_mask=executed_mask,
-                executable_2q=set(self.executable_2q),
-            )
-            self._last_graph_data = graph_data
             self._last_map_vec = map_vec
             self._last_progress = progress
-            with torch.no_grad():
-                qubit_h = self._gnn.node_embeddings(graph_data).cpu().numpy()
+            if qubit_h is None:
+                graph_data = self.build_graph_data()
+                with torch.no_grad():
+                    qubit_h = self._gnn.node_embeddings(graph_data).cpu().numpy()
             sabre_feats = self._sabre_edge_features()
             self._last_sabre_feats = sabre_feats
             edge_feats_list = []
@@ -540,7 +546,7 @@ class RoutingEnv(gym.Env):
             return self.lambda_fid * fid
         return 0.0
 
-    def _end_step(self, reward: float, info: dict):
+    def _end_step(self, reward: float, info: dict, compute_obs: bool = True):
         """统一收尾：done / truncated 判定与终端奖励。"""
         info["mapping_swaps"] = self._mapping_swaps
         done = len(self.executed) == self.dag.num_gates
@@ -552,9 +558,10 @@ class RoutingEnv(gym.Env):
             remaining = self.dag.num_gates - len(self.executed)
             reward += -self.unfinished_penalty * remaining
             info["truncated_remaining"] = remaining
-        return self._obs(), reward, done, truncated, info
+        obs = self._obs() if compute_obs else None
+        return obs, reward, done, truncated, info
 
-    def _step_mapping(self, action: int):
+    def _step_mapping(self, action: int, compute_obs: bool = True):
         """映射阶段：虚拟 SWAP 重排初始布局；commit 动作（>= num_edges）结束阶段。"""
         info: dict = {}
         reward = 0.0
@@ -575,19 +582,19 @@ class RoutingEnv(gym.Env):
                 self.mapping_phase = False
                 r_exec, r_prop = self._auto_execute_batch()
                 reward += r_exec + r_prop
-        return self._end_step(reward, info)
+        return self._end_step(reward, info, compute_obs=compute_obs)
 
     # ------------------------------------------------------------------
     #  step
     # ------------------------------------------------------------------
-    def step(self, action: int):
+    def step(self, action: int, compute_obs: bool = True):
         self._episode_step += 1
         if self.mapping_phase:
-            return self._step_mapping(action)
+            return self._step_mapping(action, compute_obs)
 
         if action >= self.num_edges:
             # 非映射阶段出现 commit 动作：视为无效（正常流程下会被掩码禁止）
-            return self._end_step(-self.invalid_penalty, {})
+            return self._end_step(-self.invalid_penalty, {}, compute_obs=compute_obs)
 
         p, q = self.coupling_map[action]
 
@@ -605,4 +612,4 @@ class RoutingEnv(gym.Env):
             r_dist = -self.eta_dist * (dist_after - dist_before) / max(dist_before, 1e-8)
             reward += r_dist
 
-        return self._end_step(reward, {})
+        return self._end_step(reward, {}, compute_obs=compute_obs)

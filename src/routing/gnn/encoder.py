@@ -145,9 +145,36 @@ class SubGNN(nn.Module):
         from ..graph.circuit_dag import RoutingGraphData as RGD
         assert isinstance(data, RGD), "node_embeddings expects RoutingGraphData"
         pyg = data.to_pyg("full")
+        pyg = pyg.to(next(self.encoder.parameters()).device)
         h = self.encoder.forward(pyg.x, pyg.edge_index, pyg.edge_attr)
         qubit_h = h[-data.num_physical:]  # last P nodes = qubit nodes
         return qubit_h
+
+    def node_embeddings_batched(self, data_list) -> list:
+        """对多个 RoutingGraphData 做批量 GNN 前向，返回每图 qubit 嵌入列表。
+
+        PyG batch 把多图拼接成一个大图，节点顺序为 [g_0, g_1, ...]，
+        每图的 qubit 节点位于该图段末尾（gates + qubits 拼接，qubits 在最后 P 个）。
+        """
+        from ..graph.circuit_dag import RoutingGraphData as RGD
+        from torch_geometric.data import Batch
+
+        assert all(isinstance(d, RGD) for d in data_list)
+        pygs = [d.to_pyg("full") for d in data_list]
+        dev = next(self.encoder.parameters()).device
+        pygs = [p.to(dev) for p in pygs]
+        batch = Batch.from_data_list(pygs)
+        h = self.encoder.forward(batch.x, batch.edge_index, batch.edge_attr)
+
+        # 切回每图的 qubit 节点（每图 = gates + qubits，qubits 在段尾 P 个）
+        outs = []
+        start = 0
+        for d in data_list:
+            seg = d.num_gates + d.num_physical
+            qubit_h = h[start + d.num_gates : start + seg]
+            outs.append(qubit_h)
+            start += seg
+        return outs
 
 
 def _to_tensor(arr: np.ndarray) -> torch.Tensor:

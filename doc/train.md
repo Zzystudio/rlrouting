@@ -1514,3 +1514,353 @@ trunc 从 100% 收敛到 0%，策略真正学习并使用映射阶段。
 **结论**：映射阶段在"布局有价值"的场景（网格/环小规模、随机起点）真正起作用，
 表现为结果对初始布局免疫；在布局无关场景（一维+深电路）正确选择少用或不用，
 与 5q 的"立即 commit"行为自洽。
+
+---
+
+## 20q 映射模型 + beam search 推理评估（2026.08.05）
+
+### 动机
+
+大拓扑验证只报告了 argmax 推理（grid 19.3 / line 66.1 / ring 52.6）。本实验在相同条件
+（映射模型 + 随机初始映射）下加入 1 步 beam search（`--beam-width 3`），对比 SABRE /
+Greedy / Random，检验「映射 + beam search」组合能否在 20q 上进一步缩小与 SABRE 的差距。
+
+### 评估设置
+
+- **模型**：`models/policy_map_unified.pt`（映射阶段 + commit 动作，n8-20 统一策略，等效 800K 步）
+- **拓扑**：line_20q / ring_20q / grid_5x4_20q（20 物理比特）
+- **数据集**：unified_test（60 circuits，n8/n10/n12/n16/n20 各 12 条）
+- **初始映射**：random（`--random-init`）
+- **奖励模式**：routing（纯路由）
+- **推理**：argmax vs beam3（top-K 克隆 + V(s') 评分）
+- **超参数**：max-num-qubits 20、max-episode-steps 400、seed 0、cpu
+- **基线**：SABRE（decay, trials=20）、Greedy、Random
+
+### 评估命令
+
+```bash
+cd src
+python3 -m routing.rl.eval_policy \
+  --model ../models/policy_map_unified.pt --data-dir ../traindata \
+  --split unified_test --reward-mode routing \
+  --topo ../traindata/topo/grid_5x4_20q.json \
+  --max-num-qubits 20 --max-episode-steps 400 --random-init \
+  --baselines --out ../results/eval20q_map_grid_argmax.json
+python3 -m routing.rl.eval_policy \
+  --model ../models/policy_map_unified.pt --data-dir ../traindata \
+  --split unified_test --reward-mode routing \
+  --topo ../traindata/topo/grid_5x4_20q.json \
+  --max-num-qubits 20 --max-episode-steps 400 --random-init \
+  --beam-width 3 --out ../results/eval20q_map_grid_beam3.json
+# line / ring 同参数，结果文件 eval20q_map_{line,ring}_{argmax,beam3}.json
+```
+
+### 结果（60 circuits，括号为完成率）
+
+> **口径说明**：`aggregate()` 的 SWAPs 均值只统计**已完成电路**（截断的不计入）。
+> 下面分两张表：`compl` 表 = 已完成电路均值（与原报告一致）；`ALL` 表 = 全部电路均值
+> （截断电路以各自 episode 时实际的 `num_swaps`~396-399 计入）。SABRE/Greedy 完成率 100%，两口径相同。
+
+#### completed-only（已完成电路，SWAPs 均值）
+
+| 拓扑 | PPO argmax | PPO beam3 | SABRE | Greedy | Random |
+|------|-----------|-----------|-------|--------|--------|
+| grid_5x4_20q | 19.3（100%） | **18.2**（100%） | **17.2**（100%） | 33.4 | 228.2（47%） |
+| line_20q | 66.1（97%） | **51.4**（82%） | **53.9**（100%） | 118.7 | 222.2（8%） |
+| ring_20q | 52.6（92%） | **48.9**（85%） | **45.5**（100%） | 81.8 | 311.0（3%） |
+
+#### 全部电路含截断（ALL，截断电路以实际 `num_swaps` 计入）
+
+| 拓扑 | PPO argmax | PPO beam3 | SABRE |
+|------|-----------|-----------|-------|
+| grid_5x4_20q | 19.3（无截断） | 18.2（无截断） | 17.2 |
+| line_20q | 77.2（截 2 条） | **115.0**（截 11 条） | **53.9** |
+| ring_20q | **81.3**（截 5 条） | 101.2（截 9 条） | **45.5** |
+
+> 截断电路的 `num_swaps` 均为 395-399（卡在 400 步上限）。
+> **ALL 口径下 beam3 反而远差于 argmax**（line 115.0 vs 77.2、ring 101.2 vs 81.3），
+> 「beam3 反超 SABRE」的结论只在 completed-only 口径下成立，属于截断裸漏的假象。
+
+### 逐规模明细（SWAPs，completed）
+
+#### grid_5x4_20q
+
+| n | PPO argmax | PPO beam3 | SABRE |
+|----|-----------|-----------|-------|
+| n8  | 6.6 | 7.0 | 7.5 |
+| n10 | 12.0 | 11.2 | 10.1 |
+| n12 | 11.3 | 11.2 | 11.0 |
+| n16 | 31.9 | 30.2 | 27.6 |
+| n20 | 34.8 | **31.4** | 29.8 |
+
+#### line_20q
+
+| n | argmax | beam3 | SABRE |
+|----|--------|-------|-------|
+| n8  | 17.2 | **16.2** | 14.6 |
+| n10 | 29.8 | 25.4（10/12） | 23.5 |
+| n12 | 34.6 | **27.0**（10/12） | 32.7 |
+| n16 | 120.8 | **97.8**（10/12） | 91.7 |
+| n20 | 140.5 | **117.6**（7/12） | 107.2 |
+
+#### ring_20q
+
+| n | argmax | beam3 | SABRE |
+|----|--------|-------|-------|
+| n8  | 17.3 | 21.5（11/12） | 14.6 |
+| n10 | 30.9 | 24.7（11/12） | 23.5 |
+| n12 | 34.5 | **29.9**（10/12） | 34.0 |
+| n16 | 121.4 | **101.3**（10/12） | 78.8 |
+| n20 | 84.4 | **74.8**（9/12） | 76.5 |
+
+### 结论
+
+1. **completed-only 口径下 beam3 优于 argmax**：grid 19.3→18.2、line 66.1→51.4、ring 52.6→48.9；
+   line 均值（51.4 < 53.9）、line n12、ring n20 反超 SABRE。**但这是排除截断后的结果**。
+2. **ALL 口径（含截断）下 beam3 全面劣于 argmax**：beam 完成率掉点导致截断电路
+   （SWAPs≈400）把均值拉高——line 115.0 vs argmax 77.2 vs SABRE 53.9；ring 101.2 vs 81.3。
+   grid 两口径相同（无截断），beam3 18.2 仍略优于 argmax 19.3、高于 SABRE 17.2。
+3. **beam search 以完成率为代价换取"已完成电路"的效率**：line 97%→82%（截 11 条）、
+   ring 92%→85%（截 9 条）。根因与 5q 一致——beam 的克隆 step 消耗映射/路由 stage 的
+   步数预算且 action mask 状态在克隆后不同步，深电路在 400 步内更易截断。
+4. **SABRE 是无可争议的胜者**：100% 完成率 + 全部口径下除 line completed-only 外全最低。
+   除非先解决 beam 的截断问题，否则「映射 + beam search 超越 SABRE」不成立。
+5. **beam3 用更少映射虚拟 SWAP**（grid 2.1 vs 3.6、line 1.6 vs 2.8、ring 1.5 vs 2.2）：
+   映射阶段用 V(s') 评分时 critic 更倾向提前 commit，映射收益被 beam 搜索本身部分覆盖。
+
+---
+
+## 20q 映射增益量化：有映射 vs 无映射（2026.08.05）
+
+### 动机
+
+上节（beam 评估）用的映射模型 `policy_map_unified.pt`。为量化「映射阶段」本身带来的提升，
+在**完全相同的评估条件**下重跑无映射统一模型 `policy_unified_phase1.pt` 作对比。
+
+### 评估命令
+
+```bash
+cd src
+python3 -m routing.rl.eval_policy \
+  --model ../models/policy_unified_phase1.pt --data-dir ../traindata \
+  --split unified_test --reward-mode routing \
+  --topo ../traindata/topo/grid_5x4_20q.json \
+  --max-num-qubits 20 --max-episode-steps 400 --random-init \
+  --no-mapping-phase --out ../results/eval20q_nomap_grid_5x4_20q.json
+# line / ring 同理；结果文件 eval20q_nomap_{line_20q,ring_20q}.json
+```
+
+两个模型同架构（EdgeActorCritic + GNN，统一 n8-20 padding），唯一差异是映射模型多出
+commit head 与映射阶段训练（等效 800K 步 vs 旧 300K 步）。评估均为 argmax + random-init。
+
+### 结果（completed-only SWAPs，随机起点）
+
+| 拓扑 | 无映射 | 有映射 | Δ | SABRE | 映射使用率(map) |
+|------|-------|--------|------|-------|----------------|
+| grid_5x4_20q | 22.8（60/60） | **19.3**（60/60） | **-3.4（-15.4%）** | 17.2 | 3.6 |
+| line_20q | 66.1（59/60） | 66.1（58/60） | -0.0（0%） | 53.9 | 2.8 |
+| ring_20q | 55.4（60/60） | **52.6**（55/60） | **-2.8（-5.1%）** | 45.5 | 2.2 |
+
+### 逐规模差异（有映射 - 无映射）
+
+| n | grid | line | ring |
+|----|------|------|------|
+| n8  | **-3.4** | **-5.1** | **-3.3** |
+| n10 | -1.8 | -1.7 | -0.9 |
+| n12 | **-3.6** | +0.3 | +0.2 |
+| n16 | **-6.2** | +2.4 | +15.6† |
+| n20 | -2.3 | +11.0† | +0.1 |
+
+> † 有映射模型在 line n20（10/12）、ring n16（8/12）完成率下降，completed-only 均值受
+> 「挑易电路」影响，实际差异被高估为正。
+
+### 结论
+
+1. **映射提升与拓扑维度强相关**：网格（grid）全规模一致受益 -1.8~-6.2 SWAPs（-15.4%），
+   环（ring）-5.1%，一维链（line）0%。虚拟 SWAP 在「高连通度拓扑 + 随机起点」上价值最大——
+   能把散布的逻辑 qubit 聚拢到中心区域，n16 收益峰值 -6.2。
+2. **小规模（n8/n10）三拓扑一致受益**（-5.1/-1.7/-3.3 等）：小电路大空间里布局敏感性高，
+   映射的边际收益直接。
+3. **一维 + 深电路布局无关**（line n12/n16/n20，ring n16/n20）：路由阶段的 SWAP 需求
+   （100+）远大于布局优化的量级，初始布局好坏不改变总成本，映射训练反而消耗步数。
+4. **总体提升 = grid -15%、ring -5%、line 0%**，约等于文档（08.04）记录的结论，
+   本次为同条件复现确认。距 SABRE 的差距（grid 17.2、line 53.9、ring 45.5）主要仍在路由阶段。
+5. **代价**：映射模型完成率略降（ring 60/60→55/60、line 59/60→58/60），虚拟 SWAP 消耗
+   episode 步数预算；对浅电路无影响。
+
+---
+
+## 编译时间优化：GPU 推理 + beam GNN 缓存复用（2026.08.05）
+
+### 背景
+
+与 SABRE 的对比中，编译时间一直是主要瓶颈：旧版 beam search 单电路 1.2~6.3s
+（SABRE ~5ms，慢 100~1000 倍）。本次实施两个 P0 优化：
+
+1. **T1 GPU 推理修复**（`agent.py`）：`self.gnn.to("cpu")` 硬编码改为
+   `self.gnn.to(device)`，`--device cuda` 下 GNN 真正在 GPU 上跑；
+   `encoder.py` 的 `node_embeddings` 将 pyg 数据迁移到 GNN 所在设备。
+2. **T2 beam 缓存复用**（`env.py` + `eval_policy.py`）：
+   - `env.py` 新增 `build_graph_data()`（从 `_obs()` 抽取）、`_obs(qubit_h=None)`
+     支持注入缓存嵌入、`step(action, compute_obs=False)` 跳过 obs 计算；
+   - beam 循环中 clone 只做 `step(compute_obs=False)`，候选图批量
+     `node_embeddings_batched()`（PyG `Batch.from_data_list`），再用
+     `_obs(qubit_h=...)` 组装 edge feats，消除每候选 2 次 GNN；
+   - 胜出 clone 的 obs 直接复用为下一步 obs，env 不再重复计算 obs
+     （原实现 env 与 clone 各算一次，浪费 ~25% 总耗时）。
+
+### 修复过程中的 bug
+
+- `eval_policy.py` 编辑时旧 `env.step(best_action)` 行残留，导致每步执行两次
+  step、obs 被覆盖 → 全部 400 步截断、完成率 0%。删除重复行后恢复。
+- 独立验证脚本需传 `max_num_qubits=20, max_num_edges=31`（与评估 CLI 一致），
+  否则 obs 维度不匹配（161 vs 171）。
+
+### 评测（unified_test 60 电路，policy_map_unified.pt，random-init，beam3，CPU）
+
+| 拓扑 | 旧版 avg(ms/ckt) | 新版 avg(ms/ckt) | 加速 | SWAPs 一致性 |
+|------|-----------------|-----------------|------|-------------|
+| grid_5x4_20q | 1240.1 | 488.0 | 2.54x | 18.2 == 18.2 |
+| line_20q | 6313.9 | 3604.8 | 1.75x | 51.4 == 51.4 |
+| ring_20q | 5286.1 | 3305.8 | 1.60x | 48.9 == 48.9 |
+
+- 全拓扑 SWAPs 与优化前逐位一致（动作轨迹相同），Comp% 一致（100/81.7/85.0）。
+- 结果文件：`results/eval20q_map_{grid,line,ring}_beam3_v2.json`
+
+### 每步耗时统计（profile_beam_new.py，n10，beam_width=3，CPU）
+
+在一个 episode 的**每一步**内，裁剪计时总耗时约 **22.2ms**，拆分为 7 个阶段
+（3 个候选 clone + 批量 GNN + 胜出步）：
+
+| 阶段 | 单步耗时(ms) | 占比 | 说明 |
+|------|-------------|------|------|
+| `env.clone()` | 0.62 | 2.8% | 浅拷贝环境可变状态 |
+| `clone.step(compute_obs=False)` | 0.57 | 2.6% | 克隆步骤执行 SWAP/commit，跳过 obs |
+| `c.build_graph_data()` ×3 | 5.50 | 24.7% | PyG 图构建（node/edge_index/edge_attr） |
+| `gnn.node_embeddings_batched()` | 6.59 | 29.6% | 3 图批量 GNN 节点嵌入 |
+| `_obs(qubit_h=...)` ×3 | 2.99 | 13.4% | 边特征拼接 + mapping/progress/phase 组装 |
+| `_forward_obs` V(s') ×3 | 0.77 | 3.5% | ActorCritic 值头预测（无图） |
+| `env.step(best_a, compute_obs=False)` | 5.20 | 23.4% | 胜出步执行 + 重新组装 obs（obs 复用前） |
+| **合计** | **22.24** | **100%** | 3 个候选下的平均单步总耗时 |
+
+各阶段**每步平均**（26 步）：
+clone=0.62、step(nobs)=0.57、graph=5.50、gnn_batch=6.59、obs_asm=2.99、
+fwd=0.77、env_step=5.20 ms。
+
+### 每步耗时占比分析
+
+1. **GNN 相关占绝对主导**：`build_graph_data`（24.7%）+ `gnn_batch`（29.6%）+
+   `_obs` 组装（13.4%）合计 **67.8%**（~15.1ms/步）。其中 `gnn_batch` 单步就
+   吃掉 29.6%，是当前单步最大瓶颈——它必须对 3 个候选图各做一次 GNN forward。
+2. **obs 重复计算被清除**：`env.step` 中的 5.20ms（23.4%）在「胜出 clone obs 复用」
+   改动后已被消除（env 不再重复算 obs）。当前跑分显示该改动让 line/ring 各再降
+   ~20%（见上方评测表，grid 1240→488ms 已含复用收益）。
+3. **纯环境开销很小**：`clone` + `step(nobs)` 合计仅 5.4%（1.19ms/步），不是瓶颈。
+4. **候选数量线性放大 GNN 开销**：3 个候选 → graph/gnn_batch/obs_asm 全部 ×3。
+   beam_width 增大时这三项的占比会同步上升（fwd 也会，但基数小）。
+5. **per-step 分解 vs 全电路**：n10 单电路 60~276ms，其中图构建/GNN 批等高阶项
+   按步数与每步 15ms 线性累积；n20 深电路（~50 步）该部分 ~750ms 是 line/ring
+   3.3~3.6s/ckt 的主体。
+
+### GPU vs CPU（n12 电路，12/12 完成）
+
+| device | avg ms/ckt |
+|--------|-----------|
+| cpu | 271 |
+| cuda | 259 |
+
+GPU 与 CPU 基本持平：单步 batch 太小（3 个图），传输/launch 开销吃掉收益。
+结论：当前规模 CPU 已足够，`--device cuda` 保留但无增益。
+
+### 结论
+
+1. T1+T2 使 beam3 编译时间整体降 1.6~2.5x，单电路从 1.2~6.3s 降到 0.5~3.6s；
+   grid（大图）收益最大。剩余瓶颈为图构建（98.7ms）+ GNN 批量推理（112.9ms）。
+2. 语义零变化：SWAPs/完成率与优化前完全一致。
+3. 下一步候选（T3/T4）：图构建缓存复用（同状态图不重复构建）、GNN batch 上
+   GPU 或剪枝无效候选、argmax 路径本身优化（grid 211ms 仍有优化空间）。
+
+---
+
+## 提升空间分析：速度 + 路由效果（2026.08.05）
+
+基于当前每步耗时拆解（见上节）与三拓扑 SWAP 差距（grid 18.2 vs 17.2、line
+51.4 vs 53.9、ring 48.9 vs 45.5），从编译速度和路由效果两个维度梳理可优化项。
+
+### 一、编译速度（按影响排序）
+
+#### 1. GNN 半精度 / 轻量化（最有效）
+
+`gnn_batch` 占单步 29.6%（6.6ms），GATEncoder 3 层 × 48 维 float32。
+
+| 手段 | 预期 |
+|------|------|
+| GNN 推理换 float16 | gnn_batch 时间 ~减半（3.6→1.8ms） |
+| `hidden_dim` 48→24 | GNN 参数量/计算 ~-30% |
+| 两者叠加 | gnn_batch 6.6 → ~2.3ms |
+
+#### 2. 自适应候选数（eval 侧）
+
+大部分步骤 top-1 与 top-2 的 V(s') 评分差显著。可先跑 argmax，只对 top-1
+做 V(s') 评估；评分低于阈值才展开其余候选。平均候选数 3 → ~1.5，直接按比例
+压缩 GNN 相关开销（67.8%）。
+
+#### 3. 图构建缓存（T3）
+
+`build_graph_data` 占 24.7%（5.5ms/步）。不同候选因 mapping 不同图不同，但
+DAG 的静态部分（节点/边拓扑）可预构建一次，每次 step 后仅用新 mapping 更新
+edge_attr。预估回收约 40%（~2.2ms/步）。
+
+#### 4. 热点 C++/Rust 重写
+
+PyG Data 构建、`build_routing_graph` 的 Python 循环开销约占图构建的 40-50%，
+用 C 扩展或 torch C++ API 可再挤 ~2ms/步。
+
+综合 → 单步从 17ms（清 obs 复用后）降到 ~8ms，全电路再提速约 2×。
+
+### 二、路由效果（按影响排序）
+
+#### 1. 后处理 SWAP 局部优化（最快见效）
+
+RL 路由完成后对 SWAP 序列做一回扫描：
+
+- 消除相邻逆 SWAP（A-B → 立即 B-A）
+- 检测可合并的冗余链（A-B, B-C, A-B → 等效 A-C）
+- 在最终映射附近试探 1 步 SWAP 是否缩短距离
+
+开销 ~1ms，预计剪掉 5-10% SWAP，深电路（line/ring）可能更多。
+
+#### 2. beam depth=2（带剪枝）
+
+当前 depth=1，line 距 SABRE 仍有 5-10 SWAPs。depth=2 评估两步后的价值，
+但候选爆炸（k²=9）。改剪枝版：top-2 → 每支只保留 top-1 → depth=2 共
+2+2=4 次 GNN（对比 depth=1 的 4 次，成本持平）。对应 `doc/plan.md` E2。
+
+#### 3. 映射阶段架构改进
+
+当前映射只对 grid 有效（-15.4%），ring 未受益（-5.1%），line 为 0%。原因：
+embedding 不感知 qubit 空间位置。方案（`doc/plan.md` 映射 v2）：
+
+- 加入拓扑拉普拉斯位置编码
+- 注意力 over qubit pairs 利用空间结构
+
+预计 ring 也能受益 5-10%。
+
+#### 4. 更深训练 + 更强数据增强
+
+当前模型 ~800K 步，line 仍有 2/60 截断。可扩展至 2M 步 + 针对性深电路采样
++ 加长 `noise_aware` 微调。最费时但空间大，模型尚未饱和。
+
+### 三、优先级建议
+
+| 优先级 | 类型 | 方案 | 预期收益 | 开发成本 |
+|--------|------|------|---------|---------|
+| P0 | 速度 | GNN float16 + hidden 减半 | gnn_batch -60% | 1-2 行代码 |
+| P0 | 效果 | 后处理 SWAP 剪枝 | SWAP -5~10% | ~50 行 |
+| P1 | 速度 | 自适应候选数 | GNN 总开销 -40% | ~30 行 eval 改动 |
+| P1 | 效果 | beam depth=2 + 剪枝 | line/ring SWAP -3~5 | ~100 行 |
+| P2 | 速度 | 图构建缓存 | graph -40% | ~200 行 |
+| P2 | 效果 | 映射阶段 v2 | ring 映射增益 | 架构改动 + 重训 |
+
+P0 两项合计可能不到 100 行代码，预期把 line 从 3.6s/ckt 拉到 ~2s，同时
+SWAP 再降 3-5 个，有望把 line 的 SWAP 差距（51.4 vs 53.9）追平 SABRE。

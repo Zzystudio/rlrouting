@@ -152,9 +152,10 @@ class PPOAgent:
 
         params = []
         if gnn is not None:
-            self.gnn.to("cpu")
+            self.gnn = gnn
             edge_feat_dim = self.gnn.encoder.out_dim * 3 + 5
             self.edge_feat_dim = edge_feat_dim
+            self.gnn.to(device)
             self.ac = EdgeActorCritic(edge_feat_dim, num_edges, num_qubits,
                                       with_commit=with_commit).to(device)
             params += list(self.gnn.parameters())

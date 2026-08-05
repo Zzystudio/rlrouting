@@ -4,6 +4,11 @@ Noise-adaptive quantum circuit routing via reinforcement learning and graph neur
 networks. Combines the noise simulator (`src/sim/sim.py`) with per-edge GNN encoding
 and PPO with SABRE-inspired features, distance reward, deadlock masking, and beam search.
 
+## Operating Environment / Hard Constraints
+
+- **磁盘 `/dev/sda1`（挂载于 `/data1`）已损坏**：所有操作（读写文件、训练/评估的输入输出、checkpoint、日志、临时文件等）**严禁涉及该硬盘**。不要创建、修改、读取或计划任何位于 `/data1` 下的路径；可用磁盘为 `/dev/nvme0n1p5`（挂载于 `/home`，项目所在）与 `/dev/sdb1`（挂载于 `/data2`）。临时文件请使用 `src/`、`/home` 或 `/tmp`（非 `/data1`）。
+- **每次跑完实验后，必须将实验结果写入 `doc/train.md`**：包括训练/评估命令、设置、关键日志摘要、评估结果表格以及结论与分析，按时间顺序追加到该文件末尾，并保持现有格式风格（`---` 分节、中文描述、代码块命令、markdown 表格）。
+
 ## Language / Framework / Package Manager
 
 - **Language**: Python (>=3.10)
