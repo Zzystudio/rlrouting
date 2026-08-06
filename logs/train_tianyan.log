@@ -1,0 +1,1187 @@
+==========================================================
+Tianyan 176 Policy Training (60q / 81 edges)
+  device:          cuda:7
+  phase 1 steps:   300000
+  phase 2 steps:   200000 (enabled=0)
+  max qubits:      60
+  max edges:       81
+  max episode len: 800
+  topology:        tianyan176_66q.json
+  split:           tianyan
+==========================================================
+Split prefix: tianyan  (initial split: tianyan_phase1)
+step=   256  rew=+0.000  swp=0.0  map=0.0  trunc=0%  pl=-0.001  vl=0.971  ent=4.394  kl=0.0029  gn=0.152
+step=   512  rew=+0.000  swp=0.0  map=0.0  trunc=0%  pl=-0.001  vl=0.937  ent=4.394  kl=0.0030  gn=0.151
+step=   768  rew=+0.000  swp=0.0  map=0.0  trunc=0%  pl=0.003  vl=0.942  ent=4.394  kl=0.0027  gn=0.125
+step=  1024  rew=-7.421  swp=0.0  map=8.0  trunc=100%  pl=0.028  vl=0.892  ent=4.394  kl=0.0147  gn=0.182
+step=  1280  rew=-7.421  swp=0.0  map=8.0  trunc=100%  pl=0.005  vl=0.902  ent=4.393  kl=0.0186  gn=0.174
+step=  1536  rew=-7.421  swp=0.0  map=8.0  trunc=100%  pl=0.001  vl=0.923  ent=4.392  kl=0.0180  gn=0.195
+step=  1792  rew=-7.113  swp=0.0  map=8.0  trunc=100%  pl=-0.028  vl=1.321  ent=4.394  kl=0.0061  gn=0.374
+step=  2048  rew=-7.113  swp=0.0  map=8.0  trunc=100%  pl=-0.000  vl=1.016  ent=4.394  kl=0.0033  gn=0.156
+step=  2304  rew=-7.113  swp=0.0  map=8.0  trunc=100%  pl=0.002  vl=1.018  ent=4.394  kl=0.0029  gn=0.142
+step=  2560  rew=-5.421  swp=0.0  map=7.3  trunc=100%  pl=-0.009  vl=0.889  ent=4.394  kl=0.0027  gn=0.144
+step=  2816  rew=-5.421  swp=0.0  map=7.3  trunc=100%  pl=-0.004  vl=0.960  ent=4.394  kl=0.0026  gn=0.136
+step=  3072  rew=-5.421  swp=0.0  map=7.3  trunc=100%  pl=-0.002  vl=0.966  ent=4.394  kl=0.0030  gn=0.129
+step=  3328  rew=-7.328  swp=0.0  map=7.5  trunc=100%  pl=0.020  vl=0.896  ent=4.394  kl=0.0113  gn=0.163
+step=  3584  rew=-7.328  swp=0.0  map=7.5  trunc=100%  pl=0.002  vl=0.956  ent=4.393  kl=0.0158  gn=0.139
+step=  3840  rew=-7.328  swp=0.0  map=7.5  trunc=100%  pl=0.001  vl=0.887  ent=4.393  kl=0.0158  gn=0.161
+step=  4096  rew=-7.276  swp=0.0  map=7.6  trunc=100%  pl=0.027  vl=1.048  ent=4.391  kl=0.0363  gn=0.163
+step=  4352  rew=-7.276  swp=0.0  map=7.6  trunc=100%  pl=0.037  vl=0.870  ent=4.383  kl=0.0529  gn=0.156
+step=  4608  rew=-7.276  swp=0.0  map=7.6  trunc=100%  pl=0.026  vl=0.996  ent=4.355  kl=0.0452  gn=0.164
+step=  4864  rew=-6.038  swp=126.5  map=7.7  trunc=83%  pl=-0.001  vl=0.904  ent=4.333  kl=0.0222  gn=0.197
+step=  5120  rew=-6.038  swp=126.5  map=7.7  trunc=83%  pl=0.006  vl=0.904  ent=4.357  kl=0.0100  gn=0.214
+step=  5376  rew=-6.038  swp=126.5  map=7.7  trunc=83%  pl=-0.004  vl=0.894  ent=4.344  kl=0.0152  gn=0.220
+step=  5632  rew=-5.852  swp=108.4  map=7.7  trunc=86%  pl=-0.007  vl=1.099  ent=4.342  kl=0.0122  gn=0.274
+step=  5888  rew=-5.852  swp=108.4  map=7.7  trunc=86%  pl=-0.001  vl=0.863  ent=4.356  kl=0.0074  gn=0.248
+step=  6144  rew=-5.852  swp=108.4  map=7.7  trunc=86%  pl=0.001  vl=0.914  ent=4.351  kl=0.0071  gn=0.252
+step=  6400  rew=-5.092  swp=94.9  map=7.8  trunc=88%  pl=-0.013  vl=0.664  ent=4.356  kl=0.0068  gn=0.302
+step=  6656  rew=-5.092  swp=94.9  map=7.8  trunc=88%  pl=-0.006  vl=0.983  ent=4.354  kl=0.0074  gn=0.467
+step=  6912  rew=-5.092  swp=94.9  map=7.8  trunc=88%  pl=0.001  vl=1.040  ent=4.363  kl=0.0078  gn=0.384
+step=  7168  rew=-4.776  swp=84.3  map=7.6  trunc=89%  pl=-0.005  vl=1.028  ent=4.360  kl=0.0063  gn=0.231
+step=  7424  rew=-4.776  swp=84.3  map=7.6  trunc=89%  pl=0.001  vl=0.825  ent=4.313  kl=0.0145  gn=0.250
+step=  7680  rew=-4.776  swp=84.3  map=7.6  trunc=89%  pl=0.003  vl=1.016  ent=4.312  kl=0.0130  gn=0.273
+step=  7936  rew=-3.978  swp=142.2  map=7.6  trunc=80%  pl=0.014  vl=0.590  ent=4.337  kl=0.0096  gn=0.301
+step=  8192  rew=-3.978  swp=142.2  map=7.6  trunc=80%  pl=0.000  vl=0.774  ent=4.390  kl=0.0046  gn=0.314
+step=  8448  rew=-3.978  swp=142.2  map=7.6  trunc=80%  pl=0.003  vl=0.876  ent=4.394  kl=0.0031  gn=0.311
+step=  8704  rew=-4.951  swp=129.3  map=7.6  trunc=82%  pl=0.001  vl=0.824  ent=4.394  kl=0.0029  gn=0.226
+step=  8960  rew=-4.951  swp=129.3  map=7.6  trunc=82%  pl=0.001  vl=0.902  ent=4.393  kl=0.0034  gn=0.376
+step=  9216  rew=-4.951  swp=129.3  map=7.6  trunc=82%  pl=0.000  vl=0.781  ent=4.390  kl=0.0038  gn=0.303
+step=  9472  rew=-5.550  swp=118.5  map=7.7  trunc=83%  pl=0.001  vl=1.006  ent=4.392  kl=0.0036  gn=0.267
+step=  9728  rew=-5.550  swp=118.5  map=7.7  trunc=83%  pl=-0.001  vl=0.951  ent=4.392  kl=0.0032  gn=0.350
+step=  9984  rew=-5.550  swp=118.5  map=7.7  trunc=83%  pl=-0.002  vl=0.755  ent=4.390  kl=0.0037  gn=0.314
+step= 10240  rew=-6.224  swp=109.4  map=7.7  trunc=85%  pl=-0.004  vl=0.977  ent=4.382  kl=0.0049  gn=0.344
+step= 10496  rew=-6.224  swp=109.4  map=7.7  trunc=85%  pl=0.003  vl=0.749  ent=4.255  kl=0.0121  gn=0.330
+step= 10752  rew=-6.224  swp=109.4  map=7.7  trunc=85%  pl=-0.001  vl=0.647  ent=4.261  kl=0.0138  gn=0.405
+step= 11008  rew=-6.224  swp=109.4  map=7.7  trunc=85%  pl=0.002  vl=0.673  ent=4.246  kl=0.0164  gn=0.367
+step= 11264  rew=-6.223  swp=101.6  map=7.3  trunc=86%  pl=-0.019  vl=0.859  ent=4.294  kl=0.0093  gn=0.413
+step= 11520  rew=-6.223  swp=101.6  map=7.3  trunc=86%  pl=0.005  vl=0.850  ent=4.327  kl=0.0081  gn=0.412
+step= 11776  rew=-6.223  swp=101.6  map=7.3  trunc=86%  pl=-0.000  vl=1.049  ent=4.338  kl=0.0089  gn=0.800
+step= 12032  rew=-5.871  swp=94.8  map=7.3  trunc=87%  pl=0.005  vl=0.796  ent=4.228  kl=0.0177  gn=0.435
+step= 12288  rew=-5.871  swp=94.8  map=7.3  trunc=87%  pl=0.007  vl=0.700  ent=4.254  kl=0.0196  gn=0.462
+step= 12544  rew=-5.871  swp=94.8  map=7.3  trunc=87%  pl=-0.000  vl=0.765  ent=4.277  kl=0.0159  gn=0.704
+step= 12800  rew=-5.364  swp=88.9  map=7.2  trunc=88%  pl=0.008  vl=0.521  ent=4.321  kl=0.0086  gn=0.824
+step= 13056  rew=-5.364  swp=88.9  map=7.2  trunc=88%  pl=0.000  vl=0.857  ent=4.326  kl=0.0082  gn=0.383
+step= 13312  rew=-5.364  swp=88.9  map=7.2  trunc=88%  pl=0.013  vl=0.905  ent=4.320  kl=0.0097  gn=0.361
+step= 13568  rew=-5.714  swp=83.6  map=7.3  trunc=88%  pl=-0.013  vl=1.027  ent=4.316  kl=0.0080  gn=0.496
+step= 13824  rew=-5.714  swp=83.6  map=7.3  trunc=88%  pl=-0.003  vl=0.574  ent=4.344  kl=0.0080  gn=0.339
+step= 14080  rew=-5.714  swp=83.6  map=7.3  trunc=88%  pl=-0.002  vl=0.930  ent=4.371  kl=0.0115  gn=0.665
+step= 14336  rew=-5.640  swp=79.0  map=7.3  trunc=89%  pl=-0.005  vl=1.137  ent=4.381  kl=0.0075  gn=0.624
+step= 14592  rew=-5.640  swp=79.0  map=7.3  trunc=89%  pl=-0.006  vl=0.881  ent=4.386  kl=0.0051  gn=0.279
+step= 14848  rew=-5.640  swp=79.0  map=7.3  trunc=89%  pl=0.004  vl=0.974  ent=4.390  kl=0.0033  gn=0.225
+step= 15104  rew=-6.003  swp=74.8  map=7.4  trunc=89%  pl=-0.001  vl=1.014  ent=4.329  kl=0.0073  gn=0.259
+step= 15360  rew=-6.003  swp=74.8  map=7.4  trunc=89%  pl=0.005  vl=0.785  ent=4.177  kl=0.0177  gn=0.311
+step= 15616  rew=-6.003  swp=74.8  map=7.4  trunc=89%  pl=0.001  vl=1.115  ent=4.138  kl=0.0170  gn=0.385
+step= 15872  rew=-5.894  swp=71.1  map=7.4  trunc=90%  pl=0.004  vl=0.993  ent=4.180  kl=0.0167  gn=0.363
+step= 16128  rew=-5.894  swp=71.1  map=7.4  trunc=90%  pl=-0.006  vl=1.049  ent=4.351  kl=0.0097  gn=0.324
+step= 16384  rew=-5.894  swp=71.1  map=7.4  trunc=90%  pl=-0.001  vl=0.881  ent=4.346  kl=0.0055  gn=0.292
+step= 16640  rew=-5.756  swp=71.1  map=7.4  trunc=90%  pl=0.002  vl=0.938  ent=4.335  kl=0.0074  gn=0.291
+step= 16896  rew=-5.756  swp=71.1  map=7.4  trunc=90%  pl=-0.012  vl=0.824  ent=4.117  kl=0.0170  gn=0.355
+step= 17152  rew=-5.756  swp=71.1  map=7.4  trunc=90%  pl=0.004  vl=1.010  ent=4.146  kl=0.0219  gn=0.442
+step= 17408  rew=-5.756  swp=71.1  map=7.4  trunc=90%  pl=0.002  vl=0.855  ent=4.107  kl=0.0205  gn=0.336
+step= 17664  rew=-5.466  swp=71.1  map=7.4  trunc=91%  pl=-0.014  vl=0.599  ent=4.217  kl=0.0099  gn=0.367
+step= 17920  rew=-5.466  swp=71.1  map=7.4  trunc=91%  pl=0.002  vl=0.812  ent=4.270  kl=0.0104  gn=0.396
+step= 18176  rew=-5.466  swp=71.1  map=7.4  trunc=91%  pl=0.006  vl=0.716  ent=4.231  kl=0.0129  gn=0.463
+step= 18432  rew=-5.601  swp=71.1  map=7.5  trunc=91%  pl=-0.005  vl=0.899  ent=4.044  kl=0.0142  gn=0.477
+step= 18688  rew=-5.601  swp=71.1  map=7.5  trunc=91%  pl=-0.011  vl=1.053  ent=3.925  kl=0.0173  gn=0.481
+step= 18944  rew=-5.601  swp=71.1  map=7.5  trunc=91%  pl=-0.008  vl=1.035  ent=3.851  kl=0.0172  gn=0.376
+step= 19200  rew=-4.840  swp=71.1  map=7.5  trunc=92%  pl=-0.019  vl=0.779  ent=4.191  kl=0.0079  gn=0.525
+step= 19456  rew=-4.840  swp=71.1  map=7.5  trunc=92%  pl=0.003  vl=0.627  ent=4.382  kl=0.0039  gn=0.270
+step= 19712  rew=-4.840  swp=71.1  map=7.5  trunc=92%  pl=-0.006  vl=1.015  ent=4.379  kl=0.0047  gn=0.593
+step= 19968  rew=-5.005  swp=71.1  map=7.5  trunc=92%  pl=0.004  vl=1.593  ent=4.179  kl=0.0095  gn=0.604
+step= 20224  rew=-5.005  swp=71.1  map=7.5  trunc=92%  pl=0.002  vl=0.917  ent=3.897  kl=0.0181  gn=0.435
+step= 20480  rew=-5.005  swp=71.1  map=7.5  trunc=92%  pl=0.004  vl=0.882  ent=3.907  kl=0.0176  gn=0.392
+step= 20736  rew=-4.728  swp=33.1  map=7.5  trunc=92%  pl=0.013  vl=0.688  ent=3.987  kl=0.0151  gn=0.302
+step= 20992  rew=-4.728  swp=33.1  map=7.5  trunc=92%  pl=0.003  vl=0.908  ent=4.268  kl=0.0095  gn=0.464
+step= 21248  rew=-4.728  swp=33.1  map=7.5  trunc=92%  pl=-0.003  vl=0.835  ent=4.241  kl=0.0101  gn=0.408
+step= 21504  rew=-4.680  swp=33.1  map=7.5  trunc=93%  pl=-0.010  vl=0.691  ent=4.292  kl=0.0096  gn=0.255
+step= 21760  rew=-4.680  swp=33.1  map=7.5  trunc=93%  pl=-0.001  vl=0.651  ent=4.387  kl=0.0041  gn=0.271
+step= 22016  rew=-4.680  swp=33.1  map=7.5  trunc=93%  pl=-0.006  vl=0.790  ent=4.383  kl=0.0048  gn=0.422
+step= 22272  rew=-5.236  swp=33.1  map=7.5  trunc=93%  pl=-0.001  vl=1.077  ent=4.353  kl=0.0049  gn=0.320
+step= 22528  rew=-5.236  swp=33.1  map=7.5  trunc=93%  pl=-0.000  vl=1.378  ent=4.184  kl=0.0082  gn=0.587
+step= 22784  rew=-5.236  swp=33.1  map=7.5  trunc=93%  pl=0.001  vl=0.912  ent=4.143  kl=0.0094  gn=0.287
+step= 23040  rew=-5.369  swp=33.1  map=7.6  trunc=93%  pl=-0.011  vl=0.883  ent=4.133  kl=0.0098  gn=0.257
+step= 23296  rew=-5.369  swp=33.1  map=7.6  trunc=93%  pl=-0.003  vl=1.096  ent=4.384  kl=0.0045  gn=0.300
+step= 23552  rew=-5.369  swp=33.1  map=7.6  trunc=93%  pl=0.002  vl=1.012  ent=4.381  kl=0.0044  gn=0.187
+step= 23808  rew=-5.369  swp=33.1  map=7.6  trunc=93%  pl=0.002  vl=0.935  ent=4.375  kl=0.0050  gn=0.182
+step= 24064  rew=-6.316  swp=0.0  map=7.6  trunc=93%  pl=0.008  vl=0.810  ent=4.349  kl=0.0064  gn=0.265
+step= 24320  rew=-6.316  swp=0.0  map=7.6  trunc=93%  pl=-0.001  vl=0.917  ent=4.353  kl=0.0059  gn=0.501
+step= 24576  rew=-6.316  swp=0.0  map=7.6  trunc=93%  pl=-0.004  vl=0.672  ent=4.369  kl=0.0067  gn=0.255
+step= 24832  rew=-6.084  swp=0.0  map=7.6  trunc=94%  pl=-0.009  vl=0.670  ent=4.373  kl=0.0050  gn=0.308
+step= 25088  rew=-6.084  swp=0.0  map=7.6  trunc=94%  pl=-0.004  vl=0.762  ent=4.371  kl=0.0060  gn=0.457
+step= 25344  rew=-6.084  swp=0.0  map=7.6  trunc=94%  pl=-0.003  vl=1.011  ent=4.364  kl=0.0056  gn=0.503
+step= 25600  rew=-5.900  swp=0.0  map=7.6  trunc=94%  pl=-0.002  vl=0.807  ent=4.370  kl=0.0059  gn=0.314
+step= 25856  rew=-5.900  swp=0.0  map=7.6  trunc=94%  pl=-0.011  vl=0.782  ent=4.368  kl=0.0046  gn=0.351
+step= 26112  rew=-5.900  swp=0.0  map=7.6  trunc=94%  pl=-0.000  vl=0.892  ent=4.349  kl=0.0066  gn=0.307
+step= 26368  rew=-6.014  swp=0.0  map=7.6  trunc=94%  pl=-0.004  vl=0.841  ent=4.338  kl=0.0072  gn=0.287
+step= 26624  rew=-6.014  swp=0.0  map=7.6  trunc=94%  pl=-0.006  vl=0.608  ent=4.321  kl=0.0083  gn=0.457
+step= 26880  rew=-6.014  swp=0.0  map=7.6  trunc=94%  pl=-0.002  vl=0.583  ent=4.307  kl=0.0091  gn=0.333
+step= 27136  rew=-5.910  swp=0.0  map=7.9  trunc=94%  pl=-0.009  vl=1.055  ent=4.311  kl=0.0095  gn=0.349
+step= 27392  rew=-5.910  swp=0.0  map=7.9  trunc=94%  pl=0.006  vl=0.578  ent=4.334  kl=0.0089  gn=0.316
+step= 27648  rew=-5.910  swp=0.0  map=7.9  trunc=94%  pl=0.001  vl=0.938  ent=4.343  kl=0.0093  gn=0.614
+step= 27904  rew=-6.085  swp=0.0  map=7.9  trunc=94%  pl=0.000  vl=1.031  ent=4.252  kl=0.0117  gn=0.413
+step= 28160  rew=-6.085  swp=0.0  map=7.9  trunc=94%  pl=0.002  vl=0.654  ent=4.077  kl=0.0266  gn=0.418
+step= 28416  rew=-6.085  swp=0.0  map=7.9  trunc=94%  pl=0.001  vl=0.591  ent=4.088  kl=0.0208  gn=0.585
+step= 28672  rew=-6.364  swp=0.0  map=8.0  trunc=94%  pl=-0.004  vl=0.776  ent=4.000  kl=0.0223  gn=0.571
+step= 28928  rew=-6.364  swp=0.0  map=8.0  trunc=94%  pl=0.006  vl=2.066  ent=4.117  kl=0.0208  gn=1.120
+step= 29184  rew=-6.364  swp=0.0  map=8.0  trunc=94%  pl=0.002  vl=0.944  ent=4.122  kl=0.0168  gn=0.486
+step= 29440  rew=-6.233  swp=0.0  map=8.0  trunc=95%  pl=0.006  vl=1.093  ent=4.143  kl=0.0180  gn=0.466
+step= 29696  rew=-6.233  swp=0.0  map=8.0  trunc=95%  pl=-0.004  vl=0.927  ent=3.925  kl=0.0235  gn=0.376
+step= 29952  rew=-6.233  swp=0.0  map=8.0  trunc=95%  pl=-0.009  vl=0.981  ent=4.010  kl=0.0218  gn=0.419
+step= 30208  rew=-6.233  swp=0.0  map=8.0  trunc=95%  pl=-0.005  vl=0.904  ent=3.948  kl=0.0211  gn=0.435
+step= 30464  rew=-5.924  swp=0.0  map=8.0  trunc=95%  pl=-0.022  vl=0.844  ent=4.176  kl=0.0134  gn=0.580
+step= 30720  rew=-5.924  swp=0.0  map=8.0  trunc=95%  pl=-0.004  vl=0.996  ent=4.231  kl=0.0113  gn=0.291
+step= 30976  rew=-5.924  swp=0.0  map=8.0  trunc=95%  pl=-0.000  vl=0.971  ent=4.260  kl=0.0101  gn=0.316
+step= 31232  rew=-5.869  swp=0.0  map=8.0  trunc=95%  pl=0.009  vl=0.954  ent=4.040  kl=0.0166  gn=0.341
+step= 31488  rew=-5.869  swp=0.0  map=8.0  trunc=95%  pl=0.002  vl=0.760  ent=4.072  kl=0.0208  gn=0.546
+step= 31744  rew=-5.869  swp=0.0  map=8.0  trunc=95%  pl=0.007  vl=0.833  ent=4.130  kl=0.0216  gn=0.534
+step= 32000  rew=-5.744  swp=0.0  map=7.7  trunc=95%  pl=-0.022  vl=0.980  ent=4.285  kl=0.0153  gn=0.409
+step= 32256  rew=-5.744  swp=0.0  map=7.7  trunc=95%  pl=-0.005  vl=0.941  ent=4.359  kl=0.0064  gn=0.370
+step= 32512  rew=-5.744  swp=0.0  map=7.7  trunc=95%  pl=-0.003  vl=0.710  ent=4.378  kl=0.0056  gn=0.240
+step= 32768  rew=-5.582  swp=0.0  map=7.7  trunc=95%  pl=0.002  vl=0.497  ent=4.344  kl=0.0057  gn=0.255
+step= 33024  rew=-5.582  swp=0.0  map=7.7  trunc=95%  pl=-0.002  vl=1.118  ent=4.320  kl=0.0063  gn=0.358
+step= 33280  rew=-5.582  swp=0.0  map=7.7  trunc=95%  pl=-0.000  vl=0.919  ent=4.314  kl=0.0066  gn=0.302
+step= 33536  rew=-6.229  swp=0.0  map=7.7  trunc=95%  pl=-0.002  vl=0.858  ent=4.269  kl=0.0084  gn=0.292
+step= 33792  rew=-6.229  swp=0.0  map=7.7  trunc=95%  pl=-0.007  vl=0.866  ent=4.243  kl=0.0112  gn=0.414
+step= 34048  rew=-6.229  swp=0.0  map=7.7  trunc=95%  pl=-0.009  vl=0.917  ent=4.266  kl=0.0111  gn=0.462
+step= 34304  rew=-6.282  swp=0.0  map=7.7  trunc=95%  pl=-0.003  vl=0.730  ent=4.242  kl=0.0133  gn=0.352
+step= 34560  rew=-6.282  swp=0.0  map=7.7  trunc=95%  pl=-0.006  vl=0.948  ent=4.217  kl=0.0140  gn=0.376
+step= 34816  rew=-6.282  swp=0.0  map=7.7  trunc=95%  pl=-0.009  vl=0.522  ent=4.266  kl=0.0115  gn=0.504
+step= 35072  rew=-6.489  swp=0.0  map=7.6  trunc=95%  pl=-0.002  vl=0.933  ent=4.247  kl=0.0127  gn=0.507
+step= 35328  rew=-6.489  swp=0.0  map=7.6  trunc=95%  pl=0.012  vl=1.727  ent=4.214  kl=0.0102  gn=0.905
+step= 35584  rew=-6.489  swp=0.0  map=7.6  trunc=95%  pl=-0.006  vl=0.858  ent=4.283  kl=0.0138  gn=0.440
+step= 35840  rew=-6.312  swp=0.0  map=7.6  trunc=96%  pl=0.015  vl=0.922  ent=4.278  kl=0.0203  gn=0.473
+step= 36096  rew=-6.312  swp=0.0  map=7.6  trunc=96%  pl=0.013  vl=0.937  ent=4.160  kl=0.0175  gn=0.420
+step= 36352  rew=-6.312  swp=0.0  map=7.6  trunc=96%  pl=0.007  vl=0.814  ent=4.164  kl=0.0167  gn=0.490
+step= 36608  rew=-6.312  swp=0.0  map=7.6  trunc=96%  pl=0.019  vl=0.929  ent=4.199  kl=0.0225  gn=0.563
+step= 36864  rew=-6.977  swp=0.0  map=7.6  trunc=96%  pl=0.002  vl=0.844  ent=3.987  kl=0.0216  gn=0.364
+step= 37120  rew=-6.977  swp=0.0  map=7.6  trunc=96%  pl=0.000  vl=1.131  ent=4.040  kl=0.0219  gn=0.848
+step= 37376  rew=-6.977  swp=0.0  map=7.6  trunc=96%  pl=0.003  vl=0.942  ent=4.072  kl=0.0216  gn=0.515
+step= 37632  rew=-6.903  swp=0.0  map=7.6  trunc=96%  pl=-0.021  vl=0.597  ent=4.059  kl=0.0186  gn=0.491
+step= 37888  rew=-6.903  swp=0.0  map=7.6  trunc=96%  pl=0.008  vl=1.014  ent=4.169  kl=0.0226  gn=0.528
+step= 38144  rew=-6.903  swp=0.0  map=7.6  trunc=96%  pl=-0.006  vl=0.914  ent=4.198  kl=0.0224  gn=0.436
+step= 38400  rew=-6.681  swp=0.0  map=7.6  trunc=96%  pl=-0.005  vl=0.848  ent=4.077  kl=0.0202  gn=0.481
+step= 38656  rew=-6.681  swp=0.0  map=7.6  trunc=96%  pl=-0.003  vl=0.950  ent=4.065  kl=0.0124  gn=0.683
+step= 38912  rew=-6.681  swp=0.0  map=7.6  trunc=96%  pl=-0.006  vl=0.621  ent=4.111  kl=0.0116  gn=0.610
+step= 39168  rew=-6.415  swp=0.0  map=7.6  trunc=96%  pl=-0.012  vl=0.377  ent=4.043  kl=0.0103  gn=0.422
+step= 39424  rew=-6.415  swp=0.0  map=7.6  trunc=96%  pl=0.002  vl=1.152  ent=3.921  kl=0.0169  gn=0.496
+step= 39680  rew=-6.415  swp=0.0  map=7.6  trunc=96%  pl=-0.014  vl=0.870  ent=3.939  kl=0.0164  gn=0.408
+step= 39936  rew=-5.654  swp=0.0  map=7.6  trunc=96%  pl=-0.009  vl=0.867  ent=4.009  kl=0.0181  gn=0.358
+step= 40192  rew=-5.654  swp=0.0  map=7.6  trunc=96%  pl=-0.009  vl=0.995  ent=4.147  kl=0.0142  gn=0.449
+step= 40448  rew=-5.654  swp=0.0  map=7.6  trunc=96%  pl=-0.002  vl=0.923  ent=4.113  kl=0.0137  gn=0.385
+step= 40704  rew=-5.328  swp=0.0  map=7.6  trunc=96%  pl=-0.002  vl=0.985  ent=4.122  kl=0.0156  gn=0.399
+step= 40960  rew=-5.328  swp=0.0  map=7.6  trunc=96%  pl=0.004  vl=0.149  ent=4.240  kl=0.0180  gn=0.411
+step= 41216  rew=-5.328  swp=0.0  map=7.6  trunc=96%  pl=-0.005  vl=1.770  ent=4.266  kl=0.0121  gn=1.352
+step= 41472  rew=-4.892  swp=0.0  map=7.6  trunc=96%  pl=0.005  vl=0.655  ent=4.228  kl=0.0117  gn=0.439
+step= 41728  rew=-4.892  swp=0.0  map=7.6  trunc=96%  pl=0.001  vl=1.344  ent=4.201  kl=0.0148  gn=0.631
+step= 41984  rew=-4.892  swp=0.0  map=7.6  trunc=96%  pl=0.010  vl=0.981  ent=4.233  kl=0.0147  gn=0.333
+step= 42240  rew=-4.558  swp=0.0  map=7.4  trunc=96%  pl=0.004  vl=1.025  ent=4.234  kl=0.0126  gn=0.369
+step= 42496  rew=-4.558  swp=0.0  map=7.4  trunc=96%  pl=-0.001  vl=0.963  ent=3.653  kl=0.0381  gn=0.400
+step= 42752  rew=-4.558  swp=0.0  map=7.4  trunc=96%  pl=0.001  vl=0.943  ent=3.758  kl=0.0406  gn=0.472
+step= 43008  rew=-4.558  swp=0.0  map=7.4  trunc=96%  pl=0.008  vl=0.931  ent=3.833  kl=0.0347  gn=0.405
+step= 43264  rew=-4.368  swp=0.0  map=7.4  trunc=96%  pl=-0.018  vl=0.819  ent=4.022  kl=0.0233  gn=0.416
+step= 43520  rew=-4.368  swp=0.0  map=7.4  trunc=96%  pl=-0.003  vl=0.851  ent=4.163  kl=0.0212  gn=0.549
+step= 43776  rew=-4.368  swp=0.0  map=7.4  trunc=96%  pl=-0.001  vl=0.788  ent=4.223  kl=0.0208  gn=0.471
+step= 44032  rew=-4.771  swp=0.0  map=7.2  trunc=96%  pl=-0.002  vl=0.724  ent=4.159  kl=0.0151  gn=0.497
+step= 44288  rew=-4.771  swp=0.0  map=7.2  trunc=96%  pl=-0.011  vl=0.949  ent=4.223  kl=0.0147  gn=0.493
+step= 44544  rew=-4.771  swp=0.0  map=7.2  trunc=96%  pl=-0.011  vl=0.757  ent=4.292  kl=0.0128  gn=0.368
+step= 44800  rew=-4.993  swp=0.0  map=7.2  trunc=96%  pl=-0.005  vl=0.895  ent=4.138  kl=0.0113  gn=0.408
+step= 45056  rew=-4.993  swp=0.0  map=7.2  trunc=96%  pl=-0.012  vl=0.892  ent=4.055  kl=0.0139  gn=0.431
+step= 45312  rew=-4.993  swp=0.0  map=7.2  trunc=96%  pl=0.006  vl=0.562  ent=4.066  kl=0.0136  gn=0.348
+step= 45568  rew=-4.633  swp=0.0  map=7.2  trunc=96%  pl=-0.024  vl=0.928  ent=4.212  kl=0.0128  gn=0.397
+step= 45824  rew=-4.633  swp=0.0  map=7.2  trunc=96%  pl=0.007  vl=0.990  ent=4.279  kl=0.0109  gn=0.387
+step= 46080  rew=-4.633  swp=0.0  map=7.2  trunc=96%  pl=-0.007  vl=0.869  ent=4.329  kl=0.0064  gn=0.680
+step= 46336  rew=-5.277  swp=0.0  map=7.2  trunc=97%  pl=-0.001  vl=1.109  ent=4.358  kl=0.0111  gn=0.316
+step= 46592  rew=-5.277  swp=0.0  map=7.2  trunc=97%  pl=-0.004  vl=1.042  ent=4.361  kl=0.0074  gn=0.372
+step= 46848  rew=-5.277  swp=0.0  map=7.2  trunc=97%  pl=-0.006  vl=0.941  ent=4.362  kl=0.0063  gn=0.461
+step= 47104  rew=-5.239  swp=0.0  map=7.2  trunc=97%  pl=-0.008  vl=0.819  ent=4.304  kl=0.0083  gn=0.294
+step= 47360  rew=-5.239  swp=0.0  map=7.2  trunc=97%  pl=-0.009  vl=0.836  ent=4.196  kl=0.0117  gn=0.362
+step= 47616  rew=-5.239  swp=0.0  map=7.2  trunc=97%  pl=0.000  vl=0.793  ent=4.222  kl=0.0164  gn=0.771
+step= 47872  rew=-5.352  swp=0.0  map=7.5  trunc=97%  pl=-0.002  vl=1.008  ent=4.180  kl=0.0131  gn=0.402
+step= 48128  rew=-5.352  swp=0.0  map=7.5  trunc=97%  pl=-0.006  vl=1.191  ent=3.826  kl=0.0219  gn=0.541
+step= 48384  rew=-5.352  swp=0.0  map=7.5  trunc=97%  pl=0.004  vl=1.072  ent=3.964  kl=0.0239  gn=0.679
+step= 48640  rew=-5.085  swp=0.0  map=7.5  trunc=97%  pl=0.013  vl=0.777  ent=3.979  kl=0.0240  gn=0.435
+step= 48896  rew=-5.085  swp=0.0  map=7.5  trunc=97%  pl=0.002  vl=1.000  ent=4.245  kl=0.0194  gn=0.364
+step= 49152  rew=-5.085  swp=0.0  map=7.5  trunc=97%  pl=0.004  vl=0.993  ent=4.299  kl=0.0211  gn=0.409
+step= 49408  rew=-5.085  swp=0.0  map=7.5  trunc=97%  pl=0.002  vl=0.968  ent=4.308  kl=0.0122  gn=0.402
+step= 49664  rew=-4.775  swp=0.0  map=7.5  trunc=97%  pl=-0.013  vl=0.736  ent=4.286  kl=0.0154  gn=0.374
+step= 49920  rew=-4.775  swp=0.0  map=7.5  trunc=97%  pl=0.008  vl=0.907  ent=4.259  kl=0.0145  gn=0.423
+step= 50176  rew=-4.775  swp=0.0  map=7.5  trunc=97%  pl=0.006  vl=1.011  ent=4.259  kl=0.0131  gn=0.449
+step= 50432  rew=-5.310  swp=0.0  map=7.5  trunc=97%  pl=-0.003  vl=0.821  ent=4.224  kl=0.0139  gn=0.456
+step= 50688  rew=-5.310  swp=0.0  map=7.5  trunc=97%  pl=0.010  vl=0.863  ent=4.235  kl=0.0121  gn=0.395
+step= 50944  rew=-5.310  swp=0.0  map=7.5  trunc=97%  pl=-0.012  vl=0.954  ent=4.252  kl=0.0124  gn=0.631
+step= 51200  rew=-5.412  swp=0.0  map=7.5  trunc=97%  pl=-0.007  vl=0.650  ent=4.288  kl=0.0094  gn=0.359
+step= 51456  rew=-5.412  swp=0.0  map=7.5  trunc=97%  pl=-0.004  vl=0.957  ent=4.307  kl=0.0104  gn=0.418
+step= 51712  rew=-5.412  swp=0.0  map=7.5  trunc=97%  pl=0.004  vl=0.799  ent=4.289  kl=0.0091  gn=0.471
+step= 51968  rew=-5.647  swp=0.0  map=7.2  trunc=97%  pl=0.005  vl=0.784  ent=4.099  kl=0.0117  gn=0.393
+step= 52224  rew=-5.647  swp=0.0  map=7.2  trunc=97%  pl=0.015  vl=1.010  ent=3.991  kl=0.0206  gn=0.769
+step= 52480  rew=-5.647  swp=0.0  map=7.2  trunc=97%  pl=0.005  vl=0.524  ent=4.042  kl=0.0212  gn=0.400
+step= 52736  rew=-5.157  swp=0.0  map=7.2  trunc=97%  pl=-0.011  vl=0.297  ent=4.004  kl=0.0184  gn=0.357
+step= 52992  rew=-5.157  swp=0.0  map=7.2  trunc=97%  pl=0.012  vl=0.830  ent=3.952  kl=0.0177  gn=0.653
+step= 53248  rew=-5.157  swp=0.0  map=7.2  trunc=97%  pl=-0.010  vl=1.640  ent=4.053  kl=0.0198  gn=1.612
+step= 53504  rew=-5.009  swp=0.0  map=7.2  trunc=97%  pl=-0.024  vl=0.818  ent=4.151  kl=0.0146  gn=0.426
+step= 53760  rew=-5.009  swp=0.0  map=7.2  trunc=97%  pl=-0.004  vl=1.191  ent=4.324  kl=0.0075  gn=0.426
+step= 54016  rew=-5.009  swp=0.0  map=7.2  trunc=97%  pl=0.001  vl=0.829  ent=4.282  kl=0.0076  gn=0.346
+step= 54272  rew=-5.231  swp=0.0  map=7.2  trunc=97%  pl=-0.012  vl=1.115  ent=4.312  kl=0.0066  gn=0.559
+step= 54528  rew=-5.231  swp=0.0  map=7.2  trunc=97%  pl=-0.001  vl=1.080  ent=4.317  kl=0.0071  gn=0.325
+step= 54784  rew=-5.231  swp=0.0  map=7.2  trunc=97%  pl=-0.008  vl=0.998  ent=4.242  kl=0.0114  gn=0.360
+step= 55040  rew=-5.749  swp=0.0  map=7.2  trunc=97%  pl=-0.004  vl=1.001  ent=4.210  kl=0.0109  gn=0.403
+step= 55296  rew=-5.749  swp=0.0  map=7.2  trunc=97%  pl=-0.012  vl=0.905  ent=4.077  kl=0.0126  gn=0.442
+step= 55552  rew=-5.749  swp=0.0  map=7.2  trunc=97%  pl=-0.009  vl=1.013  ent=4.063  kl=0.0153  gn=0.421
+step= 55808  rew=-5.749  swp=0.0  map=7.2  trunc=97%  pl=0.011  vl=0.865  ent=4.124  kl=0.0167  gn=0.373
+step= 56064  rew=-5.943  swp=0.0  map=7.2  trunc=97%  pl=-0.019  vl=0.679  ent=4.233  kl=0.0102  gn=0.422
+step= 56320  rew=-5.943  swp=0.0  map=7.2  trunc=97%  pl=-0.004  vl=0.942  ent=4.175  kl=0.0126  gn=0.372
+step= 56576  rew=-5.943  swp=0.0  map=7.2  trunc=97%  pl=-0.002  vl=0.913  ent=4.153  kl=0.0145  gn=0.576
+step= 56832  rew=-6.309  swp=0.0  map=7.2  trunc=97%  pl=-0.009  vl=0.864  ent=4.232  kl=0.0093  gn=0.431
+step= 57088  rew=-6.309  swp=0.0  map=7.2  trunc=97%  pl=-0.007  vl=0.566  ent=4.246  kl=0.0112  gn=0.483
+step= 57344  rew=-6.309  swp=0.0  map=7.2  trunc=97%  pl=-0.002  vl=0.613  ent=4.304  kl=0.0090  gn=0.555
+step= 57600  rew=-6.303  swp=0.0  map=7.2  trunc=97%  pl=-0.006  vl=0.385  ent=4.278  kl=0.0101  gn=0.335
+step= 57856  rew=-6.303  swp=0.0  map=7.2  trunc=97%  pl=-0.015  vl=1.140  ent=4.075  kl=0.0145  gn=0.604
+step= 58112  rew=-6.303  swp=0.0  map=7.2  trunc=97%  pl=0.003  vl=1.088  ent=4.090  kl=0.0210  gn=0.794
+step= 58368  rew=-6.555  swp=0.0  map=7.4  trunc=97%  pl=-0.000  vl=0.803  ent=4.195  kl=0.0167  gn=0.423
+step= 58624  rew=-6.555  swp=0.0  map=7.4  trunc=97%  pl=-0.010  vl=0.499  ent=4.312  kl=0.0109  gn=0.336
+step= 58880  rew=-6.555  swp=0.0  map=7.4  trunc=97%  pl=0.006  vl=1.186  ent=4.334  kl=0.0101  gn=0.542
+step= 59136  rew=-6.683  swp=0.0  map=7.4  trunc=97%  pl=-0.005  vl=0.842  ent=4.302  kl=0.0110  gn=0.310
+step= 59392  rew=-6.683  swp=0.0  map=7.4  trunc=97%  pl=-0.002  vl=1.038  ent=4.224  kl=0.0100  gn=0.384
+step= 59648  rew=-6.683  swp=0.0  map=7.4  trunc=97%  pl=-0.003  vl=0.735  ent=4.286  kl=0.0081  gn=0.341
+step= 59904  rew=-6.597  swp=0.0  map=7.7  trunc=97%  pl=-0.006  vl=0.945  ent=4.250  kl=0.0102  gn=0.528
+step= 60160  rew=-6.597  swp=0.0  map=7.7  trunc=97%  pl=-0.003  vl=0.693  ent=4.117  kl=0.0188  gn=0.469
+step= 60416  rew=-6.597  swp=0.0  map=7.7  trunc=97%  pl=0.008  vl=1.011  ent=4.152  kl=0.0157  gn=1.019
+step= 60672  rew=-6.092  swp=0.0  map=7.7  trunc=97%  pl=0.003  vl=0.485  ent=4.202  kl=0.0188  gn=0.441
+step= 60928  rew=-6.092  swp=0.0  map=7.7  trunc=97%  pl=-0.003  vl=2.317  ent=4.309  kl=0.0075  gn=1.333
+step= 61184  rew=-6.092  swp=0.0  map=7.7  trunc=97%  pl=-0.004  vl=1.078  ent=4.351  kl=0.0076  gn=0.340
+step= 61440  rew=-6.153  swp=0.0  map=7.7  trunc=97%  pl=-0.001  vl=0.985  ent=4.330  kl=0.0095  gn=0.293
+step= 61696  rew=-6.153  swp=0.0  map=7.7  trunc=97%  pl=-0.015  vl=0.980  ent=4.284  kl=0.0181  gn=0.450
+step= 61952  rew=-6.153  swp=0.0  map=7.7  trunc=97%  pl=-0.004  vl=0.984  ent=4.329  kl=0.0084  gn=0.368
+step= 62208  rew=-6.153  swp=0.0  map=7.7  trunc=97%  pl=-0.002  vl=0.983  ent=4.339  kl=0.0086  gn=0.291
+step= 62464  rew=-5.861  swp=0.0  map=7.7  trunc=97%  pl=-0.005  vl=0.940  ent=4.363  kl=0.0060  gn=0.251
+step= 62720  rew=-5.861  swp=0.0  map=7.7  trunc=97%  pl=-0.007  vl=0.828  ent=4.371  kl=0.0069  gn=0.285
+step= 62976  rew=-5.861  swp=0.0  map=7.7  trunc=97%  pl=0.003  vl=1.045  ent=4.376  kl=0.0061  gn=0.476
+step= 63232  rew=-5.311  swp=0.0  map=7.7  trunc=97%  pl=-0.004  vl=0.885  ent=4.364  kl=0.0066  gn=0.356
+step= 63488  rew=-5.311  swp=0.0  map=7.7  trunc=97%  pl=0.001  vl=0.936  ent=4.348  kl=0.0074  gn=0.331
+step= 63744  rew=-5.311  swp=0.0  map=7.7  trunc=97%  pl=-0.021  vl=0.992  ent=4.352  kl=0.0080  gn=0.441
+step= 64000  rew=-5.828  swp=0.0  map=7.7  trunc=98%  pl=-0.002  vl=0.882  ent=4.258  kl=0.0123  gn=0.357
+step= 64256  rew=-5.828  swp=0.0  map=7.7  trunc=98%  pl=-0.005  vl=0.626  ent=4.277  kl=0.0167  gn=0.478
+step= 64512  rew=-5.828  swp=0.0  map=7.7  trunc=98%  pl=0.004  vl=0.813  ent=4.248  kl=0.0155  gn=0.680
+step= 64768  rew=-6.032  swp=0.0  map=7.7  trunc=98%  pl=-0.015  vl=0.736  ent=4.143  kl=0.0120  gn=0.535
+step= 65024  rew=-6.032  swp=0.0  map=7.7  trunc=98%  pl=0.009  vl=1.113  ent=4.126  kl=0.0160  gn=0.483
+step= 65280  rew=-6.032  swp=0.0  map=7.7  trunc=98%  pl=0.009  vl=0.620  ent=4.057  kl=0.0164  gn=0.474
+step= 65536  rew=-5.498  swp=0.0  map=7.6  trunc=98%  pl=-0.008  vl=0.840  ent=4.218  kl=0.0114  gn=0.520
+step= 65792  rew=-5.498  swp=0.0  map=7.6  trunc=98%  pl=-0.007  vl=1.129  ent=4.334  kl=0.0083  gn=0.415
+step= 66048  rew=-5.498  swp=0.0  map=7.6  trunc=98%  pl=-0.002  vl=0.990  ent=4.333  kl=0.0077  gn=0.404
+step= 66304  rew=-5.237  swp=0.0  map=7.6  trunc=98%  pl=0.009  vl=0.937  ent=4.287  kl=0.0063  gn=0.369
+step= 66560  rew=-5.237  swp=0.0  map=7.6  trunc=98%  pl=-0.006  vl=0.981  ent=4.167  kl=0.0143  gn=0.408
+step= 66816  rew=-5.237  swp=0.0  map=7.6  trunc=98%  pl=0.006  vl=0.983  ent=4.145  kl=0.0165  gn=0.420
+step= 67072  rew=-5.289  swp=0.0  map=7.6  trunc=98%  pl=-0.004  vl=0.979  ent=4.189  kl=0.0120  gn=0.355
+step= 67328  rew=-5.289  swp=0.0  map=7.6  trunc=98%  pl=-0.003  vl=0.938  ent=4.289  kl=0.0077  gn=0.411
+step= 67584  rew=-5.289  swp=0.0  map=7.6  trunc=98%  pl=0.003  vl=0.984  ent=4.282  kl=0.0083  gn=0.492
+step= 67840  rew=-4.965  swp=0.0  map=8.0  trunc=98%  pl=0.005  vl=1.019  ent=4.252  kl=0.0108  gn=0.409
+step= 68096  rew=-4.965  swp=0.0  map=8.0  trunc=98%  pl=-0.013  vl=0.967  ent=4.297  kl=0.0185  gn=0.526
+step= 68352  rew=-4.965  swp=0.0  map=8.0  trunc=98%  pl=-0.009  vl=0.988  ent=4.252  kl=0.0139  gn=0.454
+step= 68608  rew=-4.965  swp=0.0  map=8.0  trunc=98%  pl=-0.001  vl=0.988  ent=4.280  kl=0.0118  gn=0.452
+step= 68864  rew=-5.651  swp=0.0  map=8.0  trunc=98%  pl=0.007  vl=0.905  ent=3.952  kl=0.0252  gn=0.409
+step= 69120  rew=-5.651  swp=0.0  map=8.0  trunc=98%  pl=0.001  vl=0.948  ent=3.950  kl=0.0236  gn=0.439
+step= 69376  rew=-5.651  swp=0.0  map=8.0  trunc=98%  pl=0.014  vl=0.990  ent=3.915  kl=0.0237  gn=0.419
+step= 69632  rew=-5.378  swp=39.5  map=8.0  trunc=97%  pl=0.013  vl=1.094  ent=3.884  kl=0.0232  gn=0.500
+step= 69888  rew=-4.585  swp=59.0  map=7.6  trunc=95%  pl=-0.006  vl=1.019  ent=3.912  kl=0.0243  gn=0.477
+step= 70144  rew=-4.585  swp=59.0  map=7.6  trunc=95%  pl=-0.007  vl=0.958  ent=4.221  kl=0.0172  gn=0.497
+step= 70400  rew=-4.585  swp=59.0  map=7.6  trunc=95%  pl=-0.011  vl=0.970  ent=4.274  kl=0.0152  gn=0.460
+step= 70656  rew=-4.215  swp=59.0  map=7.6  trunc=96%  pl=-0.003  vl=0.907  ent=4.280  kl=0.0130  gn=0.411
+step= 70912  rew=-4.215  swp=59.0  map=7.6  trunc=96%  pl=-0.001  vl=0.907  ent=4.239  kl=0.0150  gn=0.503
+step= 71168  rew=-4.215  swp=59.0  map=7.6  trunc=96%  pl=-0.016  vl=1.007  ent=4.224  kl=0.0197  gn=0.547
+step= 71424  rew=-4.215  swp=59.0  map=7.6  trunc=96%  pl=-0.008  vl=0.978  ent=4.275  kl=0.0173  gn=0.385
+step= 71680  rew=-4.354  swp=59.0  map=7.6  trunc=96%  pl=-0.005  vl=0.964  ent=3.989  kl=0.0222  gn=0.221
+step= 71936  rew=-4.354  swp=59.0  map=7.6  trunc=96%  pl=0.009  vl=0.978  ent=4.163  kl=0.0232  gn=0.458
+step= 72192  rew=-4.354  swp=59.0  map=7.6  trunc=96%  pl=0.003  vl=0.858  ent=4.253  kl=0.0226  gn=0.433
+step= 72448  rew=-3.894  swp=59.0  map=7.6  trunc=96%  pl=-0.026  vl=0.689  ent=4.172  kl=0.0170  gn=0.420
+step= 72704  rew=-3.894  swp=59.0  map=7.6  trunc=96%  pl=-0.004  vl=0.715  ent=4.254  kl=0.0116  gn=0.333
+step= 72960  rew=-3.894  swp=59.0  map=7.6  trunc=96%  pl=0.004  vl=1.094  ent=4.250  kl=0.0131  gn=0.685
+step= 73216  rew=-4.148  swp=59.0  map=7.6  trunc=96%  pl=-0.016  vl=0.713  ent=4.247  kl=0.0096  gn=0.510
+step= 73472  rew=-4.148  swp=59.0  map=7.6  trunc=96%  pl=-0.005  vl=0.756  ent=4.290  kl=0.0089  gn=0.372
+step= 73728  rew=-4.148  swp=59.0  map=7.6  trunc=96%  pl=-0.004  vl=1.089  ent=4.337  kl=0.0098  gn=0.644
+step= 73984  rew=-3.720  swp=59.0  map=7.6  trunc=96%  pl=0.008  vl=0.864  ent=4.135  kl=0.0156  gn=0.397
+step= 74240  rew=-3.720  swp=59.0  map=7.6  trunc=96%  pl=0.003  vl=0.811  ent=4.145  kl=0.0228  gn=0.404
+step= 74496  rew=-3.720  swp=59.0  map=7.6  trunc=96%  pl=0.010  vl=0.665  ent=4.161  kl=0.0200  gn=0.571
+step= 74752  rew=-3.458  swp=59.0  map=7.6  trunc=96%  pl=0.016  vl=0.240  ent=4.189  kl=0.0118  gn=0.531
+step= 75008  rew=-3.458  swp=59.0  map=7.6  trunc=96%  pl=-0.000  vl=0.930  ent=4.299  kl=0.0100  gn=0.680
+step= 75264  rew=-3.458  swp=59.0  map=7.6  trunc=96%  pl=-0.007  vl=0.973  ent=4.276  kl=0.0173  gn=0.579
+step= 75520  rew=-3.190  swp=59.0  map=7.6  trunc=96%  pl=-0.001  vl=0.874  ent=4.216  kl=0.0168  gn=0.486
+step= 75776  rew=-3.190  swp=59.0  map=7.6  trunc=96%  pl=0.001  vl=0.658  ent=4.126  kl=0.0174  gn=0.492
+step= 76032  rew=-3.190  swp=59.0  map=7.6  trunc=96%  pl=0.009  vl=1.225  ent=4.238  kl=0.0156  gn=0.815
+step= 76288  rew=-3.468  swp=59.0  map=7.6  trunc=96%  pl=0.003  vl=0.672  ent=4.138  kl=0.0176  gn=0.492
+step= 76544  rew=-3.468  swp=59.0  map=7.6  trunc=96%  pl=0.009  vl=1.248  ent=4.044  kl=0.0212  gn=0.786
+step= 76800  rew=-3.468  swp=59.0  map=7.6  trunc=96%  pl=-0.000  vl=0.997  ent=4.192  kl=0.0217  gn=0.451
+step= 77056  rew=-3.154  swp=59.0  map=7.6  trunc=96%  pl=-0.014  vl=0.872  ent=4.126  kl=0.0225  gn=0.485
+step= 77312  rew=-3.154  swp=59.0  map=7.6  trunc=96%  pl=-0.017  vl=0.881  ent=3.757  kl=0.0282  gn=0.525
+step= 77568  rew=-3.154  swp=59.0  map=7.6  trunc=96%  pl=-0.000  vl=1.116  ent=3.971  kl=0.0240  gn=0.666
+step= 77824  rew=-3.154  swp=59.0  map=7.6  trunc=96%  pl=0.009  vl=0.999  ent=4.006  kl=0.0229  gn=0.565
+step= 78080  rew=-2.658  swp=59.0  map=7.6  trunc=96%  pl=-0.013  vl=1.109  ent=3.829  kl=0.0230  gn=0.682
+step= 78336  rew=-2.658  swp=59.0  map=7.6  trunc=96%  pl=-0.004  vl=0.991  ent=3.981  kl=0.0227  gn=0.515
+step= 78592  rew=-1.941  swp=91.7  map=7.6  trunc=95%  pl=-0.009  vl=1.029  ent=4.006  kl=0.0171  gn=0.452
+step= 78848  rew=-1.941  swp=91.7  map=7.6  trunc=95%  pl=-0.014  vl=1.004  ent=4.024  kl=0.0189  gn=0.661
+step= 79104  rew=-1.941  swp=91.7  map=7.6  trunc=95%  pl=-0.004  vl=0.987  ent=4.147  kl=0.0250  gn=0.597
+step= 79360  rew=-1.195  swp=91.7  map=7.6  trunc=95%  pl=0.002  vl=0.867  ent=4.172  kl=0.0185  gn=0.509
+step= 79616  rew=-1.195  swp=91.7  map=7.6  trunc=95%  pl=0.003  vl=1.041  ent=4.269  kl=0.0187  gn=0.585
+step= 79872  rew=-1.195  swp=91.7  map=7.6  trunc=95%  pl=-0.003  vl=0.966  ent=4.292  kl=0.0139  gn=0.572
+step= 80128  rew=-1.696  swp=91.7  map=7.6  trunc=95%  pl=-0.003  vl=0.992  ent=4.254  kl=0.0133  gn=0.373
+step= 80384  rew=-1.696  swp=91.7  map=7.6  trunc=95%  pl=0.002  vl=0.990  ent=4.291  kl=0.0138  gn=0.370
+step= 80640  rew=-1.696  swp=91.7  map=7.6  trunc=95%  pl=-0.002  vl=0.998  ent=4.309  kl=0.0178  gn=0.368
+step= 80896  rew=-1.833  swp=91.7  map=7.7  trunc=95%  pl=-0.002  vl=0.941  ent=4.321  kl=0.0178  gn=0.499
+step= 81152  rew=-1.833  swp=91.7  map=7.7  trunc=95%  pl=-0.015  vl=0.930  ent=4.162  kl=0.0182  gn=0.585
+step= 81408  rew=-1.833  swp=91.7  map=7.7  trunc=95%  pl=0.001  vl=0.991  ent=4.217  kl=0.0140  gn=0.533
+step= 81664  rew=-1.833  swp=91.7  map=7.7  trunc=95%  pl=-0.004  vl=0.991  ent=4.272  kl=0.0160  gn=0.472
+step= 81920  rew=-1.309  swp=91.7  map=7.7  trunc=95%  pl=-0.004  vl=0.842  ent=4.210  kl=0.0154  gn=0.398
+step= 82176  rew=-1.309  swp=91.7  map=7.7  trunc=95%  pl=-0.004  vl=0.914  ent=4.243  kl=0.0169  gn=0.624
+step= 82432  rew=-1.309  swp=91.7  map=7.7  trunc=95%  pl=0.012  vl=0.974  ent=4.274  kl=0.0155  gn=0.568
+step= 82688  rew=-1.526  swp=91.7  map=7.7  trunc=95%  pl=0.007  vl=0.799  ent=3.962  kl=0.0251  gn=0.547
+step= 82944  rew=-1.526  swp=91.7  map=7.7  trunc=95%  pl=0.009  vl=0.943  ent=3.948  kl=0.0163  gn=0.456
+step= 83200  rew=-0.884  swp=119.7  map=7.7  trunc=94%  pl=-0.018  vl=1.213  ent=3.974  kl=0.0155  gn=0.440
+step= 83456  rew=-0.884  swp=119.7  map=7.7  trunc=94%  pl=0.008  vl=0.972  ent=4.085  kl=0.0201  gn=0.529
+step= 83712  rew=-0.884  swp=119.7  map=7.7  trunc=94%  pl=-0.006  vl=0.991  ent=4.144  kl=0.0172  gn=0.457
+step= 83968  rew=-0.115  swp=119.7  map=7.7  trunc=94%  pl=-0.016  vl=0.696  ent=4.148  kl=0.0189  gn=0.638
+step= 84224  rew=-0.115  swp=119.7  map=7.7  trunc=94%  pl=-0.002  vl=0.877  ent=4.149  kl=0.0192  gn=0.548
+step= 84480  rew=-0.115  swp=119.7  map=7.7  trunc=94%  pl=0.015  vl=1.077  ent=4.195  kl=0.0148  gn=0.600
+step= 84736  rew=-0.617  swp=60.7  map=7.7  trunc=94%  pl=0.002  vl=0.896  ent=4.185  kl=0.0155  gn=0.452
+step= 84992  rew=-0.617  swp=60.7  map=7.7  trunc=94%  pl=-0.004  vl=1.004  ent=4.083  kl=0.0173  gn=0.557
+step= 85248  rew=-0.617  swp=60.7  map=7.7  trunc=94%  pl=0.004  vl=0.950  ent=4.126  kl=0.0176  gn=0.573
+step= 85504  rew=-0.661  swp=60.7  map=7.7  trunc=94%  pl=-0.007  vl=0.980  ent=4.186  kl=0.0151  gn=0.445
+step= 85760  rew=-0.065  swp=69.5  map=7.7  trunc=93%  pl=-0.008  vl=1.159  ent=3.922  kl=0.0211  gn=0.626
+step= 86016  rew=-0.065  swp=69.5  map=7.7  trunc=93%  pl=-0.003  vl=0.984  ent=4.039  kl=0.0250  gn=0.456
+step= 86272  rew=-0.065  swp=69.5  map=7.7  trunc=93%  pl=-0.001  vl=0.964  ent=4.136  kl=0.0233  gn=0.506
+step= 86528  rew=+0.062  swp=69.5  map=7.7  trunc=93%  pl=-0.006  vl=0.868  ent=4.149  kl=0.0119  gn=0.434
+step= 86784  rew=+0.062  swp=69.5  map=7.7  trunc=93%  pl=-0.003  vl=0.912  ent=4.161  kl=0.0149  gn=0.451
+step= 87040  rew=+0.062  swp=69.5  map=7.7  trunc=93%  pl=-0.007  vl=0.998  ent=4.176  kl=0.0156  gn=0.443
+step= 87296  rew=+0.330  swp=69.5  map=7.7  trunc=93%  pl=-0.014  vl=0.904  ent=4.222  kl=0.0149  gn=0.429
+step= 87552  rew=+0.330  swp=69.5  map=7.7  trunc=93%  pl=-0.004  vl=0.961  ent=4.162  kl=0.0127  gn=0.517
+step= 87808  rew=+0.330  swp=69.5  map=7.7  trunc=93%  pl=-0.002  vl=0.847  ent=4.205  kl=0.0111  gn=0.476
+step= 88064  rew=+0.729  swp=69.5  map=7.7  trunc=93%  pl=-0.008  vl=0.837  ent=4.267  kl=0.0116  gn=0.485
+step= 88320  rew=+0.729  swp=69.5  map=7.7  trunc=93%  pl=0.005  vl=1.065  ent=4.197  kl=0.0135  gn=0.533
+step= 88576  rew=+0.729  swp=69.5  map=7.7  trunc=93%  pl=-0.004  vl=0.821  ent=4.273  kl=0.0122  gn=0.506
+step= 88832  rew=+0.729  swp=69.5  map=7.7  trunc=93%  pl=-0.003  vl=0.954  ent=4.283  kl=0.0096  gn=0.527
+step= 89088  rew=+0.313  swp=69.5  map=7.7  trunc=93%  pl=-0.009  vl=0.877  ent=4.247  kl=0.0111  gn=0.396
+step= 89344  rew=+0.313  swp=69.5  map=7.7  trunc=93%  pl=-0.000  vl=0.870  ent=4.248  kl=0.0154  gn=0.511
+step= 89600  rew=+0.313  swp=69.5  map=7.7  trunc=93%  pl=0.005  vl=0.982  ent=4.355  kl=0.0170  gn=0.556
+step= 89856  rew=+0.817  swp=69.5  map=7.7  trunc=93%  pl=0.025  vl=0.816  ent=3.839  kl=0.0233  gn=0.614
+step= 90112  rew=+1.567  swp=83.9  map=7.7  trunc=92%  pl=0.002  vl=1.104  ent=4.034  kl=0.0170  gn=0.586
+step= 90368  rew=+1.567  swp=83.9  map=7.7  trunc=92%  pl=0.001  vl=0.895  ent=4.281  kl=0.0152  gn=0.510
+step= 90624  rew=+1.567  swp=83.9  map=7.7  trunc=92%  pl=-0.006  vl=1.165  ent=4.317  kl=0.0133  gn=0.584
+step= 90880  rew=+1.333  swp=83.9  map=7.7  trunc=92%  pl=0.002  vl=0.953  ent=4.179  kl=0.0211  gn=0.499
+step= 91136  rew=+1.333  swp=83.9  map=7.7  trunc=92%  pl=-0.002  vl=1.015  ent=4.184  kl=0.0271  gn=0.566
+step= 91392  rew=+1.333  swp=83.9  map=7.7  trunc=92%  pl=-0.001  vl=0.988  ent=4.195  kl=0.0133  gn=0.559
+step= 91648  rew=+1.472  swp=83.9  map=7.7  trunc=92%  pl=-0.016  vl=0.731  ent=3.978  kl=0.0167  gn=0.476
+step= 91904  rew=+1.087  swp=61.6  map=7.6  trunc=92%  pl=-0.007  vl=1.010  ent=3.696  kl=0.0193  gn=0.693
+step= 92160  rew=+1.390  swp=75.1  map=7.6  trunc=91%  pl=0.004  vl=0.937  ent=3.851  kl=0.0210  gn=0.624
+step= 92416  rew=+1.390  swp=75.1  map=7.6  trunc=91%  pl=0.004  vl=1.004  ent=3.931  kl=0.0172  gn=0.561
+step= 92672  rew=+1.390  swp=75.1  map=7.6  trunc=91%  pl=-0.006  vl=1.018  ent=3.965  kl=0.0124  gn=0.546
+step= 92928  rew=+2.242  swp=75.1  map=7.6  trunc=91%  pl=-0.017  vl=0.693  ent=3.856  kl=0.0158  gn=0.544
+step= 93184  rew=+3.592  swp=91.0  map=7.6  trunc=89%  pl=-0.005  vl=0.825  ent=3.866  kl=0.0166  gn=0.578
+step= 93440  rew=+3.567  swp=70.0  map=7.6  trunc=88%  pl=-0.003  vl=0.706  ent=3.887  kl=0.0130  gn=0.608
+step= 93696  rew=+3.567  swp=70.0  map=7.6  trunc=88%  pl=-0.006  vl=1.114  ent=4.302  kl=0.0139  gn=0.568
+step= 93952  rew=+3.567  swp=70.0  map=7.6  trunc=88%  pl=0.009  vl=1.033  ent=4.284  kl=0.0113  gn=0.513
+step= 94208  rew=+1.659  swp=70.0  map=7.6  trunc=88%  pl=-0.013  vl=0.869  ent=4.104  kl=0.0095  gn=0.512
+step= 94464  rew=+2.164  swp=85.0  map=7.6  trunc=87%  pl=-0.000  vl=1.069  ent=3.680  kl=0.0111  gn=0.575
+step= 94720  rew=+2.164  swp=85.0  map=7.6  trunc=87%  pl=-0.009  vl=0.958  ent=4.320  kl=0.0125  gn=0.572
+step= 94976  rew=+2.164  swp=85.0  map=7.6  trunc=87%  pl=0.004  vl=0.984  ent=4.327  kl=0.0137  gn=0.551
+step= 95232  rew=+2.184  swp=85.0  map=8.0  trunc=88%  pl=0.001  vl=1.022  ent=4.290  kl=0.0128  gn=0.515
+step= 95488  rew=+2.184  swp=85.0  map=8.0  trunc=88%  pl=-0.002  vl=1.004  ent=4.180  kl=0.0170  gn=0.642
+step= 95744  rew=+2.184  swp=85.0  map=8.0  trunc=88%  pl=0.006  vl=0.981  ent=4.144  kl=0.0140  gn=0.683
+step= 96000  rew=+2.184  swp=85.0  map=8.0  trunc=88%  pl=0.007  vl=1.016  ent=4.188  kl=0.0136  gn=0.514
+step= 96256  rew=+2.524  swp=85.0  map=8.0  trunc=88%  pl=0.013  vl=0.831  ent=4.067  kl=0.0186  gn=0.566
+step= 96512  rew=+2.524  swp=85.0  map=8.0  trunc=88%  pl=-0.016  vl=0.929  ent=4.208  kl=0.0156  gn=0.555
+step= 96768  rew=+2.524  swp=85.0  map=8.0  trunc=88%  pl=-0.001  vl=0.903  ent=4.266  kl=0.0145  gn=0.595
+step= 97024  rew=+2.451  swp=76.2  map=8.0  trunc=88%  pl=-0.012  vl=0.870  ent=4.247  kl=0.0185  gn=0.593
+step= 97280  rew=+2.451  swp=76.2  map=8.0  trunc=88%  pl=0.003  vl=0.649  ent=4.280  kl=0.0108  gn=0.547
+step= 97536  rew=+2.451  swp=76.2  map=8.0  trunc=88%  pl=-0.003  vl=0.980  ent=4.372  kl=0.0099  gn=0.617
+step= 97792  rew=+2.769  swp=77.5  map=8.0  trunc=87%  pl=-0.007  vl=0.985  ent=4.017  kl=0.0186  gn=0.610
+step= 98048  rew=+2.769  swp=77.5  map=8.0  trunc=87%  pl=-0.018  vl=0.785  ent=3.937  kl=0.0223  gn=0.607
+step= 98304  rew=+2.769  swp=77.5  map=8.0  trunc=87%  pl=-0.009  vl=0.902  ent=4.039  kl=0.0215  gn=0.562
+step= 98560  rew=+2.950  swp=77.5  map=8.0  trunc=87%  pl=-0.007  vl=0.872  ent=4.159  kl=0.0157  gn=0.564
+step= 98816  rew=+2.950  swp=77.5  map=8.0  trunc=87%  pl=0.004  vl=1.041  ent=4.211  kl=0.0198  gn=0.576
+step= 99072  rew=+2.950  swp=77.5  map=8.0  trunc=87%  pl=-0.003  vl=0.950  ent=4.202  kl=0.0193  gn=0.562
+step= 99328  rew=+2.964  swp=77.5  map=8.0  trunc=87%  pl=-0.003  vl=0.804  ent=4.185  kl=0.0160  gn=0.563
+step= 99584  rew=+2.964  swp=77.5  map=8.0  trunc=87%  pl=-0.013  vl=1.039  ent=4.170  kl=0.0227  gn=0.684
+step= 99840  rew=+2.964  swp=77.5  map=8.0  trunc=87%  pl=-0.001  vl=1.243  ent=4.350  kl=0.0131  gn=0.928
+step=100096  rew=+2.877  swp=77.5  map=8.0  trunc=87%  pl=-0.002  vl=0.886  ent=4.304  kl=0.0146  gn=0.500
+step=100352  rew=+2.877  swp=77.5  map=8.0  trunc=87%  pl=0.007  vl=1.027  ent=3.829  kl=0.0238  gn=0.794
+step=100608  rew=+2.877  swp=77.5  map=8.0  trunc=87%  pl=-0.005  vl=0.682  ent=4.147  kl=0.0141  gn=0.634
+step=100864  rew=+2.877  swp=77.5  map=8.0  trunc=87%  pl=0.001  vl=0.958  ent=4.320  kl=0.0135  gn=0.579
+step=101120  rew=+2.618  swp=63.1  map=8.0  trunc=88%  pl=0.014  vl=1.096  ent=3.847  kl=0.0233  gn=0.725
+step=101376  rew=+2.618  swp=63.1  map=8.0  trunc=88%  pl=0.015  vl=1.022  ent=4.027  kl=0.0260  gn=0.737
+step=101632  rew=+2.618  swp=63.1  map=8.0  trunc=88%  pl=-0.009  vl=1.000  ent=4.231  kl=0.0151  gn=0.559
+step=101888  rew=+2.725  swp=63.1  map=8.0  trunc=88%  pl=-0.018  vl=0.837  ent=3.922  kl=0.0240  gn=0.715
+step=102144  rew=+2.725  swp=63.1  map=8.0  trunc=88%  pl=0.007  vl=1.068  ent=3.885  kl=0.0334  gn=0.754
+step=102400  rew=+2.725  swp=63.1  map=8.0  trunc=88%  pl=0.004  vl=0.979  ent=4.192  kl=0.0229  gn=0.679
+step=102656  rew=+2.687  swp=63.1  map=8.0  trunc=88%  pl=-0.024  vl=0.807  ent=4.226  kl=0.0212  gn=0.581
+step=102912  rew=+2.687  swp=63.1  map=8.0  trunc=88%  pl=0.008  vl=0.918  ent=4.082  kl=0.0264  gn=0.777
+step=103168  rew=+2.687  swp=63.1  map=8.0  trunc=88%  pl=0.009  vl=1.022  ent=4.165  kl=0.0144  gn=0.745
+step=103424  rew=+2.798  swp=52.7  map=8.0  trunc=88%  pl=-0.006  vl=0.674  ent=3.974  kl=0.0192  gn=0.611
+step=103680  rew=+2.798  swp=52.7  map=8.0  trunc=88%  pl=0.012  vl=0.959  ent=3.731  kl=0.0222  gn=0.646
+step=103936  rew=+2.798  swp=52.7  map=8.0  trunc=88%  pl=-0.030  vl=1.033  ent=3.865  kl=0.0178  gn=0.630
+step=104192  rew=+2.711  swp=39.2  map=8.0  trunc=88%  pl=-0.013  vl=0.738  ent=4.034  kl=0.0205  gn=0.551
+step=104448  rew=+2.711  swp=39.2  map=8.0  trunc=88%  pl=0.001  vl=1.097  ent=4.022  kl=0.0152  gn=0.703
+step=104704  rew=+2.711  swp=39.2  map=8.0  trunc=88%  pl=-0.016  vl=0.947  ent=4.257  kl=0.0151  gn=0.763
+step=104960  rew=+2.845  swp=39.2  map=8.0  trunc=88%  pl=-0.014  vl=0.756  ent=4.099  kl=0.0134  gn=0.633
+step=105216  rew=+2.845  swp=39.2  map=8.0  trunc=88%  pl=0.001  vl=0.917  ent=4.094  kl=0.0177  gn=0.623
+step=105472  rew=+2.845  swp=39.2  map=8.0  trunc=88%  pl=-0.002  vl=0.919  ent=4.095  kl=0.0177  gn=0.628
+step=105728  rew=+2.623  swp=34.0  map=8.0  trunc=88%  pl=-0.013  vl=0.807  ent=4.034  kl=0.0191  gn=0.738
+step=105984  rew=+2.623  swp=34.0  map=8.0  trunc=88%  pl=-0.018  vl=0.480  ent=3.920  kl=0.0143  gn=0.799
+step=106240  rew=+2.623  swp=34.0  map=8.0  trunc=88%  pl=-0.005  vl=0.866  ent=4.104  kl=0.0146  gn=0.647
+step=106496  rew=+2.751  swp=32.6  map=8.0  trunc=88%  pl=-0.028  vl=0.473  ent=4.054  kl=0.0152  gn=0.687
+step=106752  rew=+2.876  swp=33.0  map=8.0  trunc=88%  pl=-0.007  vl=1.135  ent=3.255  kl=0.0150  gn=0.730
+step=107008  rew=+2.847  swp=31.1  map=8.0  trunc=87%  pl=0.020  vl=1.239  ent=3.311  kl=0.0187  gn=0.847
+step=107264  rew=+5.187  swp=45.2  map=8.0  trunc=86%  pl=-0.005  vl=1.050  ent=3.653  kl=0.0194  gn=0.505
+step=107520  rew=+5.187  swp=45.2  map=8.0  trunc=86%  pl=0.001  vl=0.955  ent=4.163  kl=0.0135  gn=0.659
+step=107776  rew=+5.187  swp=45.2  map=8.0  trunc=86%  pl=-0.012  vl=1.016  ent=4.223  kl=0.0077  gn=0.686
+step=108032  rew=+4.585  swp=30.1  map=8.0  trunc=86%  pl=-0.016  vl=0.810  ent=4.201  kl=0.0168  gn=0.478
+step=108288  rew=+4.585  swp=30.1  map=8.0  trunc=86%  pl=-0.002  vl=0.980  ent=4.173  kl=0.0186  gn=0.754
+step=108544  rew=+4.585  swp=30.1  map=8.0  trunc=86%  pl=-0.001  vl=0.995  ent=4.164  kl=0.0104  gn=0.661
+step=108800  rew=+4.155  swp=30.1  map=8.0  trunc=86%  pl=-0.005  vl=0.838  ent=4.219  kl=0.0112  gn=0.610
+step=109056  rew=+4.155  swp=30.1  map=8.0  trunc=86%  pl=0.019  vl=0.980  ent=4.101  kl=0.0123  gn=0.697
+step=109312  rew=+4.155  swp=30.1  map=8.0  trunc=86%  pl=-0.011  vl=1.186  ent=3.998  kl=0.0134  gn=0.630
+step=109568  rew=+4.362  swp=30.1  map=8.0  trunc=87%  pl=-0.005  vl=0.807  ent=4.058  kl=0.0154  gn=0.495
+step=109824  rew=+4.362  swp=30.1  map=8.0  trunc=87%  pl=-0.007  vl=1.024  ent=4.237  kl=0.0215  gn=0.630
+step=110080  rew=+4.362  swp=30.1  map=8.0  trunc=87%  pl=0.023  vl=0.909  ent=4.196  kl=0.0187  gn=0.583
+step=110336  rew=+4.070  swp=30.1  map=8.0  trunc=87%  pl=-0.007  vl=0.956  ent=4.310  kl=0.0172  gn=0.472
+step=110592  rew=+4.070  swp=30.1  map=8.0  trunc=87%  pl=0.008  vl=1.059  ent=4.248  kl=0.0192  gn=0.726
+step=110848  rew=+4.070  swp=30.1  map=8.0  trunc=87%  pl=0.003  vl=1.004  ent=4.190  kl=0.0284  gn=0.620
+step=111104  rew=+3.476  swp=30.1  map=8.0  trunc=87%  pl=0.006  vl=0.998  ent=4.136  kl=0.0254  gn=0.637
+step=111360  rew=+3.476  swp=30.1  map=8.0  trunc=87%  pl=-0.026  vl=0.861  ent=3.928  kl=0.0260  gn=0.770
+step=111616  rew=+3.476  swp=30.1  map=8.0  trunc=87%  pl=0.015  vl=0.956  ent=4.196  kl=0.0206  gn=0.598
+step=111872  rew=+3.499  swp=28.9  map=8.0  trunc=87%  pl=-0.004  vl=0.899  ent=4.155  kl=0.0187  gn=0.518
+step=112128  rew=+3.657  swp=37.9  map=8.0  trunc=86%  pl=0.039  vl=0.993  ent=3.038  kl=0.0294  gn=0.822
+step=112384  rew=+4.365  swp=42.5  map=8.0  trunc=86%  pl=-0.005  vl=1.051  ent=3.658  kl=0.0276  gn=0.770
+step=112640  rew=+4.365  swp=42.5  map=8.0  trunc=86%  pl=-0.001  vl=0.942  ent=3.846  kl=0.0138  gn=0.689
+step=112896  rew=+4.365  swp=42.5  map=8.0  trunc=86%  pl=0.013  vl=0.964  ent=4.188  kl=0.0165  gn=0.529
+step=113152  rew=+4.694  swp=42.5  map=8.0  trunc=86%  pl=-0.017  vl=0.830  ent=3.313  kl=0.0208  gn=0.584
+step=113408  rew=+5.053  swp=62.1  map=8.0  trunc=84%  pl=0.009  vl=0.935  ent=2.369  kl=0.0306  gn=0.858
+step=113664  rew=+5.479  swp=76.0  map=8.0  trunc=84%  pl=-0.018  vl=1.032  ent=2.881  kl=0.0347  gn=0.717
+step=113920  rew=+5.479  swp=76.0  map=8.0  trunc=84%  pl=-0.017  vl=0.837  ent=3.758  kl=0.0312  gn=0.815
+step=114176  rew=+5.479  swp=76.0  map=8.0  trunc=84%  pl=0.012  vl=0.932  ent=4.115  kl=0.0253  gn=0.627
+step=114432  rew=+5.479  swp=76.0  map=8.0  trunc=84%  pl=0.007  vl=0.977  ent=4.104  kl=0.0253  gn=0.702
+step=114688  rew=+5.394  swp=76.0  map=8.0  trunc=84%  pl=-0.009  vl=0.790  ent=3.895  kl=0.0221  gn=0.668
+step=114944  rew=+5.394  swp=76.0  map=8.0  trunc=84%  pl=-0.002  vl=0.937  ent=4.029  kl=0.0210  gn=0.675
+step=115200  rew=+5.394  swp=76.0  map=8.0  trunc=84%  pl=-0.011  vl=0.943  ent=4.171  kl=0.0227  gn=0.589
+step=115456  rew=+5.248  swp=76.0  map=8.0  trunc=84%  pl=-0.014  vl=0.728  ent=3.838  kl=0.0405  gn=0.663
+step=115712  rew=+5.248  swp=76.0  map=8.0  trunc=84%  pl=0.007  vl=0.749  ent=3.638  kl=0.0170  gn=0.718
+step=115968  rew=+5.248  swp=76.0  map=8.0  trunc=84%  pl=-0.001  vl=1.001  ent=4.072  kl=0.0185  gn=0.642
+step=116224  rew=+5.761  swp=76.0  map=8.0  trunc=84%  pl=-0.003  vl=0.894  ent=3.606  kl=0.0191  gn=0.638
+step=116480  rew=+5.761  swp=76.0  map=8.0  trunc=84%  pl=0.004  vl=0.924  ent=3.939  kl=0.0206  gn=0.545
+step=116736  rew=+5.761  swp=76.0  map=8.0  trunc=84%  pl=0.011  vl=0.870  ent=3.886  kl=0.0255  gn=0.562
+step=116992  rew=+5.418  swp=76.0  map=8.0  trunc=84%  pl=-0.012  vl=0.652  ent=3.918  kl=0.0208  gn=0.520
+step=117248  rew=+5.418  swp=76.0  map=8.0  trunc=84%  pl=-0.003  vl=0.888  ent=3.937  kl=0.0152  gn=0.647
+step=117504  rew=+5.418  swp=76.0  map=8.0  trunc=84%  pl=-0.003  vl=0.909  ent=4.343  kl=0.0171  gn=0.687
+step=117760  rew=+5.061  swp=65.0  map=8.0  trunc=84%  pl=-0.019  vl=0.836  ent=3.664  kl=0.0174  gn=0.733
+step=118016  rew=+5.061  swp=65.0  map=8.0  trunc=84%  pl=-0.001  vl=0.947  ent=3.456  kl=0.0292  gn=0.916
+step=118272  rew=+5.061  swp=65.0  map=8.0  trunc=84%  pl=0.000  vl=0.877  ent=3.904  kl=0.0242  gn=0.705
+step=118528  rew=+5.061  swp=65.0  map=8.0  trunc=84%  pl=0.014  vl=0.837  ent=3.840  kl=0.0269  gn=0.601
+step=118784  rew=+5.264  swp=56.6  map=8.0  trunc=83%  pl=-0.023  vl=1.167  ent=3.052  kl=0.0224  gn=0.618
+step=119040  rew=+5.264  swp=56.6  map=8.0  trunc=83%  pl=-0.024  vl=0.807  ent=3.373  kl=0.0190  gn=0.868
+step=119296  rew=+5.264  swp=56.6  map=8.0  trunc=83%  pl=0.008  vl=0.921  ent=3.893  kl=0.0198  gn=0.585
+step=119552  rew=+6.127  swp=60.4  map=8.0  trunc=83%  pl=-0.032  vl=0.835  ent=3.404  kl=0.0173  gn=0.694
+step=119808  rew=+6.127  swp=60.4  map=8.0  trunc=83%  pl=0.012  vl=0.675  ent=3.338  kl=0.0150  gn=0.637
+step=120064  rew=+6.127  swp=60.4  map=8.0  trunc=83%  pl=-0.002  vl=0.929  ent=3.942  kl=0.0175  gn=0.596
+step=120320  rew=+6.127  swp=60.4  map=8.0  trunc=83%  pl=0.006  vl=0.844  ent=3.949  kl=0.0203  gn=0.626
+step=120576  rew=+6.624  swp=60.4  map=8.0  trunc=83%  pl=-0.010  vl=0.727  ent=3.132  kl=0.0155  gn=0.698
+step=120832  rew=+7.806  swp=73.9  map=8.0  trunc=82%  pl=-0.017  vl=0.974  ent=3.353  kl=0.0145  gn=0.752
+step=121088  rew=+7.806  swp=73.9  map=8.0  trunc=82%  pl=0.005  vl=1.061  ent=3.973  kl=0.0185  gn=0.722
+step=121344  rew=+7.806  swp=73.9  map=8.0  trunc=82%  pl=-0.006  vl=0.880  ent=3.905  kl=0.0215  gn=0.571
+step=121600  rew=+7.769  swp=73.9  map=8.0  trunc=83%  pl=-0.015  vl=0.720  ent=3.704  kl=0.0167  gn=0.666
+step=121856  rew=+7.769  swp=73.9  map=8.0  trunc=83%  pl=-0.014  vl=0.945  ent=3.516  kl=0.0164  gn=0.651
+step=122112  rew=+7.769  swp=73.9  map=8.0  trunc=83%  pl=0.011  vl=0.756  ent=3.992  kl=0.0194  gn=0.563
+step=122368  rew=+7.798  swp=64.9  map=8.0  trunc=83%  pl=-0.023  vl=0.664  ent=4.079  kl=0.0202  gn=0.603
+step=122624  rew=+7.798  swp=64.9  map=8.0  trunc=83%  pl=-0.010  vl=1.030  ent=4.125  kl=0.0147  gn=0.641
+step=122880  rew=+7.798  swp=64.9  map=8.0  trunc=83%  pl=-0.009  vl=0.936  ent=4.104  kl=0.0103  gn=0.597
+step=123136  rew=+7.230  swp=60.2  map=8.0  trunc=83%  pl=-0.007  vl=0.762  ent=4.277  kl=0.0157  gn=0.692
+step=123392  rew=+7.230  swp=60.2  map=8.0  trunc=83%  pl=0.006  vl=0.915  ent=4.030  kl=0.0177  gn=0.755
+step=123648  rew=+7.230  swp=60.2  map=8.0  trunc=83%  pl=-0.013  vl=1.077  ent=4.071  kl=0.0129  gn=0.819
+step=123904  rew=+6.401  swp=60.2  map=8.0  trunc=83%  pl=-0.004  vl=0.944  ent=4.181  kl=0.0226  gn=0.631
+step=124160  rew=+6.401  swp=60.2  map=8.0  trunc=83%  pl=0.010  vl=0.831  ent=3.597  kl=0.0266  gn=0.742
+step=124416  rew=+6.401  swp=60.2  map=8.0  trunc=83%  pl=-0.021  vl=0.902  ent=3.836  kl=0.0182  gn=0.668
+step=124672  rew=+6.359  swp=47.9  map=8.0  trunc=83%  pl=-0.005  vl=0.854  ent=4.123  kl=0.0265  gn=0.635
+step=124928  rew=+6.359  swp=47.9  map=8.0  trunc=83%  pl=0.032  vl=1.230  ent=3.976  kl=0.0383  gn=0.844
+step=125184  rew=+6.359  swp=47.9  map=8.0  trunc=83%  pl=-0.005  vl=0.957  ent=3.860  kl=0.0212  gn=0.777
+step=125440  rew=+5.824  swp=43.2  map=8.0  trunc=83%  pl=-0.002  vl=1.056  ent=4.281  kl=0.0174  gn=0.720
+step=125696  rew=+5.824  swp=43.2  map=8.0  trunc=83%  pl=0.006  vl=0.975  ent=3.763  kl=0.0231  gn=0.896
+step=125952  rew=+5.824  swp=43.2  map=8.0  trunc=83%  pl=-0.029  vl=0.967  ent=4.060  kl=0.0209  gn=0.657
+step=126208  rew=+5.824  swp=43.2  map=8.0  trunc=83%  pl=0.011  vl=0.907  ent=4.298  kl=0.0197  gn=0.666
+step=126464  rew=+5.858  swp=40.6  map=8.0  trunc=83%  pl=-0.013  vl=0.932  ent=3.841  kl=0.0207  gn=0.610
+step=126720  rew=+5.858  swp=40.6  map=8.0  trunc=83%  pl=-0.009  vl=0.972  ent=4.043  kl=0.0200  gn=0.739
+step=126976  rew=+5.858  swp=40.6  map=8.0  trunc=83%  pl=0.011  vl=0.956  ent=4.267  kl=0.0183  gn=0.617
+step=127232  rew=+4.876  swp=26.8  map=8.0  trunc=83%  pl=-0.000  vl=0.886  ent=3.562  kl=0.0260  gn=0.700
+step=127488  rew=+4.876  swp=26.8  map=8.0  trunc=83%  pl=-0.003  vl=0.914  ent=4.038  kl=0.0219  gn=0.802
+step=127744  rew=+4.876  swp=26.8  map=8.0  trunc=83%  pl=0.020  vl=0.705  ent=4.144  kl=0.0228  gn=0.722
+step=128000  rew=+4.953  swp=26.8  map=8.0  trunc=83%  pl=-0.004  vl=0.645  ent=2.776  kl=0.0316  gn=0.689
+step=128256  rew=+5.273  swp=35.4  map=8.0  trunc=83%  pl=0.015  vl=0.946  ent=3.690  kl=0.0237  gn=0.749
+step=128512  rew=+5.273  swp=35.4  map=8.0  trunc=83%  pl=-0.013  vl=0.860  ent=3.468  kl=0.0152  gn=0.788
+step=128768  rew=+5.273  swp=35.4  map=8.0  trunc=83%  pl=0.012  vl=0.818  ent=4.071  kl=0.0205  gn=0.789
+step=129024  rew=+5.107  swp=35.4  map=8.0  trunc=83%  pl=-0.017  vl=0.801  ent=3.766  kl=0.0224  gn=0.759
+step=129280  rew=+5.107  swp=35.4  map=8.0  trunc=83%  pl=0.001  vl=1.017  ent=3.537  kl=0.0241  gn=0.731
+step=129536  rew=+5.107  swp=35.4  map=8.0  trunc=83%  pl=0.009  vl=0.829  ent=4.188  kl=0.0262  gn=0.743
+step=129792  rew=+5.872  swp=40.9  map=8.0  trunc=83%  pl=-0.024  vl=0.764  ent=3.204  kl=0.0258  gn=0.706
+step=130048  rew=+5.872  swp=40.9  map=8.0  trunc=83%  pl=0.017  vl=0.962  ent=3.698  kl=0.0297  gn=0.725
+step=130304  rew=+5.872  swp=40.9  map=8.0  trunc=83%  pl=-0.011  vl=1.095  ent=4.113  kl=0.0228  gn=0.891
+step=130560  rew=+4.846  swp=37.4  map=8.0  trunc=82%  pl=-0.005  vl=0.907  ent=4.083  kl=0.0262  gn=0.615
+step=130816  rew=+4.846  swp=37.4  map=8.0  trunc=82%  pl=0.022  vl=1.058  ent=3.895  kl=0.0341  gn=0.805
+step=131072  rew=+4.846  swp=37.4  map=8.0  trunc=82%  pl=-0.018  vl=0.992  ent=3.887  kl=0.0189  gn=0.741
+step=131328  rew=+4.846  swp=37.4  map=8.0  trunc=82%  pl=0.001  vl=0.906  ent=4.232  kl=0.0224  gn=0.783
+step=131584  rew=+4.290  swp=31.6  map=8.0  trunc=82%  pl=-0.022  vl=0.891  ent=3.439  kl=0.0262  gn=0.541
+step=131840  rew=+4.290  swp=31.6  map=8.0  trunc=82%  pl=-0.031  vl=0.826  ent=3.790  kl=0.0157  gn=0.910
+step=132096  rew=+4.290  swp=31.6  map=8.0  trunc=82%  pl=0.004  vl=0.783  ent=4.268  kl=0.0168  gn=0.702
+step=132352  rew=+4.424  swp=34.5  map=8.0  trunc=82%  pl=-0.023  vl=0.839  ent=2.812  kl=0.0176  gn=0.675
+step=132608  rew=+4.424  swp=34.5  map=8.0  trunc=82%  pl=-0.024  vl=1.089  ent=4.157  kl=0.0183  gn=0.784
+step=132864  rew=+4.424  swp=34.5  map=8.0  trunc=82%  pl=0.007  vl=0.896  ent=4.349  kl=0.0178  gn=0.686
+step=133120  rew=+4.045  swp=34.5  map=8.0  trunc=82%  pl=-0.007  vl=0.945  ent=3.923  kl=0.0204  gn=0.745
+step=133376  rew=+3.576  swp=24.1  map=8.0  trunc=82%  pl=-0.020  vl=0.706  ent=2.811  kl=0.0257  gn=0.727
+step=133632  rew=+3.576  swp=24.1  map=8.0  trunc=82%  pl=0.006  vl=0.862  ent=4.149  kl=0.0183  gn=0.778
+step=133888  rew=+3.576  swp=24.1  map=8.0  trunc=82%  pl=-0.001  vl=0.864  ent=4.173  kl=0.0180  gn=0.761
+step=134144  rew=+3.591  swp=24.1  map=8.0  trunc=82%  pl=-0.014  vl=1.389  ent=3.841  kl=0.0150  gn=0.972
+step=134400  rew=+3.591  swp=24.1  map=8.0  trunc=82%  pl=0.002  vl=0.743  ent=4.362  kl=0.0149  gn=0.751
+step=134656  rew=+3.591  swp=24.1  map=8.0  trunc=82%  pl=0.001  vl=0.803  ent=4.355  kl=0.0197  gn=0.769
+step=134912  rew=+3.125  swp=24.1  map=8.0  trunc=82%  pl=-0.013  vl=0.648  ent=3.501  kl=0.0299  gn=0.944
+step=135168  rew=+3.125  swp=24.1  map=8.0  trunc=82%  pl=-0.030  vl=0.839  ent=3.710  kl=0.0237  gn=0.748
+step=135424  rew=+3.125  swp=24.1  map=8.0  trunc=82%  pl=0.013  vl=0.714  ent=4.158  kl=0.0241  gn=0.885
+step=135680  rew=+3.542  swp=24.1  map=8.0  trunc=82%  pl=-0.023  vl=0.638  ent=3.291  kl=0.0296  gn=0.934
+step=135936  rew=+4.897  swp=32.5  map=8.0  trunc=82%  pl=0.005  vl=0.941  ent=2.929  kl=0.0286  gn=0.895
+step=136192  rew=+4.897  swp=32.5  map=8.0  trunc=82%  pl=0.000  vl=1.339  ent=4.193  kl=0.0230  gn=0.939
+step=136448  rew=+4.897  swp=32.5  map=8.0  trunc=82%  pl=0.006  vl=0.744  ent=4.292  kl=0.0246  gn=0.733
+step=136704  rew=+4.894  swp=32.5  map=8.0  trunc=82%  pl=-0.014  vl=0.714  ent=3.703  kl=0.0468  gn=0.830
+step=136960  rew=+4.894  swp=32.5  map=8.0  trunc=82%  pl=-0.022  vl=0.557  ent=3.806  kl=0.0228  gn=0.729
+step=137216  rew=+4.894  swp=32.5  map=8.0  trunc=82%  pl=-0.010  vl=0.921  ent=4.318  kl=0.0162  gn=0.716
+step=137472  rew=+4.947  swp=32.5  map=8.0  trunc=82%  pl=-0.018  vl=0.869  ent=3.325  kl=0.0256  gn=0.709
+step=137728  rew=+4.947  swp=32.5  map=8.0  trunc=82%  pl=0.004  vl=1.044  ent=4.150  kl=0.0374  gn=0.855
+step=137984  rew=+4.947  swp=32.5  map=8.0  trunc=82%  pl=0.016  vl=0.571  ent=4.299  kl=0.0358  gn=0.958
+step=138240  rew=+4.856  swp=32.5  map=8.0  trunc=82%  pl=-0.023  vl=1.043  ent=3.807  kl=0.0259  gn=0.994
+step=138496  rew=+4.856  swp=32.5  map=8.0  trunc=82%  pl=-0.016  vl=0.837  ent=4.062  kl=0.0230  gn=0.659
+step=138752  rew=+4.856  swp=32.5  map=8.0  trunc=82%  pl=-0.001  vl=0.758  ent=4.275  kl=0.0253  gn=0.799
+step=139008  rew=+4.849  swp=33.0  map=8.0  trunc=82%  pl=-0.025  vl=0.695  ent=3.685  kl=0.0200  gn=0.784
+step=139264  rew=+4.956  swp=32.5  map=8.0  trunc=81%  pl=0.005  vl=1.271  ent=3.065  kl=0.0237  gn=0.863
+step=139520  rew=+4.956  swp=32.5  map=8.0  trunc=81%  pl=-0.015  vl=0.838  ent=3.301  kl=0.0203  gn=0.777
+step=139776  rew=+4.956  swp=32.5  map=8.0  trunc=81%  pl=-0.008  vl=1.016  ent=4.196  kl=0.0208  gn=0.971
+step=140032  rew=+4.874  swp=32.5  map=8.0  trunc=81%  pl=-0.016  vl=0.815  ent=3.930  kl=0.0313  gn=0.700
+step=140288  rew=+4.874  swp=32.5  map=8.0  trunc=81%  pl=-0.003  vl=0.760  ent=3.466  kl=0.0242  gn=0.837
+step=140544  rew=+4.874  swp=32.5  map=8.0  trunc=81%  pl=0.010  vl=0.968  ent=4.283  kl=0.0193  gn=0.821
+step=140800  rew=+4.664  swp=27.6  map=8.0  trunc=81%  pl=-0.012  vl=0.778  ent=3.906  kl=0.0234  gn=0.677
+step=141056  rew=+4.664  swp=27.6  map=8.0  trunc=81%  pl=0.005  vl=0.917  ent=3.497  kl=0.0215  gn=0.881
+step=141312  rew=+4.664  swp=27.6  map=8.0  trunc=81%  pl=0.011  vl=0.862  ent=4.347  kl=0.0153  gn=0.748
+step=141568  rew=+5.496  swp=27.6  map=8.0  trunc=81%  pl=-0.005  vl=0.987  ent=4.228  kl=0.0183  gn=0.610
+step=141824  rew=+5.496  swp=27.6  map=8.0  trunc=81%  pl=-0.026  vl=1.108  ent=3.642  kl=0.0247  gn=0.831
+step=142080  rew=+5.496  swp=27.6  map=8.0  trunc=81%  pl=-0.001  vl=0.622  ent=4.315  kl=0.0168  gn=0.823
+step=142336  rew=+5.496  swp=27.3  map=8.0  trunc=81%  pl=0.000  vl=1.010  ent=4.268  kl=0.0226  gn=0.633
+step=142592  rew=+5.496  swp=27.3  map=8.0  trunc=81%  pl=0.017  vl=1.123  ent=3.784  kl=0.0298  gn=0.810
+step=142848  rew=+5.496  swp=27.3  map=8.0  trunc=81%  pl=-0.025  vl=1.031  ent=4.171  kl=0.0211  gn=0.688
+step=143104  rew=+5.496  swp=27.3  map=8.0  trunc=81%  pl=0.002  vl=0.973  ent=4.343  kl=0.0214  gn=0.696
+step=143360  rew=+5.242  swp=27.3  map=8.0  trunc=81%  pl=-0.010  vl=0.859  ent=3.416  kl=0.0235  gn=0.639
+step=143616  rew=+5.242  swp=27.3  map=8.0  trunc=81%  pl=-0.032  vl=1.162  ent=3.942  kl=0.0232  gn=0.623
+step=143872  rew=+5.242  swp=27.3  map=8.0  trunc=81%  pl=0.005  vl=0.925  ent=4.134  kl=0.0197  gn=0.612
+step=144128  rew=+4.896  swp=27.3  map=8.0  trunc=81%  pl=-0.021  vl=0.939  ent=3.900  kl=0.0320  gn=0.665
+step=144384  rew=+4.896  swp=27.3  map=8.0  trunc=81%  pl=-0.010  vl=0.976  ent=3.733  kl=0.0219  gn=0.645
+step=144640  rew=+4.896  swp=27.3  map=8.0  trunc=81%  pl=0.022  vl=0.931  ent=4.329  kl=0.0192  gn=0.792
+step=144896  rew=+4.353  swp=20.8  map=8.0  trunc=81%  pl=-0.001  vl=0.770  ent=3.203  kl=0.0210  gn=0.743
+step=145152  rew=+4.353  swp=20.8  map=8.0  trunc=81%  pl=0.011  vl=0.791  ent=3.955  kl=0.0234  gn=0.764
+step=145408  rew=+4.353  swp=20.8  map=8.0  trunc=81%  pl=0.005  vl=0.744  ent=3.904  kl=0.0217  gn=0.734
+step=145664  rew=+5.000  swp=20.8  map=8.0  trunc=81%  pl=-0.027  vl=0.726  ent=3.564  kl=0.0295  gn=0.763
+step=145920  rew=+5.000  swp=20.8  map=8.0  trunc=81%  pl=-0.020  vl=0.973  ent=3.663  kl=0.0163  gn=0.842
+step=146176  rew=+5.000  swp=20.8  map=8.0  trunc=81%  pl=0.008  vl=0.777  ent=4.185  kl=0.0197  gn=0.709
+step=146432  rew=+4.851  swp=17.6  map=7.8  trunc=82%  pl=-0.015  vl=0.690  ent=3.662  kl=0.0336  gn=0.766
+step=146688  rew=+4.851  swp=17.6  map=7.8  trunc=82%  pl=-0.039  vl=0.769  ent=3.145  kl=0.0220  gn=0.718
+step=146944  rew=+4.851  swp=17.6  map=7.8  trunc=82%  pl=-0.007  vl=0.812  ent=3.843  kl=0.0256  gn=0.784
+step=147200  rew=+5.099  swp=17.6  map=7.8  trunc=82%  pl=-0.019  vl=0.846  ent=3.633  kl=0.0261  gn=0.679
+step=147456  rew=+5.099  swp=17.6  map=7.8  trunc=82%  pl=-0.035  vl=0.482  ent=3.353  kl=0.0202  gn=0.944
+step=147712  rew=+5.099  swp=17.6  map=7.8  trunc=82%  pl=0.008  vl=0.643  ent=3.824  kl=0.0273  gn=0.792
+step=147968  rew=+5.274  swp=17.6  map=7.8  trunc=82%  pl=-0.005  vl=0.692  ent=3.856  kl=0.0272  gn=0.714
+step=148224  rew=+5.274  swp=17.6  map=7.8  trunc=82%  pl=0.004  vl=1.448  ent=3.852  kl=0.0369  gn=1.050
+step=148480  rew=+5.274  swp=17.6  map=7.8  trunc=82%  pl=-0.013  vl=0.854  ent=3.804  kl=0.0163  gn=0.795
+step=148736  rew=+4.851  swp=17.6  map=7.8  trunc=82%  pl=0.003  vl=1.198  ent=4.257  kl=0.0178  gn=0.697
+step=148992  rew=+4.851  swp=17.6  map=7.8  trunc=82%  pl=-0.031  vl=0.662  ent=3.680  kl=0.0152  gn=0.866
+step=149248  rew=+4.851  swp=17.6  map=7.8  trunc=82%  pl=-0.001  vl=0.663  ent=4.258  kl=0.0163  gn=0.821
+step=149504  rew=+4.851  swp=17.6  map=7.8  trunc=82%  pl=0.002  vl=0.883  ent=4.257  kl=0.0215  gn=0.747
+step=149760  rew=+3.872  swp=9.2  map=7.8  trunc=82%  pl=-0.034  vl=0.798  ent=3.104  kl=0.0192  gn=0.760
+step=150016  rew=+3.872  swp=9.2  map=7.8  trunc=82%  pl=0.010  vl=0.728  ent=3.880  kl=0.0285  gn=0.800
+step=150272  rew=+3.872  swp=9.2  map=7.8  trunc=82%  pl=0.010  vl=0.790  ent=3.864  kl=0.0322  gn=0.813
+step=150528  rew=+4.463  swp=16.1  map=7.8  trunc=82%  pl=-0.019  vl=0.714  ent=2.732  kl=0.0424  gn=0.774
+step=150784  rew=+4.463  swp=16.1  map=7.8  trunc=82%  pl=-0.005  vl=0.747  ent=3.267  kl=0.0161  gn=0.822
+step=151040  rew=+4.463  swp=16.1  map=7.8  trunc=82%  pl=-0.002  vl=0.943  ent=4.276  kl=0.0129  gn=0.864
+step=151296  rew=+4.420  swp=16.1  map=7.8  trunc=82%  pl=0.005  vl=0.926  ent=4.164  kl=0.0125  gn=0.697
+step=151552  rew=+4.420  swp=16.1  map=7.8  trunc=82%  pl=-0.027  vl=0.872  ent=3.477  kl=0.0161  gn=0.835
+step=151808  rew=+4.420  swp=16.1  map=7.8  trunc=82%  pl=0.000  vl=0.759  ent=4.235  kl=0.0146  gn=0.780
+step=152064  rew=+4.420  swp=16.1  map=7.8  trunc=82%  pl=0.000  vl=0.838  ent=4.203  kl=0.0175  gn=0.679
+step=152320  rew=+5.617  swp=24.1  map=7.8  trunc=81%  pl=-0.015  vl=0.920  ent=2.425  kl=0.0277  gn=0.752
+step=152576  rew=+5.617  swp=24.1  map=7.8  trunc=81%  pl=-0.038  vl=0.699  ent=3.267  kl=0.0165  gn=0.702
+step=152832  rew=+5.617  swp=24.1  map=7.8  trunc=81%  pl=0.002  vl=0.883  ent=3.986  kl=0.0227  gn=0.792
+step=153088  rew=+5.356  swp=15.9  map=7.8  trunc=81%  pl=-0.004  vl=0.823  ent=3.940  kl=0.0214  gn=0.663
+step=153344  rew=+5.356  swp=15.9  map=7.8  trunc=81%  pl=-0.032  vl=0.685  ent=3.786  kl=0.0120  gn=0.883
+step=153600  rew=+5.356  swp=15.9  map=7.8  trunc=81%  pl=0.003  vl=0.869  ent=4.325  kl=0.0133  gn=0.831
+step=153856  rew=+4.846  swp=15.9  map=7.8  trunc=82%  pl=-0.012  vl=1.057  ent=4.321  kl=0.0136  gn=0.684
+step=154112  rew=+5.330  swp=24.8  map=7.8  trunc=81%  pl=0.003  vl=1.330  ent=2.167  kl=0.0282  gn=1.042
+step=154368  rew=+5.330  swp=24.8  map=7.8  trunc=81%  pl=-0.021  vl=0.985  ent=3.641  kl=0.0218  gn=0.876
+step=154624  rew=+5.330  swp=24.8  map=7.8  trunc=81%  pl=0.009  vl=0.874  ent=4.261  kl=0.0180  gn=0.914
+step=154880  rew=+4.727  swp=24.8  map=7.8  trunc=81%  pl=-0.011  vl=0.850  ent=4.040  kl=0.0241  gn=0.767
+step=155136  rew=+4.836  swp=27.3  map=7.8  trunc=81%  pl=-0.004  vl=1.061  ent=2.763  kl=0.0210  gn=0.850
+step=155392  rew=+4.836  swp=27.3  map=7.8  trunc=81%  pl=0.004  vl=0.916  ent=4.212  kl=0.0172  gn=0.844
+step=155648  rew=+4.836  swp=27.3  map=7.8  trunc=81%  pl=0.004  vl=0.881  ent=4.198  kl=0.0175  gn=0.678
+step=155904  rew=+6.657  swp=35.5  map=7.8  trunc=80%  pl=-0.026  vl=0.874  ent=2.444  kl=0.0208  gn=0.797
+step=156160  rew=+6.657  swp=35.5  map=7.8  trunc=80%  pl=-0.029  vl=0.643  ent=3.440  kl=0.0262  gn=0.973
+step=156416  rew=+6.657  swp=35.5  map=7.8  trunc=80%  pl=0.004  vl=0.834  ent=4.033  kl=0.0274  gn=0.851
+step=156672  rew=+6.657  swp=35.5  map=7.8  trunc=80%  pl=0.003  vl=0.970  ent=4.077  kl=0.0203  gn=0.782
+step=156928  rew=+6.403  swp=35.5  map=7.8  trunc=80%  pl=-0.029  vl=1.031  ent=3.770  kl=0.0145  gn=0.884
+step=157184  rew=+6.403  swp=35.5  map=7.8  trunc=80%  pl=0.011  vl=0.922  ent=4.340  kl=0.0122  gn=0.664
+step=157440  rew=+6.403  swp=35.5  map=7.8  trunc=80%  pl=-0.000  vl=0.937  ent=4.330  kl=0.0139  gn=0.595
+step=157696  rew=+6.265  swp=35.5  map=8.0  trunc=80%  pl=-0.012  vl=0.784  ent=3.585  kl=0.0323  gn=0.722
+step=157952  rew=+6.265  swp=35.5  map=8.0  trunc=80%  pl=-0.032  vl=0.957  ent=3.602  kl=0.0197  gn=0.749
+step=158208  rew=+6.265  swp=35.5  map=8.0  trunc=80%  pl=0.006  vl=0.671  ent=4.240  kl=0.0190  gn=0.844
+step=158464  rew=+6.501  swp=35.5  map=8.0  trunc=80%  pl=-0.019  vl=0.973  ent=3.219  kl=0.0184  gn=0.856
+step=158720  rew=+6.501  swp=35.5  map=8.0  trunc=80%  pl=-0.030  vl=0.931  ent=3.924  kl=0.0393  gn=0.752
+step=158976  rew=+6.501  swp=35.5  map=8.0  trunc=80%  pl=0.011  vl=0.762  ent=4.164  kl=0.0378  gn=0.805
+step=159232  rew=+6.853  swp=35.5  map=8.0  trunc=80%  pl=-0.022  vl=0.935  ent=3.723  kl=0.0318  gn=0.597
+step=159488  rew=+6.853  swp=35.5  map=8.0  trunc=80%  pl=0.006  vl=0.891  ent=4.256  kl=0.0246  gn=0.802
+step=159744  rew=+6.853  swp=35.5  map=8.0  trunc=80%  pl=-0.001  vl=0.869  ent=4.269  kl=0.0202  gn=0.705
+step=160000  rew=+7.096  swp=35.5  map=8.0  trunc=80%  pl=-0.048  vl=0.601  ent=3.539  kl=0.0225  gn=0.766
+step=160256  rew=+7.096  swp=35.5  map=8.0  trunc=80%  pl=-0.059  vl=0.879  ent=3.894  kl=0.0450  gn=0.764
+step=160512  rew=+7.096  swp=35.5  map=8.0  trunc=80%  pl=0.015  vl=0.806  ent=4.166  kl=0.0473  gn=0.845
+step=160768  rew=+7.370  swp=35.5  map=8.0  trunc=80%  pl=-0.032  vl=0.728  ent=3.848  kl=0.0140  gn=0.830
+step=161024  rew=+7.370  swp=35.5  map=8.0  trunc=80%  pl=-0.034  vl=0.532  ent=3.287  kl=0.0133  gn=0.832
+step=161280  rew=+7.370  swp=35.5  map=8.0  trunc=80%  pl=-0.001  vl=0.870  ent=4.295  kl=0.0171  gn=0.747
+step=161536  rew=+7.343  swp=35.5  map=8.0  trunc=81%  pl=-0.008  vl=0.761  ent=4.095  kl=0.0209  gn=0.624
+step=161792  rew=+7.343  swp=35.5  map=8.0  trunc=81%  pl=-0.038  vl=0.426  ent=3.060  kl=0.0298  gn=0.760
+step=162048  rew=+7.343  swp=35.5  map=8.0  trunc=81%  pl=0.023  vl=0.974  ent=4.313  kl=0.0287  gn=1.132
+step=162304  rew=+7.277  swp=28.6  map=8.0  trunc=81%  pl=-0.007  vl=1.089  ent=4.307  kl=0.0272  gn=0.746
+step=162560  rew=+7.277  swp=28.6  map=8.0  trunc=81%  pl=0.015  vl=1.060  ent=3.061  kl=0.0182  gn=0.968
+step=162816  rew=+7.277  swp=28.6  map=8.0  trunc=81%  pl=-0.020  vl=1.045  ent=4.088  kl=0.0158  gn=0.814
+step=163072  rew=+7.277  swp=28.6  map=8.0  trunc=81%  pl=-0.004  vl=0.850  ent=4.270  kl=0.0176  gn=0.737
+step=163328  rew=+7.097  swp=28.6  map=8.0  trunc=81%  pl=-0.028  vl=1.181  ent=3.584  kl=0.0149  gn=0.623
+step=163584  rew=+7.097  swp=28.6  map=8.0  trunc=81%  pl=0.007  vl=0.812  ent=4.333  kl=0.0141  gn=0.683
+step=163840  rew=+7.097  swp=28.6  map=8.0  trunc=81%  pl=0.000  vl=0.915  ent=4.288  kl=0.0184  gn=0.743
+step=164096  rew=+6.525  swp=28.6  map=8.0  trunc=81%  pl=0.006  vl=0.709  ent=3.511  kl=0.0410  gn=0.782
+step=164352  rew=+6.525  swp=28.6  map=8.0  trunc=81%  pl=0.006  vl=0.885  ent=4.327  kl=0.0166  gn=0.782
+step=164608  rew=+6.525  swp=28.6  map=8.0  trunc=81%  pl=-0.004  vl=0.944  ent=4.326  kl=0.0151  gn=0.814
+step=164864  rew=+5.802  swp=20.2  map=8.0  trunc=81%  pl=-0.022  vl=0.715  ent=3.788  kl=0.0256  gn=0.745
+step=165120  rew=+5.802  swp=20.2  map=8.0  trunc=81%  pl=-0.024  vl=0.703  ent=3.541  kl=0.0136  gn=0.655
+step=165376  rew=+5.802  swp=20.2  map=8.0  trunc=81%  pl=0.006  vl=0.869  ent=4.235  kl=0.0209  gn=0.791
+step=165632  rew=+4.945  swp=20.2  map=8.0  trunc=81%  pl=0.002  vl=0.831  ent=3.827  kl=0.0294  gn=0.705
+step=165888  rew=+4.945  swp=20.2  map=8.0  trunc=81%  pl=-0.025  vl=0.740  ent=3.197  kl=0.0207  gn=0.936
+step=166144  rew=+4.945  swp=20.2  map=8.0  trunc=81%  pl=0.001  vl=0.863  ent=4.329  kl=0.0156  gn=0.875
+step=166400  rew=+5.364  swp=18.6  map=7.9  trunc=81%  pl=-0.018  vl=0.949  ent=3.681  kl=0.0216  gn=0.827
+step=166656  rew=+5.364  swp=18.6  map=7.9  trunc=81%  pl=0.011  vl=1.067  ent=3.503  kl=0.0152  gn=0.858
+step=166912  rew=+5.364  swp=18.6  map=7.9  trunc=81%  pl=-0.021  vl=0.966  ent=4.165  kl=0.0129  gn=0.636
+step=167168  rew=+4.461  swp=13.3  map=7.9  trunc=81%  pl=-0.009  vl=0.848  ent=4.279  kl=0.0112  gn=0.600
+step=167424  rew=+4.461  swp=13.3  map=7.9  trunc=81%  pl=-0.050  vl=0.559  ent=3.285  kl=0.0259  gn=0.894
+step=167680  rew=+4.461  swp=13.3  map=7.9  trunc=81%  pl=0.010  vl=1.059  ent=4.331  kl=0.0309  gn=1.038
+step=167936  rew=+4.461  swp=13.3  map=7.9  trunc=81%  pl=0.014  vl=0.703  ent=4.340  kl=0.0233  gn=0.814
+step=168192  rew=+5.291  swp=13.3  map=7.9  trunc=81%  pl=-0.037  vl=0.846  ent=3.257  kl=0.0224  gn=0.916
+step=168448  rew=+5.291  swp=13.3  map=7.9  trunc=81%  pl=-0.004  vl=1.070  ent=4.291  kl=0.0362  gn=0.962
+step=168704  rew=+5.291  swp=13.3  map=7.9  trunc=81%  pl=0.003  vl=0.679  ent=4.216  kl=0.0271  gn=0.874
+step=168960  rew=+5.087  swp=10.8  map=7.9  trunc=81%  pl=-0.045  vl=0.734  ent=3.699  kl=0.0195  gn=0.663
+step=169216  rew=+5.087  swp=10.8  map=7.9  trunc=81%  pl=-0.004  vl=1.149  ent=4.366  kl=0.0121  gn=0.776
+step=169472  rew=+5.087  swp=10.8  map=7.9  trunc=81%  pl=-0.009  vl=0.626  ent=4.362  kl=0.0115  gn=0.576
+step=169728  rew=+4.909  swp=10.8  map=7.9  trunc=81%  pl=-0.025  vl=0.660  ent=3.553  kl=0.0300  gn=0.991
+step=169984  rew=+4.909  swp=10.8  map=7.9  trunc=81%  pl=0.039  vl=0.728  ent=4.292  kl=0.0571  gn=0.767
+step=170240  rew=+4.909  swp=10.8  map=7.9  trunc=81%  pl=0.001  vl=0.610  ent=4.307  kl=0.0311  gn=0.946
+step=170496  rew=+4.640  swp=9.2  map=7.9  trunc=81%  pl=-0.045  vl=1.017  ent=3.799  kl=0.0325  gn=0.997
+step=170752  rew=+4.640  swp=9.2  map=7.9  trunc=81%  pl=-0.021  vl=0.775  ent=4.049  kl=0.0133  gn=0.705
+step=171008  rew=+4.640  swp=9.2  map=7.9  trunc=81%  pl=0.001  vl=0.726  ent=4.291  kl=0.0131  gn=0.590
+step=171264  rew=+3.829  swp=2.6  map=7.9  trunc=81%  pl=-0.016  vl=0.859  ent=3.849  kl=0.0184  gn=0.660
+step=171520  rew=+3.829  swp=2.6  map=7.9  trunc=81%  pl=-0.024  vl=0.560  ent=3.694  kl=0.0193  gn=0.790
+step=171776  rew=+3.829  swp=2.6  map=7.9  trunc=81%  pl=0.004  vl=0.796  ent=4.301  kl=0.0218  gn=0.759
+step=172032  rew=+3.611  swp=2.6  map=7.9  trunc=81%  pl=-0.021  vl=0.680  ent=3.580  kl=0.0232  gn=0.772
+step=172288  rew=+4.156  swp=15.3  map=7.7  trunc=81%  pl=-0.005  vl=1.434  ent=2.314  kl=0.0370  gn=1.076
+step=172544  rew=+4.156  swp=15.3  map=7.7  trunc=81%  pl=-0.017  vl=0.549  ent=3.346  kl=0.0211  gn=0.959
+step=172800  rew=+4.156  swp=15.3  map=7.7  trunc=81%  pl=-0.005  vl=1.035  ent=4.287  kl=0.0152  gn=0.943
+step=173056  rew=+3.935  swp=15.3  map=7.7  trunc=81%  pl=-0.010  vl=0.839  ent=3.949  kl=0.0205  gn=0.882
+step=173312  rew=+4.254  swp=17.6  map=7.7  trunc=80%  pl=0.008  vl=1.371  ent=3.093  kl=0.0483  gn=1.209
+step=173568  rew=+4.254  swp=17.6  map=7.7  trunc=80%  pl=-0.025  vl=0.750  ent=3.269  kl=0.0231  gn=0.710
+step=173824  rew=+4.254  swp=17.6  map=7.7  trunc=80%  pl=0.017  vl=1.064  ent=4.241  kl=0.0224  gn=0.983
+step=174080  rew=+4.612  swp=23.7  map=7.2  trunc=80%  pl=-0.020  vl=0.951  ent=2.493  kl=0.0270  gn=0.782
+step=174336  rew=+4.519  swp=30.6  map=7.0  trunc=80%  pl=-0.013  vl=0.854  ent=2.427  kl=0.0478  gn=0.658
+step=174592  rew=+4.519  swp=30.6  map=7.0  trunc=80%  pl=-0.008  vl=1.132  ent=4.136  kl=0.0230  gn=0.979
+step=174848  rew=+4.519  swp=30.6  map=7.0  trunc=80%  pl=-0.002  vl=0.641  ent=4.205  kl=0.0221  gn=0.823
+step=175104  rew=+4.826  swp=30.6  map=7.0  trunc=80%  pl=-0.028  vl=0.615  ent=2.864  kl=0.0198  gn=0.737
+step=175360  rew=+5.790  swp=40.9  map=6.7  trunc=80%  pl=0.013  vl=1.155  ent=2.878  kl=0.0173  gn=0.964
+step=175616  rew=+5.790  swp=40.9  map=6.7  trunc=80%  pl=-0.041  vl=0.983  ent=3.453  kl=0.0183  gn=0.692
+step=175872  rew=+5.790  swp=40.9  map=6.7  trunc=80%  pl=0.005  vl=0.942  ent=4.299  kl=0.0185  gn=0.722
+step=176128  rew=+5.844  swp=40.9  map=6.4  trunc=80%  pl=-0.011  vl=0.938  ent=3.255  kl=0.0191  gn=0.719
+step=176384  rew=+5.844  swp=40.9  map=6.4  trunc=80%  pl=-0.021  vl=0.898  ent=3.318  kl=0.0209  gn=0.659
+step=176640  rew=+5.844  swp=40.9  map=6.4  trunc=80%  pl=0.007  vl=0.649  ent=4.179  kl=0.0291  gn=0.766
+step=176896  rew=+6.570  swp=43.3  map=6.0  trunc=79%  pl=-0.026  vl=1.016  ent=3.368  kl=0.0203  gn=0.652
+step=177152  rew=+6.570  swp=43.3  map=6.0  trunc=79%  pl=-0.018  vl=0.808  ent=3.895  kl=0.0127  gn=0.722
+step=177408  rew=+6.570  swp=43.3  map=6.0  trunc=79%  pl=-0.002  vl=0.881  ent=4.282  kl=0.0177  gn=0.764
+step=177664  rew=+6.426  swp=41.8  map=6.1  trunc=79%  pl=-0.008  vl=1.172  ent=3.894  kl=0.0176  gn=0.627
+step=177920  rew=+6.426  swp=41.8  map=6.1  trunc=79%  pl=-0.001  vl=1.073  ent=3.244  kl=0.0326  gn=0.919
+step=178176  rew=+6.426  swp=41.8  map=6.1  trunc=79%  pl=-0.024  vl=0.808  ent=3.794  kl=0.0152  gn=0.725
+step=178432  rew=+6.426  swp=41.8  map=6.1  trunc=79%  pl=-0.006  vl=0.811  ent=4.329  kl=0.0167  gn=0.779
+step=178688  rew=+6.058  swp=41.8  map=6.1  trunc=79%  pl=-0.018  vl=0.897  ent=3.256  kl=0.0245  gn=0.758
+step=178944  rew=+6.058  swp=41.8  map=6.1  trunc=79%  pl=0.011  vl=0.680  ent=4.323  kl=0.0165  gn=0.815
+step=179200  rew=+6.058  swp=41.8  map=6.1  trunc=79%  pl=0.004  vl=0.798  ent=4.307  kl=0.0191  gn=0.717
+step=179456  rew=+6.153  swp=41.8  map=6.0  trunc=79%  pl=-0.020  vl=0.963  ent=3.353  kl=0.0198  gn=0.760
+step=179712  rew=+6.153  swp=41.8  map=6.0  trunc=79%  pl=-0.021  vl=0.850  ent=3.782  kl=0.0149  gn=0.691
+step=179968  rew=+6.153  swp=41.8  map=6.0  trunc=79%  pl=-0.002  vl=0.821  ent=4.291  kl=0.0227  gn=0.705
+step=180224  rew=+5.437  swp=41.8  map=5.8  trunc=79%  pl=-0.002  vl=1.173  ent=3.190  kl=0.0190  gn=0.742
+step=180480  rew=+5.437  swp=41.8  map=5.8  trunc=79%  pl=0.000  vl=0.608  ent=4.146  kl=0.0240  gn=0.824
+step=180736  rew=+5.437  swp=41.8  map=5.8  trunc=79%  pl=0.013  vl=0.634  ent=4.135  kl=0.0339  gn=0.917
+step=180992  rew=+5.364  swp=41.8  map=5.4  trunc=79%  pl=-0.029  vl=0.841  ent=3.054  kl=0.0329  gn=0.808
+step=181248  rew=+5.364  swp=41.8  map=5.4  trunc=79%  pl=0.001  vl=0.868  ent=4.264  kl=0.0232  gn=0.913
+step=181504  rew=+5.364  swp=41.8  map=5.4  trunc=79%  pl=0.022  vl=0.643  ent=4.277  kl=0.0242  gn=0.821
+step=181760  rew=+5.838  swp=41.8  map=5.4  trunc=80%  pl=-0.028  vl=0.805  ent=3.587  kl=0.0236  gn=0.837
+step=182016  rew=+5.838  swp=41.8  map=5.4  trunc=80%  pl=-0.000  vl=0.709  ent=4.240  kl=0.0263  gn=0.886
+step=182272  rew=+5.838  swp=41.8  map=5.4  trunc=80%  pl=0.001  vl=0.620  ent=4.238  kl=0.0289  gn=0.863
+step=182528  rew=+5.964  swp=40.1  map=5.4  trunc=79%  pl=-0.038  vl=0.572  ent=3.461  kl=0.0276  gn=0.779
+step=182784  rew=+5.964  swp=40.1  map=5.4  trunc=79%  pl=-0.045  vl=0.352  ent=3.257  kl=0.0935  gn=0.825
+step=183040  rew=+5.964  swp=40.1  map=5.4  trunc=79%  pl=0.049  vl=0.865  ent=4.018  kl=0.1047  gn=1.341
+step=183296  rew=+5.964  swp=40.1  map=5.4  trunc=79%  pl=0.020  vl=0.765  ent=4.215  kl=0.0329  gn=0.870
+step=183552  rew=+5.252  swp=31.8  map=5.6  trunc=79%  pl=0.022  vl=1.336  ent=2.231  kl=0.0275  gn=1.159
+step=183808  rew=+5.252  swp=31.8  map=5.6  trunc=79%  pl=0.019  vl=0.891  ent=4.145  kl=0.0254  gn=0.975
+step=184064  rew=+5.252  swp=31.8  map=5.6  trunc=79%  pl=0.009  vl=0.757  ent=4.224  kl=0.0429  gn=0.941
+step=184320  rew=+5.298  swp=31.8  map=5.5  trunc=79%  pl=-0.029  vl=1.331  ent=3.212  kl=0.0258  gn=0.872
+step=184576  rew=+5.298  swp=31.8  map=5.5  trunc=79%  pl=-0.041  vl=1.141  ent=3.567  kl=0.0161  gn=0.757
+step=184832  rew=+5.298  swp=31.8  map=5.5  trunc=79%  pl=0.003  vl=0.863  ent=4.272  kl=0.0204  gn=0.769
+step=185088  rew=+5.306  swp=29.5  map=5.2  trunc=80%  pl=-0.018  vl=0.452  ent=3.531  kl=0.0272  gn=0.697
+step=185344  rew=+5.306  swp=29.5  map=5.2  trunc=80%  pl=-0.041  vl=0.786  ent=3.491  kl=0.0171  gn=0.680
+step=185600  rew=+5.306  swp=29.5  map=5.2  trunc=80%  pl=-0.002  vl=0.697  ent=4.280  kl=0.0181  gn=0.777
+step=185856  rew=+5.063  swp=29.5  map=5.0  trunc=80%  pl=-0.013  vl=0.883  ent=3.558  kl=0.0240  gn=0.786
+step=186112  rew=+5.063  swp=29.5  map=5.0  trunc=80%  pl=-0.030  vl=0.734  ent=3.919  kl=0.0162  gn=0.693
+step=186368  rew=+5.063  swp=29.5  map=5.0  trunc=80%  pl=0.003  vl=0.751  ent=4.265  kl=0.0155  gn=0.652
+step=186624  rew=+4.190  swp=23.4  map=5.1  trunc=80%  pl=-0.011  vl=0.581  ent=3.347  kl=0.0259  gn=0.767
+step=186880  rew=+4.190  swp=23.4  map=5.1  trunc=80%  pl=-0.043  vl=0.788  ent=3.348  kl=0.0264  gn=0.564
+step=187136  rew=+4.190  swp=23.4  map=5.1  trunc=80%  pl=0.015  vl=0.726  ent=3.982  kl=0.0418  gn=0.674
+step=187392  rew=+0.228  swp=16.6  map=4.9  trunc=80%  pl=-0.012  vl=0.871  ent=3.310  kl=0.0308  gn=0.619
+step=187648  rew=+0.228  swp=16.6  map=4.9  trunc=80%  pl=-0.020  vl=0.859  ent=3.251  kl=0.0260  gn=0.940
+step=187904  rew=+0.228  swp=16.6  map=4.9  trunc=80%  pl=0.002  vl=0.939  ent=3.950  kl=0.0300  gn=0.816
+step=188160  rew=+0.168  swp=16.6  map=4.5  trunc=80%  pl=-0.017  vl=1.090  ent=3.403  kl=0.0260  gn=0.707
+step=188416  rew=+0.155  swp=18.5  map=4.5  trunc=80%  pl=0.009  vl=0.980  ent=1.857  kl=0.0264  gn=0.676
+step=188672  rew=+0.155  swp=18.5  map=4.5  trunc=80%  pl=-0.016  vl=0.510  ent=3.542  kl=0.0200  gn=1.016
+step=188928  rew=+0.155  swp=18.5  map=4.5  trunc=80%  pl=-0.006  vl=0.857  ent=4.271  kl=0.0192  gn=0.749
+step=189184  rew=-0.027  swp=18.5  map=4.5  trunc=80%  pl=0.001  vl=0.963  ent=4.161  kl=0.0252  gn=0.561
+step=189440  rew=-0.027  swp=18.5  map=4.5  trunc=80%  pl=-0.032  vl=0.371  ent=3.448  kl=0.0225  gn=0.893
+step=189696  rew=-0.027  swp=18.5  map=4.5  trunc=80%  pl=0.009  vl=1.110  ent=4.256  kl=0.0244  gn=0.836
+step=189952  rew=-0.608  swp=18.5  map=4.6  trunc=80%  pl=0.004  vl=0.986  ent=4.260  kl=0.0235  gn=0.719
+step=190208  rew=-0.608  swp=18.5  map=4.6  trunc=80%  pl=-0.015  vl=0.634  ent=3.301  kl=0.0168  gn=0.956
+step=190464  rew=-0.608  swp=18.5  map=4.6  trunc=80%  pl=0.002  vl=0.917  ent=4.311  kl=0.0151  gn=0.746
+step=190720  rew=-0.608  swp=18.5  map=4.6  trunc=80%  pl=-0.009  vl=0.793  ent=4.306  kl=0.0178  gn=0.764
+step=190976  rew=-0.736  swp=16.1  map=4.3  trunc=80%  pl=-0.007  vl=0.892  ent=3.526  kl=0.0266  gn=0.801
+step=191232  rew=-0.736  swp=16.1  map=4.3  trunc=80%  pl=-0.033  vl=0.824  ent=3.482  kl=0.0149  gn=0.710
+step=191488  rew=-0.736  swp=16.1  map=4.3  trunc=80%  pl=-0.007  vl=0.775  ent=4.360  kl=0.0115  gn=0.670
+step=191744  rew=+0.034  swp=22.1  map=3.6  trunc=80%  pl=-0.025  vl=0.696  ent=2.605  kl=0.0127  gn=0.745
+step=192000  rew=+0.034  swp=22.1  map=3.6  trunc=80%  pl=-0.023  vl=0.841  ent=2.822  kl=0.0151  gn=0.787
+step=192256  rew=+0.034  swp=22.1  map=3.6  trunc=80%  pl=0.001  vl=0.993  ent=4.352  kl=0.0132  gn=0.754
+step=192512  rew=+0.331  swp=22.1  map=3.4  trunc=80%  pl=-0.004  vl=0.861  ent=4.241  kl=0.0133  gn=0.624
+step=192768  rew=+0.972  swp=30.4  map=3.1  trunc=79%  pl=0.007  vl=1.352  ent=1.966  kl=0.0169  gn=0.948
+step=193024  rew=+0.972  swp=30.4  map=3.1  trunc=79%  pl=-0.026  vl=0.821  ent=3.977  kl=0.0238  gn=0.624
+step=193280  rew=+0.972  swp=30.4  map=3.1  trunc=79%  pl=0.017  vl=0.761  ent=4.317  kl=0.0331  gn=0.706
+step=193536  rew=+1.259  swp=30.4  map=3.0  trunc=79%  pl=-0.023  vl=0.803  ent=4.059  kl=0.0265  gn=0.565
+step=193792  rew=+1.259  swp=30.4  map=3.0  trunc=79%  pl=-0.011  vl=1.113  ent=2.879  kl=0.0111  gn=0.776
+step=194048  rew=+1.259  swp=30.4  map=3.0  trunc=79%  pl=0.004  vl=0.797  ent=4.372  kl=0.0096  gn=0.583
+step=194304  rew=+1.128  swp=30.4  map=3.3  trunc=80%  pl=-0.008  vl=1.094  ent=4.016  kl=0.0132  gn=0.551
+step=194560  rew=+1.128  swp=30.4  map=3.3  trunc=80%  pl=-0.006  vl=0.670  ent=4.074  kl=0.0199  gn=0.729
+step=194816  rew=+1.128  swp=30.4  map=3.3  trunc=80%  pl=0.001  vl=0.693  ent=4.287  kl=0.0196  gn=0.713
+step=195072  rew=+0.934  swp=30.4  map=3.3  trunc=80%  pl=0.005  vl=0.948  ent=4.248  kl=0.0224  gn=0.789
+step=195328  rew=+0.934  swp=30.4  map=3.3  trunc=80%  pl=-0.010  vl=1.088  ent=2.503  kl=0.0225  gn=0.895
+step=195584  rew=+0.934  swp=30.4  map=3.3  trunc=80%  pl=-0.003  vl=0.808  ent=4.202  kl=0.0226  gn=0.918
+step=195840  rew=+0.934  swp=30.4  map=3.3  trunc=80%  pl=-0.008  vl=0.879  ent=4.192  kl=0.0226  gn=0.768
+step=196096  rew=-2.770  swp=37.4  map=3.0  trunc=79%  pl=-0.015  vl=0.900  ent=2.049  kl=0.0225  gn=0.801
+step=196352  rew=-2.770  swp=37.4  map=3.0  trunc=79%  pl=-0.003  vl=0.926  ent=3.271  kl=0.0219  gn=0.610
+step=196608  rew=-2.770  swp=37.4  map=3.0  trunc=79%  pl=-0.025  vl=1.089  ent=3.931  kl=0.0150  gn=0.587
+step=196864  rew=-2.770  swp=37.4  map=3.0  trunc=79%  pl=0.010  vl=0.866  ent=4.356  kl=0.0147  gn=0.600
+step=197120  rew=-9.112  swp=37.4  map=3.0  trunc=79%  pl=-0.011  vl=0.933  ent=3.064  kl=0.0174  gn=0.583
+step=197376  rew=-9.112  swp=37.4  map=3.0  trunc=79%  pl=-0.010  vl=0.871  ent=4.167  kl=0.0224  gn=0.920
+step=197632  rew=-9.112  swp=37.4  map=3.0  trunc=79%  pl=0.009  vl=0.773  ent=4.137  kl=0.0244  gn=0.713
+step=197888  rew=-9.155  swp=37.4  map=3.1  trunc=79%  pl=-0.029  vl=0.831  ent=2.496  kl=0.0191  gn=0.691
+step=198144  rew=-9.155  swp=37.4  map=3.1  trunc=79%  pl=-0.031  vl=0.962  ent=3.544  kl=0.0185  gn=0.481
+step=198400  rew=-9.155  swp=37.4  map=3.1  trunc=79%  pl=0.008  vl=0.889  ent=4.005  kl=0.0210  gn=0.658
+step=198656  rew=-9.674  swp=37.4  map=3.1  trunc=79%  pl=-0.025  vl=0.809  ent=3.156  kl=0.0254  gn=0.608
+step=198912  rew=-9.674  swp=37.4  map=3.1  trunc=79%  pl=-0.010  vl=0.913  ent=4.172  kl=0.0158  gn=0.651
+step=199168  rew=-9.674  swp=37.4  map=3.1  trunc=79%  pl=-0.003  vl=0.632  ent=4.318  kl=0.0167  gn=0.646
+step=199424  rew=-5.738  swp=37.4  map=3.2  trunc=79%  pl=-0.025  vl=0.482  ent=3.798  kl=0.0206  gn=0.655
+step=199680  rew=-5.738  swp=37.4  map=3.2  trunc=79%  pl=-0.026  vl=0.655  ent=3.584  kl=0.0139  gn=0.735
+step=199936  rew=-5.738  swp=37.4  map=3.2  trunc=79%  pl=-0.005  vl=0.636  ent=4.328  kl=0.0159  gn=0.647
+step=200192  rew=-6.331  swp=37.4  map=3.4  trunc=79%  pl=-0.024  vl=0.612  ent=3.158  kl=0.0158  gn=0.699
+step=200448  rew=-5.663  swp=39.5  map=3.5  trunc=79%  pl=0.002  vl=0.988  ent=1.944  kl=0.0164  gn=0.859
+step=200704  rew=-5.663  swp=39.5  map=3.5  trunc=79%  pl=-0.014  vl=0.665  ent=2.676  kl=0.0107  gn=1.053
+step=200960  rew=-5.663  swp=39.5  map=3.5  trunc=79%  pl=-0.001  vl=0.554  ent=4.198  kl=0.0140  gn=0.686
+step=201216  rew=-7.452  swp=39.5  map=3.7  trunc=79%  pl=-0.010  vl=0.985  ent=3.765  kl=0.0203  gn=0.602
+step=201472  rew=-6.451  swp=47.2  map=4.0  trunc=78%  pl=-0.002  vl=1.197  ent=2.630  kl=0.0140  gn=0.946
+step=201728  rew=-6.451  swp=47.2  map=4.0  trunc=78%  pl=-0.034  vl=0.927  ent=3.342  kl=0.0092  gn=0.585
+step=201984  rew=-6.451  swp=47.2  map=4.0  trunc=78%  pl=0.002  vl=0.886  ent=4.319  kl=0.0089  gn=0.557
+step=202240  rew=-14.409  swp=40.1  map=4.1  trunc=78%  pl=-0.019  vl=0.730  ent=3.771  kl=0.0108  gn=0.525
+step=202496  rew=-14.409  swp=40.1  map=4.1  trunc=78%  pl=-0.024  vl=0.573  ent=3.604  kl=0.0134  gn=0.833
+step=202752  rew=-14.409  swp=40.1  map=4.1  trunc=78%  pl=0.001  vl=0.798  ent=4.285  kl=0.0147  gn=0.666
+step=203008  rew=-15.053  swp=31.9  map=4.1  trunc=78%  pl=-0.024  vl=0.698  ent=3.685  kl=0.0175  gn=0.705
+step=203264  rew=-14.324  swp=37.8  map=4.1  trunc=78%  pl=0.009  vl=1.137  ent=2.487  kl=0.0134  gn=0.883
+step=203520  rew=-14.324  swp=37.8  map=4.1  trunc=78%  pl=-0.005  vl=0.962  ent=4.054  kl=0.0141  gn=0.847
+step=203776  rew=-14.324  swp=37.8  map=4.1  trunc=78%  pl=-0.006  vl=0.863  ent=4.185  kl=0.0170  gn=0.634
+step=204032  rew=-13.851  swp=37.8  map=3.8  trunc=78%  pl=-0.033  vl=0.558  ent=3.496  kl=0.0138  gn=0.582
+step=204288  rew=-13.851  swp=37.8  map=3.8  trunc=78%  pl=-0.044  vl=1.020  ent=3.571  kl=0.0153  gn=0.605
+step=204544  rew=-13.851  swp=37.8  map=3.8  trunc=78%  pl=-0.004  vl=0.805  ent=4.365  kl=0.0103  gn=0.642
+step=204800  rew=-20.311  swp=37.8  map=3.5  trunc=78%  pl=-0.019  vl=0.739  ent=3.047  kl=0.0085  gn=0.666
+step=205056  rew=-15.687  swp=48.8  map=3.6  trunc=78%  pl=-0.006  vl=0.943  ent=2.836  kl=0.0072  gn=0.658
+step=205312  rew=-15.687  swp=48.8  map=3.6  trunc=78%  pl=-0.025  vl=0.708  ent=3.370  kl=0.0092  gn=0.585
+step=205568  rew=-15.687  swp=48.8  map=3.6  trunc=78%  pl=0.002  vl=0.770  ent=4.347  kl=0.0104  gn=0.532
+step=205824  rew=-22.918  swp=45.1  map=3.5  trunc=78%  pl=-0.020  vl=0.951  ent=3.723  kl=0.0111  gn=0.571
+step=206080  rew=-22.918  swp=45.1  map=3.5  trunc=78%  pl=-0.002  vl=0.328  ent=3.077  kl=0.0084  gn=0.741
+step=206336  rew=-22.918  swp=45.1  map=3.5  trunc=78%  pl=-0.005  vl=0.860  ent=4.338  kl=0.0111  gn=0.761
+step=206592  rew=-24.985  swp=43.4  map=3.1  trunc=78%  pl=-0.012  vl=1.211  ent=4.011  kl=0.0226  gn=0.616
+step=206848  rew=-24.985  swp=43.4  map=3.1  trunc=78%  pl=-0.004  vl=1.166  ent=2.997  kl=0.0124  gn=0.682
+step=207104  rew=-24.985  swp=43.4  map=3.1  trunc=78%  pl=0.002  vl=0.804  ent=4.327  kl=0.0169  gn=0.632
+step=207360  rew=-31.978  swp=39.0  map=3.3  trunc=78%  pl=-0.012  vl=1.005  ent=3.922  kl=0.0125  gn=0.557
+step=207616  rew=-31.978  swp=39.0  map=3.3  trunc=78%  pl=-0.024  vl=0.804  ent=2.588  kl=0.0156  gn=0.579
+step=207872  rew=-31.978  swp=39.0  map=3.3  trunc=78%  pl=-0.013  vl=0.741  ent=4.244  kl=0.0170  gn=0.597
+step=208128  rew=-28.063  swp=39.0  map=3.7  trunc=78%  pl=-0.005  vl=0.985  ent=4.074  kl=0.0166  gn=0.574
+step=208384  rew=-28.063  swp=39.0  map=3.7  trunc=78%  pl=-0.010  vl=0.525  ent=2.610  kl=0.0095  gn=0.537
+step=208640  rew=-28.063  swp=39.0  map=3.7  trunc=78%  pl=-0.011  vl=1.030  ent=4.180  kl=0.0167  gn=0.698
+step=208896  rew=-29.057  swp=39.0  map=3.9  trunc=78%  pl=-0.003  vl=1.206  ent=4.222  kl=0.0190  gn=0.542
+step=209152  rew=-29.057  swp=39.0  map=3.9  trunc=78%  pl=-0.004  vl=1.118  ent=2.938  kl=0.0141  gn=0.607
+step=209408  rew=-29.057  swp=39.0  map=3.9  trunc=78%  pl=-0.025  vl=0.968  ent=2.844  kl=0.0121  gn=0.583
+step=209664  rew=-29.057  swp=39.0  map=3.9  trunc=78%  pl=0.004  vl=0.916  ent=4.258  kl=0.0159  gn=0.572
+step=209920  rew=-31.254  swp=39.0  map=4.2  trunc=78%  pl=-0.024  vl=0.807  ent=2.387  kl=0.0205  gn=0.610
+step=210176  rew=-31.254  swp=39.0  map=4.2  trunc=78%  pl=0.004  vl=0.826  ent=3.979  kl=0.0184  gn=0.918
+step=210432  rew=-31.254  swp=39.0  map=4.2  trunc=78%  pl=0.015  vl=0.892  ent=4.101  kl=0.0222  gn=0.678
+step=210688  rew=-32.812  swp=39.0  map=4.4  trunc=78%  pl=-0.038  vl=0.720  ent=2.267  kl=0.0129  gn=0.532
+step=210944  rew=-30.532  swp=60.1  map=4.7  trunc=78%  pl=-0.002  vl=0.987  ent=2.019  kl=0.0061  gn=0.571
+step=211200  rew=-30.532  swp=60.1  map=4.7  trunc=78%  pl=-0.010  vl=0.782  ent=3.182  kl=0.0116  gn=0.558
+step=211456  rew=-30.532  swp=60.1  map=4.7  trunc=78%  pl=0.010  vl=0.702  ent=4.319  kl=0.0144  gn=0.534
+step=211712  rew=-30.532  swp=60.1  map=4.7  trunc=78%  pl=0.003  vl=0.739  ent=4.325  kl=0.0133  gn=0.533
+step=211968  rew=-37.878  swp=53.8  map=5.0  trunc=78%  pl=-0.021  vl=0.878  ent=1.903  kl=0.0147  gn=0.402
+step=212224  rew=-37.375  swp=60.6  map=5.2  trunc=78%  pl=0.001  vl=0.656  ent=2.566  kl=0.0075  gn=0.585
+step=212480  rew=-37.375  swp=60.6  map=5.2  trunc=78%  pl=-0.022  vl=1.086  ent=3.406  kl=0.0081  gn=0.667
+step=212736  rew=-37.375  swp=60.6  map=5.2  trunc=78%  pl=-0.011  vl=0.818  ent=4.365  kl=0.0116  gn=0.603
+step=212992  rew=-36.860  swp=60.6  map=4.8  trunc=78%  pl=-0.016  vl=1.237  ent=3.716  kl=0.0112  gn=0.591
+step=213248  rew=-36.860  swp=60.6  map=4.8  trunc=78%  pl=-0.009  vl=0.646  ent=4.328  kl=0.0118  gn=0.661
+step=213504  rew=-36.860  swp=60.6  map=4.8  trunc=78%  pl=0.006  vl=0.938  ent=4.344  kl=0.0113  gn=0.653
+step=213760  rew=-38.592  swp=58.7  map=4.8  trunc=78%  pl=-0.006  vl=0.890  ent=3.430  kl=0.0106  gn=0.642
+step=214016  rew=-38.592  swp=58.7  map=4.8  trunc=78%  pl=-0.037  vl=0.894  ent=3.417  kl=0.0133  gn=0.679
+step=214272  rew=-38.592  swp=58.7  map=4.8  trunc=78%  pl=-0.004  vl=0.864  ent=4.365  kl=0.0184  gn=0.579
+step=214528  rew=-40.103  swp=53.0  map=5.2  trunc=78%  pl=-0.025  vl=0.969  ent=3.410  kl=0.0178  gn=0.601
+step=214784  rew=-30.869  swp=69.2  map=5.6  trunc=78%  pl=-0.013  vl=0.954  ent=1.759  kl=0.0107  gn=0.631
+step=215040  rew=-30.869  swp=69.2  map=5.6  trunc=78%  pl=-0.035  vl=0.746  ent=2.762  kl=0.0174  gn=0.698
+step=215296  rew=-30.869  swp=69.2  map=5.6  trunc=78%  pl=0.015  vl=0.861  ent=4.326  kl=0.0371  gn=0.759
+step=215552  rew=-30.869  swp=69.2  map=5.6  trunc=78%  pl=-0.005  vl=0.861  ent=4.275  kl=0.0295  gn=0.709
+step=215808  rew=-33.616  swp=69.2  map=6.0  trunc=78%  pl=-0.024  vl=0.715  ent=3.063  kl=0.0113  gn=0.692
+step=216064  rew=-33.616  swp=69.2  map=6.0  trunc=78%  pl=-0.015  vl=0.900  ent=4.323  kl=0.0132  gn=0.568
+step=216320  rew=-33.616  swp=69.2  map=6.0  trunc=78%  pl=-0.004  vl=0.727  ent=4.326  kl=0.0141  gn=0.641
+step=216576  rew=-41.324  swp=67.7  map=6.7  trunc=77%  pl=-0.024  vl=0.873  ent=3.005  kl=0.0175  gn=0.615
+step=216832  rew=-41.324  swp=67.7  map=6.7  trunc=77%  pl=-0.005  vl=0.517  ent=2.801  kl=0.0095  gn=0.727
+step=217088  rew=-41.324  swp=67.7  map=6.7  trunc=77%  pl=-0.007  vl=1.059  ent=4.261  kl=0.0113  gn=0.800
+step=217344  rew=-37.115  swp=67.7  map=7.0  trunc=78%  pl=-0.014  vl=1.101  ent=3.873  kl=0.0191  gn=0.754
+step=217600  rew=-37.115  swp=67.7  map=7.0  trunc=78%  pl=-0.013  vl=0.774  ent=4.364  kl=0.0162  gn=0.715
+step=217856  rew=-37.115  swp=67.7  map=7.0  trunc=78%  pl=-0.003  vl=0.783  ent=4.357  kl=0.0158  gn=0.617
+step=218112  rew=-38.199  swp=56.7  map=7.0  trunc=78%  pl=-0.005  vl=0.857  ent=4.135  kl=0.0127  gn=0.610
+step=218368  rew=-38.199  swp=56.7  map=7.0  trunc=78%  pl=-0.020  vl=1.010  ent=2.843  kl=0.0082  gn=0.578
+step=218624  rew=-38.199  swp=56.7  map=7.0  trunc=78%  pl=0.008  vl=0.766  ent=4.328  kl=0.0174  gn=0.607
+step=218880  rew=-36.449  swp=56.7  map=7.2  trunc=78%  pl=-0.005  vl=1.096  ent=4.241  kl=0.0139  gn=0.556
+step=219136  rew=-34.237  swp=60.0  map=7.5  trunc=77%  pl=-0.001  vl=0.656  ent=2.241  kl=0.0106  gn=0.828
+step=219392  rew=-34.237  swp=60.0  map=7.5  trunc=77%  pl=-0.015  vl=0.814  ent=3.899  kl=0.0172  gn=0.724
+step=219648  rew=-34.237  swp=60.0  map=7.5  trunc=77%  pl=0.002  vl=0.733  ent=4.302  kl=0.0153  gn=0.642
+step=219904  rew=-29.689  swp=60.0  map=7.5  trunc=77%  pl=-0.027  vl=0.840  ent=3.004  kl=0.0174  gn=0.659
+step=220160  rew=-29.689  swp=60.0  map=7.5  trunc=77%  pl=-0.035  vl=0.747  ent=3.480  kl=0.0165  gn=0.537
+step=220416  rew=-29.689  swp=60.0  map=7.5  trunc=77%  pl=0.016  vl=1.023  ent=4.314  kl=0.0227  gn=0.730
+step=220672  rew=-28.194  swp=60.0  map=7.5  trunc=78%  pl=-0.031  vl=1.262  ent=3.687  kl=0.0206  gn=0.609
+step=220928  rew=-28.194  swp=60.0  map=7.5  trunc=78%  pl=-0.040  vl=0.607  ent=3.340  kl=0.0093  gn=0.651
+step=221184  rew=-28.194  swp=60.0  map=7.5  trunc=78%  pl=-0.008  vl=0.638  ent=4.327  kl=0.0188  gn=0.638
+step=221440  rew=-29.717  swp=60.0  map=7.5  trunc=78%  pl=-0.012  vl=1.086  ent=3.990  kl=0.0105  gn=0.696
+step=221696  rew=-29.717  swp=60.0  map=7.5  trunc=78%  pl=-0.028  vl=0.761  ent=3.189  kl=0.0097  gn=0.620
+step=221952  rew=-29.717  swp=60.0  map=7.5  trunc=78%  pl=-0.005  vl=0.878  ent=4.304  kl=0.0200  gn=0.635
+step=222208  rew=-33.834  swp=60.0  map=7.5  trunc=78%  pl=-0.012  vl=0.912  ent=3.716  kl=0.0166  gn=0.487
+step=222464  rew=-31.141  swp=73.2  map=7.5  trunc=77%  pl=-0.015  vl=0.853  ent=1.986  kl=0.0108  gn=0.593
+step=222720  rew=-32.707  swp=56.1  map=7.5  trunc=77%  pl=-0.031  vl=0.540  ent=2.424  kl=0.0128  gn=0.689
+step=222976  rew=-32.707  swp=56.1  map=7.5  trunc=77%  pl=-0.003  vl=0.875  ent=4.317  kl=0.0216  gn=0.746
+step=223232  rew=-32.707  swp=56.1  map=7.5  trunc=77%  pl=0.000  vl=0.640  ent=4.287  kl=0.0246  gn=0.737
+step=223488  rew=-29.515  swp=56.1  map=7.5  trunc=77%  pl=-0.035  vl=0.874  ent=3.271  kl=0.0179  gn=0.637
+step=223744  rew=-29.515  swp=56.1  map=7.5  trunc=77%  pl=-0.014  vl=1.079  ent=3.554  kl=0.0090  gn=0.739
+step=224000  rew=-29.515  swp=56.1  map=7.5  trunc=77%  pl=-0.010  vl=0.857  ent=4.347  kl=0.0119  gn=0.749
+step=224256  rew=-31.551  swp=41.3  map=7.5  trunc=77%  pl=-0.015  vl=0.936  ent=3.368  kl=0.0109  gn=0.725
+step=224512  rew=-31.551  swp=41.3  map=7.5  trunc=77%  pl=-0.031  vl=0.880  ent=3.848  kl=0.0117  gn=0.835
+step=224768  rew=-31.551  swp=41.3  map=7.5  trunc=77%  pl=-0.011  vl=0.623  ent=4.332  kl=0.0115  gn=0.822
+step=225024  rew=-34.389  swp=41.3  map=7.9  trunc=77%  pl=-0.010  vl=0.920  ent=3.332  kl=0.0137  gn=0.682
+step=225280  rew=-34.389  swp=41.3  map=7.9  trunc=77%  pl=-0.043  vl=0.676  ent=3.176  kl=0.0128  gn=0.651
+step=225536  rew=-34.389  swp=41.3  map=7.9  trunc=77%  pl=0.008  vl=0.747  ent=4.374  kl=0.0196  gn=0.572
+step=225792  rew=-35.107  swp=41.3  map=7.9  trunc=77%  pl=-0.024  vl=0.945  ent=3.680  kl=0.0171  gn=0.522
+step=226048  rew=-35.107  swp=41.3  map=7.9  trunc=77%  pl=-0.020  vl=0.585  ent=4.007  kl=0.0199  gn=0.488
+step=226304  rew=-35.107  swp=41.3  map=7.9  trunc=77%  pl=-0.000  vl=0.764  ent=4.349  kl=0.0186  gn=0.479
+step=226560  rew=-33.923  swp=41.3  map=7.9  trunc=78%  pl=-0.010  vl=0.463  ent=3.763  kl=0.0224  gn=0.649
+step=226816  rew=-34.589  swp=40.9  map=8.0  trunc=77%  pl=0.003  vl=0.995  ent=2.022  kl=0.0142  gn=0.629
+step=227072  rew=-34.589  swp=40.9  map=8.0  trunc=77%  pl=-0.023  vl=0.863  ent=3.871  kl=0.0143  gn=0.739
+step=227328  rew=-34.589  swp=40.9  map=8.0  trunc=77%  pl=-0.011  vl=0.783  ent=4.300  kl=0.0188  gn=0.710
+step=227584  rew=-38.741  swp=34.5  map=8.0  trunc=77%  pl=-0.005  vl=0.807  ent=3.540  kl=0.0192  gn=0.706
+step=227840  rew=-34.836  swp=48.7  map=7.9  trunc=77%  pl=-0.002  vl=0.831  ent=1.682  kl=0.0212  gn=0.755
+step=228096  rew=-26.120  swp=60.4  map=7.8  trunc=77%  pl=0.005  vl=0.753  ent=1.721  kl=0.0120  gn=0.683
+step=228352  rew=-26.120  swp=60.4  map=7.8  trunc=77%  pl=-0.025  vl=0.737  ent=2.969  kl=0.0166  gn=0.561
+step=228608  rew=-26.120  swp=60.4  map=7.8  trunc=77%  pl=0.009  vl=0.625  ent=4.174  kl=0.0220  gn=0.695
+step=228864  rew=-30.116  swp=56.0  map=7.8  trunc=77%  pl=-0.004  vl=1.254  ent=4.023  kl=0.0238  gn=0.622
+step=229120  rew=-30.116  swp=56.0  map=7.8  trunc=77%  pl=0.004  vl=0.773  ent=2.495  kl=0.0138  gn=0.649
+step=229376  rew=-30.116  swp=56.0  map=7.8  trunc=77%  pl=-0.000  vl=0.773  ent=4.254  kl=0.0145  gn=0.634
+step=229632  rew=-30.116  swp=56.0  map=7.8  trunc=77%  pl=-0.005  vl=0.803  ent=4.224  kl=0.0172  gn=0.632
+step=229888  rew=-31.412  swp=64.5  map=7.8  trunc=77%  pl=-0.004  vl=1.269  ent=1.752  kl=0.0189  gn=0.601
+step=230144  rew=-25.086  swp=75.8  map=7.8  trunc=77%  pl=-0.008  vl=0.880  ent=2.243  kl=0.0189  gn=0.666
+step=230400  rew=-25.086  swp=75.8  map=7.8  trunc=77%  pl=-0.019  vl=0.660  ent=2.938  kl=0.0203  gn=0.807
+step=230656  rew=-25.086  swp=75.8  map=7.8  trunc=77%  pl=-0.003  vl=0.907  ent=4.158  kl=0.0223  gn=0.723
+step=230912  rew=-31.580  swp=72.6  map=7.8  trunc=77%  pl=-0.004  vl=0.913  ent=3.603  kl=0.0246  gn=0.646
+step=231168  rew=-31.580  swp=72.6  map=7.8  trunc=77%  pl=-0.025  vl=0.371  ent=2.403  kl=0.0156  gn=0.577
+step=231424  rew=-31.580  swp=72.6  map=7.8  trunc=77%  pl=0.004  vl=0.996  ent=4.072  kl=0.0232  gn=0.843
+step=231680  rew=-29.842  swp=72.6  map=7.8  trunc=77%  pl=-0.008  vl=1.204  ent=3.748  kl=0.0274  gn=0.598
+step=231936  rew=-29.842  swp=72.6  map=7.8  trunc=77%  pl=0.002  vl=1.134  ent=1.657  kl=0.0135  gn=0.685
+step=232192  rew=-27.851  swp=88.0  map=7.8  trunc=77%  pl=-0.016  vl=0.875  ent=2.352  kl=0.0191  gn=0.693
+step=232448  rew=-27.851  swp=88.0  map=7.8  trunc=77%  pl=0.000  vl=0.852  ent=4.256  kl=0.0192  gn=0.797
+step=232704  rew=-27.851  swp=88.0  map=7.8  trunc=77%  pl=-0.005  vl=0.929  ent=4.231  kl=0.0154  gn=0.797
+step=232960  rew=-25.782  swp=88.0  map=7.8  trunc=77%  pl=-0.028  vl=0.844  ent=2.643  kl=0.0171  gn=0.573
+step=233216  rew=-25.782  swp=88.0  map=7.8  trunc=77%  pl=-0.017  vl=1.013  ent=3.908  kl=0.0193  gn=0.595
+step=233472  rew=-25.782  swp=88.0  map=7.8  trunc=77%  pl=-0.005  vl=0.871  ent=4.188  kl=0.0175  gn=0.708
+step=233728  rew=-23.990  swp=74.8  map=7.1  trunc=76%  pl=-0.020  vl=0.837  ent=3.381  kl=0.0280  gn=0.600
+step=233984  rew=-23.990  swp=74.8  map=7.1  trunc=76%  pl=-0.023  vl=0.801  ent=3.234  kl=0.0155  gn=0.565
+step=234240  rew=-23.990  swp=74.8  map=7.1  trunc=76%  pl=-0.006  vl=0.783  ent=4.232  kl=0.0193  gn=0.643
+step=234496  rew=-30.654  swp=70.7  map=7.1  trunc=77%  pl=-0.020  vl=0.989  ent=2.810  kl=0.0204  gn=0.541
+step=234752  rew=-30.654  swp=70.7  map=7.1  trunc=77%  pl=0.012  vl=1.215  ent=1.675  kl=0.0068  gn=0.577
+step=235008  rew=-25.229  swp=91.2  map=7.1  trunc=76%  pl=0.004  vl=0.683  ent=1.785  kl=0.0108  gn=0.598
+step=235264  rew=-23.475  swp=103.0  map=7.1  trunc=76%  pl=0.012  vl=1.003  ent=2.411  kl=0.0192  gn=0.682
+step=235520  rew=-23.475  swp=103.0  map=7.1  trunc=76%  pl=-0.026  vl=0.811  ent=3.730  kl=0.0164  gn=0.595
+step=235776  rew=-23.475  swp=103.0  map=7.1  trunc=76%  pl=0.002  vl=0.772  ent=4.221  kl=0.0180  gn=0.605
+step=236032  rew=-21.156  swp=103.0  map=6.8  trunc=76%  pl=-0.031  vl=1.180  ent=2.390  kl=0.0221  gn=0.584
+step=236288  rew=-21.156  swp=103.0  map=6.8  trunc=76%  pl=-0.000  vl=1.410  ent=3.990  kl=0.0198  gn=0.916
+step=236544  rew=-21.156  swp=103.0  map=6.8  trunc=76%  pl=-0.005  vl=0.867  ent=4.335  kl=0.0213  gn=0.623
+step=236800  rew=-18.350  swp=106.8  map=6.8  trunc=76%  pl=-0.027  vl=0.735  ent=3.189  kl=0.0163  gn=0.559
+step=237056  rew=-18.350  swp=106.8  map=6.8  trunc=76%  pl=-0.000  vl=1.076  ent=3.057  kl=0.0162  gn=0.558
+step=237312  rew=-18.350  swp=106.8  map=6.8  trunc=76%  pl=-0.007  vl=0.967  ent=4.257  kl=0.0180  gn=0.445
+step=237568  rew=-25.575  swp=97.2  map=6.8  trunc=76%  pl=-0.004  vl=1.022  ent=3.959  kl=0.0228  gn=0.464
+step=237824  rew=-25.575  swp=97.2  map=6.8  trunc=76%  pl=-0.021  vl=0.807  ent=2.713  kl=0.0242  gn=0.748
+step=238080  rew=-25.575  swp=97.2  map=6.8  trunc=76%  pl=0.016  vl=0.771  ent=4.096  kl=0.0199  gn=0.809
+step=238336  rew=-24.541  swp=97.2  map=6.8  trunc=76%  pl=0.007  vl=1.003  ent=3.909  kl=0.0251  gn=0.688
+step=238592  rew=-24.541  swp=97.2  map=6.8  trunc=76%  pl=0.013  vl=0.963  ent=2.825  kl=0.0204  gn=0.633
+step=238848  rew=-24.541  swp=97.2  map=6.8  trunc=76%  pl=-0.006  vl=0.918  ent=3.996  kl=0.0149  gn=0.695
+step=239104  rew=-24.541  swp=97.2  map=6.8  trunc=76%  pl=0.009  vl=0.883  ent=4.204  kl=0.0184  gn=0.592
+step=239360  rew=-32.599  swp=83.0  map=6.9  trunc=76%  pl=-0.015  vl=0.925  ent=2.988  kl=0.0147  gn=0.479
+step=239616  rew=-32.599  swp=83.0  map=6.9  trunc=76%  pl=0.005  vl=0.879  ent=4.118  kl=0.0196  gn=0.617
+step=239872  rew=-32.599  swp=83.0  map=6.9  trunc=76%  pl=-0.006  vl=0.835  ent=4.118  kl=0.0212  gn=0.622
+step=240128  rew=-37.354  swp=71.3  map=7.0  trunc=76%  pl=-0.035  vl=0.781  ent=2.414  kl=0.0164  gn=0.513
+step=240384  rew=-37.354  swp=71.3  map=7.0  trunc=76%  pl=0.010  vl=0.630  ent=4.223  kl=0.0324  gn=0.837
+step=240640  rew=-37.354  swp=71.3  map=7.0  trunc=76%  pl=0.007  vl=0.825  ent=4.218  kl=0.0272  gn=0.703
+step=240896  rew=-36.905  swp=71.3  map=7.0  trunc=76%  pl=-0.032  vl=0.777  ent=2.740  kl=0.0140  gn=0.635
+step=241152  rew=-36.905  swp=71.3  map=7.0  trunc=76%  pl=0.001  vl=0.661  ent=4.255  kl=0.0145  gn=0.731
+step=241408  rew=-36.905  swp=71.3  map=7.0  trunc=76%  pl=-0.006  vl=0.578  ent=4.294  kl=0.0127  gn=0.677
+step=241664  rew=-35.357  swp=71.3  map=7.0  trunc=76%  pl=-0.024  vl=1.162  ent=3.247  kl=0.0102  gn=0.604
+step=241920  rew=-35.357  swp=71.3  map=7.0  trunc=76%  pl=-0.019  vl=0.643  ent=3.635  kl=0.0084  gn=0.549
+step=242176  rew=-35.357  swp=71.3  map=7.0  trunc=76%  pl=-0.009  vl=0.820  ent=4.351  kl=0.0091  gn=0.569
+step=242432  rew=-38.100  swp=52.5  map=7.0  trunc=76%  pl=-0.022  vl=0.797  ent=3.318  kl=0.0102  gn=0.564
+step=242688  rew=-38.100  swp=52.5  map=7.0  trunc=76%  pl=-0.059  vl=0.752  ent=3.377  kl=0.0205  gn=0.613
+step=242944  rew=-38.100  swp=52.5  map=7.0  trunc=76%  pl=0.001  vl=0.878  ent=4.330  kl=0.0280  gn=0.757
+step=243200  rew=-35.470  swp=52.5  map=7.0  trunc=76%  pl=-0.020  vl=1.160  ent=3.955  kl=0.0208  gn=0.480
+step=243456  rew=-35.470  swp=52.5  map=7.0  trunc=76%  pl=-0.045  vl=1.077  ent=3.313  kl=0.0111  gn=0.654
+step=243712  rew=-35.470  swp=52.5  map=7.0  trunc=76%  pl=-0.010  vl=0.759  ent=4.358  kl=0.0126  gn=0.480
+step=243968  rew=-34.851  swp=52.5  map=7.0  trunc=76%  pl=-0.017  vl=0.767  ent=4.139  kl=0.0119  gn=0.478
+step=244224  rew=-34.851  swp=52.5  map=7.0  trunc=76%  pl=-0.046  vl=0.739  ent=2.617  kl=0.0142  gn=0.613
+step=244480  rew=-34.851  swp=52.5  map=7.0  trunc=76%  pl=0.016  vl=0.828  ent=4.308  kl=0.0338  gn=0.751
+step=244736  rew=-34.851  swp=52.5  map=7.0  trunc=76%  pl=0.001  vl=0.866  ent=4.305  kl=0.0247  gn=0.642
+step=244992  rew=-39.593  swp=37.1  map=7.0  trunc=76%  pl=-0.016  vl=0.985  ent=1.752  kl=0.0078  gn=0.278
+step=245248  rew=-37.864  swp=52.5  map=7.0  trunc=76%  pl=-0.009  vl=0.619  ent=1.892  kl=0.0111  gn=0.677
+step=245504  rew=-37.864  swp=52.5  map=7.0  trunc=76%  pl=0.003  vl=1.441  ent=3.950  kl=0.0186  gn=0.909
+step=245760  rew=-37.864  swp=52.5  map=7.0  trunc=76%  pl=0.013  vl=0.803  ent=4.297  kl=0.0226  gn=0.602
+step=246016  rew=-33.929  swp=52.5  map=7.3  trunc=76%  pl=-0.031  vl=0.791  ent=2.814  kl=0.0170  gn=0.614
+step=246272  rew=-33.929  swp=52.5  map=7.3  trunc=76%  pl=-0.003  vl=0.705  ent=4.051  kl=0.0206  gn=0.528
+step=246528  rew=-33.929  swp=52.5  map=7.3  trunc=76%  pl=-0.004  vl=0.672  ent=4.314  kl=0.0222  gn=0.554
+step=246784  rew=-34.449  swp=52.5  map=7.8  trunc=76%  pl=-0.029  vl=1.064  ent=3.505  kl=0.0179  gn=0.552
+step=247040  rew=-34.449  swp=52.5  map=7.8  trunc=76%  pl=-0.031  vl=0.859  ent=3.322  kl=0.0142  gn=0.573
+step=247296  rew=-34.449  swp=52.5  map=7.8  trunc=76%  pl=0.001  vl=0.727  ent=4.256  kl=0.0178  gn=0.588
+step=247552  rew=-33.171  swp=52.5  map=7.8  trunc=76%  pl=-0.002  vl=1.027  ent=3.799  kl=0.0176  gn=0.600
+step=247808  rew=-33.171  swp=52.5  map=7.8  trunc=76%  pl=-0.021  vl=1.063  ent=3.132  kl=0.0098  gn=0.584
+step=248064  rew=-33.171  swp=52.5  map=7.8  trunc=76%  pl=0.008  vl=0.675  ent=4.318  kl=0.0100  gn=0.542
+step=248320  rew=-41.751  swp=31.9  map=7.8  trunc=77%  pl=-0.018  vl=1.137  ent=3.869  kl=0.0107  gn=0.550
+step=248576  rew=-41.751  swp=31.9  map=7.8  trunc=77%  pl=-0.025  vl=0.839  ent=2.839  kl=0.0149  gn=0.556
+step=248832  rew=-41.751  swp=31.9  map=7.8  trunc=77%  pl=-0.001  vl=0.800  ent=4.270  kl=0.0149  gn=0.732
+step=249088  rew=-47.599  swp=20.2  map=7.8  trunc=77%  pl=-0.009  vl=1.477  ent=4.082  kl=0.0163  gn=0.659
+step=249344  rew=-47.599  swp=20.2  map=7.8  trunc=77%  pl=-0.008  vl=0.891  ent=2.544  kl=0.0112  gn=0.690
+step=249600  rew=-47.599  swp=20.2  map=7.8  trunc=77%  pl=-0.002  vl=0.743  ent=4.273  kl=0.0179  gn=0.626
+step=249856  rew=-50.014  swp=20.2  map=8.0  trunc=77%  pl=-0.005  vl=0.887  ent=4.294  kl=0.0180  gn=0.518
+step=250112  rew=-50.014  swp=20.2  map=8.0  trunc=77%  pl=-0.030  vl=0.352  ent=2.755  kl=0.0193  gn=0.591
+step=250368  rew=-50.014  swp=20.2  map=8.0  trunc=77%  pl=0.014  vl=0.775  ent=4.294  kl=0.0269  gn=0.622
+step=250624  rew=-50.014  swp=20.2  map=8.0  trunc=77%  pl=0.022  vl=0.586  ent=4.302  kl=0.0358  gn=0.629
+step=250880  rew=-51.263  swp=20.2  map=8.0  trunc=77%  pl=-0.038  vl=0.938  ent=2.308  kl=0.0168  gn=0.535
+step=251136  rew=-51.263  swp=20.2  map=8.0  trunc=77%  pl=0.012  vl=0.615  ent=4.236  kl=0.0170  gn=0.586
+step=251392  rew=-51.263  swp=20.2  map=8.0  trunc=77%  pl=0.004  vl=0.429  ent=4.304  kl=0.0153  gn=0.632
+step=251648  rew=-54.641  swp=16.4  map=8.0  trunc=77%  pl=-0.013  vl=1.048  ent=3.626  kl=0.0144  gn=0.504
+step=251904  rew=-54.641  swp=16.4  map=8.0  trunc=77%  pl=0.003  vl=0.607  ent=4.286  kl=0.0183  gn=0.601
+step=252160  rew=-54.641  swp=16.4  map=8.0  trunc=77%  pl=0.002  vl=0.691  ent=4.307  kl=0.0199  gn=0.540
+step=252416  rew=-48.614  swp=16.4  map=8.0  trunc=77%  pl=-0.035  vl=0.381  ent=3.200  kl=0.0122  gn=0.533
+step=252672  rew=-48.614  swp=16.4  map=8.0  trunc=77%  pl=-0.022  vl=0.859  ent=3.390  kl=0.0069  gn=0.794
+step=252928  rew=-48.614  swp=16.4  map=8.0  trunc=77%  pl=-0.002  vl=0.829  ent=4.331  kl=0.0122  gn=0.592
+step=253184  rew=-50.145  swp=16.4  map=8.0  trunc=77%  pl=-0.013  vl=0.961  ent=3.862  kl=0.0116  gn=0.567
+step=253440  rew=-50.145  swp=16.4  map=8.0  trunc=77%  pl=-0.030  vl=0.790  ent=3.273  kl=0.0135  gn=0.576
+step=253696  rew=-50.145  swp=16.4  map=8.0  trunc=77%  pl=-0.001  vl=0.829  ent=4.337  kl=0.0125  gn=0.521
+step=253952  rew=-50.122  swp=16.4  map=8.0  trunc=77%  pl=-0.007  vl=0.844  ent=3.283  kl=0.0133  gn=0.520
+step=254208  rew=-45.650  swp=31.6  map=8.0  trunc=77%  pl=-0.000  vl=0.721  ent=2.119  kl=0.0103  gn=0.510
+step=254464  rew=-45.650  swp=31.6  map=8.0  trunc=77%  pl=-0.021  vl=0.629  ent=2.708  kl=0.0115  gn=0.584
+step=254720  rew=-45.650  swp=31.6  map=8.0  trunc=77%  pl=-0.006  vl=0.877  ent=4.285  kl=0.0162  gn=0.702
+step=254976  rew=-47.375  swp=31.6  map=8.0  trunc=77%  pl=-0.007  vl=0.834  ent=4.196  kl=0.0165  gn=0.638
+step=255232  rew=-47.375  swp=31.6  map=8.0  trunc=77%  pl=0.037  vl=1.044  ent=3.935  kl=0.0306  gn=0.619
+step=255488  rew=-47.375  swp=31.6  map=8.0  trunc=77%  pl=0.026  vl=0.717  ent=4.246  kl=0.0350  gn=0.682
+step=255744  rew=-47.375  swp=31.6  map=8.0  trunc=77%  pl=0.011  vl=0.952  ent=4.267  kl=0.0352  gn=0.642
+step=256000  rew=-45.006  swp=31.6  map=8.0  trunc=77%  pl=-0.027  vl=0.946  ent=2.539  kl=0.0150  gn=0.696
+step=256256  rew=-45.006  swp=31.6  map=8.0  trunc=77%  pl=0.010  vl=0.822  ent=4.321  kl=0.0122  gn=0.599
+step=256512  rew=-45.006  swp=31.6  map=8.0  trunc=77%  pl=-0.003  vl=0.529  ent=4.341  kl=0.0113  gn=0.542
+step=256768  rew=-46.165  swp=31.6  map=8.0  trunc=77%  pl=-0.032  vl=0.751  ent=3.069  kl=0.0127  gn=0.526
+step=257024  rew=-46.165  swp=31.6  map=8.0  trunc=77%  pl=-0.023  vl=1.044  ent=3.746  kl=0.0107  gn=0.760
+step=257280  rew=-46.165  swp=31.6  map=8.0  trunc=77%  pl=-0.001  vl=0.930  ent=4.327  kl=0.0102  gn=0.595
+step=257536  rew=-48.623  swp=30.6  map=8.0  trunc=77%  pl=-0.017  vl=0.700  ent=3.427  kl=0.0226  gn=0.480
+step=257792  rew=-48.623  swp=30.6  map=8.0  trunc=77%  pl=-0.008  vl=0.664  ent=3.614  kl=0.0095  gn=0.725
+step=258048  rew=-48.623  swp=30.6  map=8.0  trunc=77%  pl=0.004  vl=0.585  ent=4.289  kl=0.0112  gn=0.576
+step=258304  rew=-51.252  swp=30.6  map=8.0  trunc=77%  pl=-0.024  vl=1.023  ent=3.744  kl=0.0107  gn=0.503
+step=258560  rew=-51.252  swp=30.6  map=8.0  trunc=77%  pl=-0.026  vl=0.820  ent=3.702  kl=0.0093  gn=0.507
+step=258816  rew=-51.252  swp=30.6  map=8.0  trunc=77%  pl=-0.006  vl=1.175  ent=4.328  kl=0.0090  gn=0.630
+step=259072  rew=-58.911  swp=30.6  map=8.0  trunc=77%  pl=-0.016  vl=0.865  ent=3.946  kl=0.0134  gn=0.396
+step=259328  rew=-58.911  swp=30.6  map=8.0  trunc=77%  pl=-0.025  vl=0.794  ent=3.349  kl=0.0109  gn=0.605
+step=259584  rew=-58.911  swp=30.6  map=8.0  trunc=77%  pl=-0.009  vl=0.768  ent=4.331  kl=0.0119  gn=0.505
+step=259840  rew=-59.259  swp=30.6  map=8.0  trunc=77%  pl=-0.010  vl=0.879  ent=3.798  kl=0.0138  gn=0.492
+step=260096  rew=-59.259  swp=30.6  map=8.0  trunc=77%  pl=-0.012  vl=0.442  ent=2.627  kl=0.0212  gn=0.704
+step=260352  rew=-59.259  swp=30.6  map=8.0  trunc=77%  pl=0.007  vl=0.759  ent=4.338  kl=0.0235  gn=0.545
+step=260608  rew=-62.873  swp=15.2  map=8.0  trunc=77%  pl=-0.009  vl=1.041  ent=4.156  kl=0.0164  gn=0.457
+step=260864  rew=-62.873  swp=15.2  map=8.0  trunc=77%  pl=-0.031  vl=0.660  ent=3.418  kl=0.0139  gn=0.658
+step=261120  rew=-62.873  swp=15.2  map=8.0  trunc=77%  pl=0.006  vl=0.796  ent=4.224  kl=0.0139  gn=0.561
+step=261376  rew=-69.991  swp=15.2  map=8.0  trunc=77%  pl=-0.005  vl=1.122  ent=4.231  kl=0.0169  gn=0.654
+step=261632  rew=-69.991  swp=15.2  map=8.0  trunc=77%  pl=0.007  vl=1.070  ent=2.876  kl=0.0207  gn=0.745
+step=261888  rew=-69.991  swp=15.2  map=8.0  trunc=77%  pl=0.005  vl=0.818  ent=3.977  kl=0.0225  gn=0.651
+step=262144  rew=-69.991  swp=15.2  map=8.0  trunc=77%  pl=0.002  vl=0.800  ent=4.227  kl=0.0253  gn=0.722
+step=262400  rew=-76.811  swp=15.2  map=8.0  trunc=77%  pl=-0.023  vl=0.838  ent=2.938  kl=0.0290  gn=0.584
+step=262656  rew=-76.811  swp=15.2  map=8.0  trunc=77%  pl=-0.002  vl=0.805  ent=3.976  kl=0.0157  gn=0.740
+step=262912  rew=-76.811  swp=15.2  map=8.0  trunc=77%  pl=0.004  vl=0.524  ent=4.239  kl=0.0203  gn=0.678
+step=263168  rew=-74.924  swp=15.2  map=8.0  trunc=77%  pl=-0.017  vl=0.942  ent=2.379  kl=0.0127  gn=0.628
+step=263424  rew=-67.576  swp=26.6  map=8.0  trunc=77%  pl=0.007  vl=0.612  ent=1.732  kl=0.0147  gn=0.612
+step=263680  rew=-61.559  swp=37.4  map=8.0  trunc=77%  pl=-0.004  vl=0.547  ent=2.750  kl=0.0194  gn=0.721
+step=263936  rew=-61.559  swp=37.4  map=8.0  trunc=77%  pl=-0.007  vl=0.856  ent=4.249  kl=0.0143  gn=0.717
+step=264192  rew=-61.559  swp=37.4  map=8.0  trunc=77%  pl=-0.000  vl=0.782  ent=4.289  kl=0.0143  gn=0.597
+step=264448  rew=-58.095  swp=37.4  map=8.0  trunc=77%  pl=-0.030  vl=0.874  ent=2.115  kl=0.0094  gn=0.482
+step=264704  rew=-56.359  swp=49.3  map=8.0  trunc=77%  pl=-0.050  vl=0.460  ent=2.587  kl=0.0307  gn=0.632
+step=264960  rew=-56.359  swp=49.3  map=8.0  trunc=77%  pl=0.045  vl=0.697  ent=4.259  kl=0.0614  gn=0.529
+step=265216  rew=-56.359  swp=49.3  map=8.0  trunc=77%  pl=0.015  vl=0.726  ent=4.204  kl=0.0279  gn=0.589
+step=265472  rew=-54.003  swp=49.3  map=8.0  trunc=77%  pl=-0.039  vl=0.908  ent=3.393  kl=0.0167  gn=0.611
+step=265728  rew=-54.003  swp=49.3  map=8.0  trunc=77%  pl=-0.009  vl=0.677  ent=3.785  kl=0.0079  gn=0.566
+step=265984  rew=-54.003  swp=49.3  map=8.0  trunc=77%  pl=-0.007  vl=0.821  ent=4.338  kl=0.0094  gn=0.478
+step=266240  rew=-60.674  swp=49.3  map=8.0  trunc=77%  pl=-0.028  vl=0.867  ent=3.816  kl=0.0145  gn=0.432
+step=266496  rew=-60.674  swp=49.3  map=8.0  trunc=77%  pl=-0.016  vl=0.728  ent=3.288  kl=0.0096  gn=0.661
+step=266752  rew=-60.674  swp=49.3  map=8.0  trunc=77%  pl=0.000  vl=0.904  ent=4.320  kl=0.0088  gn=0.625
+step=267008  rew=-57.336  swp=51.6  map=8.0  trunc=77%  pl=-0.010  vl=1.188  ent=3.103  kl=0.0254  gn=0.580
+step=267264  rew=-57.336  swp=51.6  map=8.0  trunc=77%  pl=-0.034  vl=0.703  ent=3.011  kl=0.0196  gn=0.646
+step=267520  rew=-57.336  swp=51.6  map=8.0  trunc=77%  pl=0.011  vl=0.629  ent=4.305  kl=0.0281  gn=0.541
+step=267776  rew=-59.489  swp=36.5  map=7.8  trunc=77%  pl=-0.005  vl=0.622  ent=4.211  kl=0.0185  gn=0.422
+step=268032  rew=-59.489  swp=36.5  map=7.8  trunc=77%  pl=0.001  vl=1.337  ent=3.452  kl=0.0095  gn=0.689
+step=268288  rew=-59.489  swp=36.5  map=7.8  trunc=77%  pl=-0.011  vl=0.596  ent=3.880  kl=0.0068  gn=0.456
+step=268544  rew=-57.541  swp=36.5  map=7.7  trunc=77%  pl=-0.009  vl=1.169  ent=4.322  kl=0.0085  gn=0.392
+step=268800  rew=-57.541  swp=36.5  map=7.7  trunc=77%  pl=-0.008  vl=1.019  ent=3.009  kl=0.0097  gn=0.764
+step=269056  rew=-57.541  swp=36.5  map=7.7  trunc=77%  pl=-0.029  vl=1.007  ent=3.439  kl=0.0079  gn=0.477
+step=269312  rew=-57.541  swp=36.5  map=7.7  trunc=77%  pl=-0.009  vl=0.703  ent=4.352  kl=0.0090  gn=0.448
+step=269568  rew=-57.626  swp=36.5  map=7.5  trunc=77%  pl=-0.027  vl=1.109  ent=3.275  kl=0.0095  gn=0.481
+step=269824  rew=-57.626  swp=36.5  map=7.5  trunc=77%  pl=-0.011  vl=0.816  ent=3.990  kl=0.0068  gn=0.588
+step=270080  rew=-57.626  swp=36.5  map=7.5  trunc=77%  pl=-0.000  vl=0.769  ent=4.355  kl=0.0097  gn=0.508
+step=270336  rew=-56.327  swp=36.5  map=7.2  trunc=77%  pl=-0.006  vl=0.681  ent=4.106  kl=0.0094  gn=0.420
+step=270592  rew=-56.327  swp=36.5  map=7.2  trunc=77%  pl=0.002  vl=0.817  ent=4.341  kl=0.0085  gn=0.518
+step=270848  rew=-56.327  swp=36.5  map=7.2  trunc=77%  pl=0.002  vl=0.792  ent=4.295  kl=0.0142  gn=0.439
+step=271104  rew=-54.337  swp=36.5  map=7.2  trunc=77%  pl=-0.028  vl=0.644  ent=2.700  kl=0.0131  gn=0.610
+step=271360  rew=-54.337  swp=36.5  map=7.2  trunc=77%  pl=0.006  vl=0.581  ent=4.048  kl=0.0207  gn=0.642
+step=271616  rew=-54.337  swp=36.5  map=7.2  trunc=77%  pl=0.006  vl=0.726  ent=4.342  kl=0.0192  gn=0.571
+step=271872  rew=-48.439  swp=36.5  map=7.2  trunc=77%  pl=-0.028  vl=0.576  ent=3.479  kl=0.0173  gn=0.511
+step=272128  rew=-48.439  swp=36.5  map=7.2  trunc=77%  pl=0.011  vl=0.749  ent=3.390  kl=0.0191  gn=0.584
+step=272384  rew=-48.439  swp=36.5  map=7.2  trunc=77%  pl=0.003  vl=0.717  ent=4.336  kl=0.0112  gn=0.596
+step=272640  rew=-43.192  swp=36.5  map=7.2  trunc=77%  pl=0.001  vl=1.056  ent=3.817  kl=0.0172  gn=0.495
+step=272896  rew=-43.192  swp=36.5  map=7.2  trunc=77%  pl=0.011  vl=0.602  ent=4.326  kl=0.0254  gn=0.713
+step=273152  rew=-43.192  swp=36.5  map=7.2  trunc=77%  pl=0.012  vl=0.568  ent=4.347  kl=0.0240  gn=0.660
+step=273408  rew=-39.857  swp=36.5  map=7.2  trunc=77%  pl=-0.009  vl=1.334  ent=3.822  kl=0.0179  gn=0.692
+step=273664  rew=-39.857  swp=36.5  map=7.2  trunc=77%  pl=-0.005  vl=0.969  ent=2.061  kl=0.0069  gn=0.532
+step=273920  rew=-39.857  swp=36.5  map=7.2  trunc=77%  pl=0.001  vl=0.659  ent=4.333  kl=0.0145  gn=0.427
+step=274176  rew=-39.825  swp=36.5  map=7.2  trunc=77%  pl=-0.009  vl=0.905  ent=4.017  kl=0.0171  gn=0.409
+step=274432  rew=-39.825  swp=36.5  map=7.2  trunc=77%  pl=-0.017  vl=0.497  ent=2.753  kl=0.0097  gn=0.556
+step=274688  rew=-39.825  swp=36.5  map=7.2  trunc=77%  pl=-0.006  vl=0.918  ent=4.328  kl=0.0080  gn=0.638
+step=274944  rew=-34.744  swp=36.5  map=7.2  trunc=77%  pl=-0.010  vl=1.219  ent=4.249  kl=0.0119  gn=0.467
+step=275200  rew=-34.744  swp=36.5  map=7.2  trunc=77%  pl=-0.004  vl=0.823  ent=2.265  kl=0.0147  gn=0.649
+step=275456  rew=-34.744  swp=36.5  map=7.2  trunc=77%  pl=0.004  vl=0.619  ent=4.369  kl=0.0149  gn=0.415
+step=275712  rew=-34.744  swp=36.5  map=7.2  trunc=77%  pl=0.001  vl=0.776  ent=4.376  kl=0.0180  gn=0.460
+step=275968  rew=-28.534  swp=36.5  map=7.2  trunc=77%  pl=-0.039  vl=0.892  ent=3.392  kl=0.0101  gn=0.401
+step=276224  rew=-28.534  swp=36.5  map=7.2  trunc=77%  pl=-0.030  vl=1.026  ent=3.905  kl=0.0056  gn=0.496
+step=276480  rew=-28.534  swp=36.5  map=7.2  trunc=77%  pl=-0.007  vl=0.752  ent=4.377  kl=0.0066  gn=0.441
+step=276736  rew=-28.252  swp=36.5  map=7.0  trunc=78%  pl=-0.026  vl=1.093  ent=2.309  kl=0.0088  gn=0.474
+step=276992  rew=-27.518  swp=38.5  map=7.0  trunc=77%  pl=-0.010  vl=0.960  ent=2.031  kl=0.0075  gn=0.472
+step=277248  rew=-27.518  swp=38.5  map=7.0  trunc=77%  pl=-0.001  vl=0.531  ent=4.210  kl=0.0200  gn=0.444
+step=277504  rew=-27.518  swp=38.5  map=7.0  trunc=77%  pl=-0.006  vl=1.118  ent=4.358  kl=0.0151  gn=0.662
+step=277760  rew=-29.433  swp=27.7  map=7.0  trunc=77%  pl=-0.030  vl=0.520  ent=2.837  kl=0.0098  gn=0.509
+step=278016  rew=-27.225  swp=40.4  map=7.0  trunc=77%  pl=0.004  vl=0.784  ent=1.940  kl=0.0205  gn=0.531
+step=278272  rew=-27.225  swp=40.4  map=7.0  trunc=77%  pl=-0.035  vl=0.587  ent=2.996  kl=0.0077  gn=0.470
+step=278528  rew=-27.225  swp=40.4  map=7.0  trunc=77%  pl=0.002  vl=1.004  ent=4.352  kl=0.0107  gn=0.511
+step=278784  rew=-28.929  swp=28.4  map=7.0  trunc=77%  pl=-0.024  vl=0.989  ent=3.244  kl=0.0092  gn=0.465
+step=279040  rew=-27.371  swp=37.8  map=7.0  trunc=77%  pl=-0.008  vl=0.948  ent=2.652  kl=0.0067  gn=0.660
+step=279296  rew=-27.371  swp=37.8  map=7.0  trunc=77%  pl=-0.028  vl=0.842  ent=3.673  kl=0.0077  gn=0.603
+step=279552  rew=-27.371  swp=37.8  map=7.0  trunc=77%  pl=-0.009  vl=0.779  ent=4.337  kl=0.0095  gn=0.460
+step=279808  rew=-21.228  swp=37.8  map=7.0  trunc=77%  pl=-0.013  vl=1.002  ent=3.011  kl=0.0078  gn=0.497
+step=280064  rew=-12.711  swp=57.1  map=7.0  trunc=77%  pl=-0.002  vl=0.638  ent=1.833  kl=0.0223  gn=0.599
+step=280320  rew=-12.711  swp=57.1  map=7.0  trunc=77%  pl=-0.010  vl=0.815  ent=4.119  kl=0.0120  gn=0.622
+step=280576  rew=-12.711  swp=57.1  map=7.0  trunc=77%  pl=-0.002  vl=0.829  ent=4.316  kl=0.0124  gn=0.624
+step=280832  rew=-12.711  swp=57.1  map=7.0  trunc=77%  pl=-0.002  vl=0.778  ent=4.321  kl=0.0141  gn=0.556
+step=281088  rew=-13.418  swp=54.8  map=7.0  trunc=77%  pl=-0.029  vl=0.792  ent=3.529  kl=0.0122  gn=0.567
+step=281344  rew=-13.418  swp=54.8  map=7.0  trunc=77%  pl=-0.001  vl=0.764  ent=3.291  kl=0.0085  gn=0.687
+step=281600  rew=-13.418  swp=54.8  map=7.0  trunc=77%  pl=-0.020  vl=0.582  ent=3.831  kl=0.0106  gn=0.533
+step=281856  rew=-15.736  swp=54.8  map=7.0  trunc=77%  pl=-0.024  vl=0.627  ent=2.923  kl=0.0188  gn=0.530
+step=282112  rew=-15.736  swp=54.8  map=7.0  trunc=77%  pl=-0.051  vl=0.933  ent=3.690  kl=0.0187  gn=0.616
+step=282368  rew=-15.736  swp=54.8  map=7.0  trunc=77%  pl=-0.000  vl=0.878  ent=4.288  kl=0.0243  gn=0.492
+step=282624  rew=-16.115  swp=54.8  map=7.0  trunc=77%  pl=-0.038  vl=0.804  ent=3.200  kl=0.0143  gn=0.460
+step=282880  rew=-16.115  swp=54.8  map=7.0  trunc=77%  pl=-0.018  vl=0.501  ent=3.527  kl=0.0080  gn=0.630
+step=283136  rew=-16.115  swp=54.8  map=7.0  trunc=77%  pl=-0.000  vl=0.721  ent=4.281  kl=0.0097  gn=0.638
+step=283392  rew=-19.146  swp=54.8  map=7.2  trunc=77%  pl=-0.024  vl=0.823  ent=3.969  kl=0.0110  gn=0.471
+step=283648  rew=-19.146  swp=54.8  map=7.2  trunc=77%  pl=-0.014  vl=0.765  ent=3.395  kl=0.0119  gn=0.599
+step=283904  rew=-19.146  swp=54.8  map=7.2  trunc=77%  pl=-0.007  vl=0.817  ent=4.360  kl=0.0084  gn=0.455
+step=284160  rew=-24.808  swp=54.8  map=7.3  trunc=77%  pl=-0.018  vl=0.928  ent=3.574  kl=0.0092  gn=0.402
+step=284416  rew=-24.808  swp=54.8  map=7.3  trunc=77%  pl=-0.044  vl=0.789  ent=2.643  kl=0.0103  gn=0.540
+step=284672  rew=-24.808  swp=54.8  map=7.3  trunc=77%  pl=0.001  vl=0.898  ent=4.338  kl=0.0156  gn=0.460
+step=284928  rew=-26.811  swp=54.8  map=7.3  trunc=77%  pl=-0.005  vl=0.971  ent=4.085  kl=0.0154  gn=0.486
+step=285184  rew=-26.811  swp=54.8  map=7.3  trunc=77%  pl=-0.008  vl=0.789  ent=4.353  kl=0.0087  gn=0.472
+step=285440  rew=-26.811  swp=54.8  map=7.3  trunc=77%  pl=-0.006  vl=0.668  ent=4.347  kl=0.0118  gn=0.498
+step=285696  rew=-27.027  swp=54.8  map=7.3  trunc=77%  pl=-0.003  vl=0.636  ent=4.035  kl=0.0092  gn=0.510
+step=285952  rew=-27.027  swp=54.8  map=7.3  trunc=77%  pl=0.005  vl=1.392  ent=2.103  kl=0.0077  gn=0.673
+step=286208  rew=-27.027  swp=54.8  map=7.3  trunc=77%  pl=-0.044  vl=0.563  ent=3.551  kl=0.0129  gn=0.483
+step=286464  rew=-24.598  swp=54.8  map=7.3  trunc=77%  pl=-0.005  vl=1.529  ent=4.322  kl=0.0143  gn=0.567
+step=286720  rew=-24.598  swp=54.8  map=7.3  trunc=77%  pl=-0.001  vl=1.058  ent=3.166  kl=0.0125  gn=0.650
+step=286976  rew=-24.598  swp=54.8  map=7.3  trunc=77%  pl=-0.028  vl=1.052  ent=4.153  kl=0.0084  gn=0.518
+step=287232  rew=-24.598  swp=54.8  map=7.3  trunc=77%  pl=-0.004  vl=0.895  ent=4.377  kl=0.0072  gn=0.345
+step=287488  rew=-31.085  swp=54.8  map=7.3  trunc=77%  pl=-0.015  vl=1.072  ent=3.756  kl=0.0100  gn=0.392
+step=287744  rew=-31.085  swp=54.8  map=7.3  trunc=77%  pl=-0.003  vl=0.726  ent=4.351  kl=0.0088  gn=0.524
+step=288000  rew=-31.085  swp=54.8  map=7.3  trunc=77%  pl=-0.005  vl=0.720  ent=4.351  kl=0.0074  gn=0.504
+step=288256  rew=-30.207  swp=54.8  map=7.2  trunc=77%  pl=-0.020  vl=0.725  ent=2.298  kl=0.0111  gn=0.451
+step=288512  rew=-25.895  swp=76.3  map=7.2  trunc=77%  pl=-0.009  vl=0.905  ent=2.027  kl=0.0088  gn=0.584
+step=288768  rew=-25.895  swp=76.3  map=7.2  trunc=77%  pl=0.007  vl=0.855  ent=3.349  kl=0.0138  gn=0.749
+step=289024  rew=-25.895  swp=76.3  map=7.2  trunc=77%  pl=-0.031  vl=0.854  ent=3.647  kl=0.0077  gn=0.504
+step=289280  rew=-25.895  swp=76.3  map=7.2  trunc=77%  pl=-0.009  vl=0.925  ent=4.359  kl=0.0072  gn=0.427
+step=289536  rew=-30.337  swp=63.0  map=6.8  trunc=77%  pl=0.001  vl=0.937  ent=3.615  kl=0.0102  gn=0.510
+step=289792  rew=-30.337  swp=63.0  map=6.8  trunc=77%  pl=-0.001  vl=0.656  ent=4.349  kl=0.0118  gn=0.486
+step=290048  rew=-30.337  swp=63.0  map=6.8  trunc=77%  pl=-0.012  vl=0.757  ent=4.333  kl=0.0132  gn=0.493
+step=290304  rew=-29.301  swp=63.0  map=6.8  trunc=77%  pl=-0.032  vl=0.775  ent=3.509  kl=0.0169  gn=0.506
+step=290560  rew=-29.301  swp=63.0  map=6.8  trunc=77%  pl=-0.018  vl=1.020  ent=3.574  kl=0.0175  gn=0.609
+step=290816  rew=-29.301  swp=63.0  map=6.8  trunc=77%  pl=-0.008  vl=0.724  ent=4.323  kl=0.0123  gn=0.577
+step=291072  rew=-37.148  swp=50.3  map=6.8  trunc=77%  pl=-0.019  vl=0.841  ent=2.846  kl=0.0166  gn=0.611
+step=291328  rew=-37.148  swp=50.3  map=6.8  trunc=77%  pl=-0.021  vl=0.273  ent=3.645  kl=0.0164  gn=0.605
+step=291584  rew=-37.148  swp=50.3  map=6.8  trunc=77%  pl=-0.001  vl=0.715  ent=4.323  kl=0.0187  gn=0.676
+step=291840  rew=-37.333  swp=50.3  map=6.8  trunc=77%  pl=-0.027  vl=0.471  ent=2.844  kl=0.0155  gn=0.533
+step=292096  rew=-36.637  swp=59.6  map=6.8  trunc=77%  pl=-0.007  vl=0.666  ent=1.905  kl=0.0112  gn=0.742
+step=292352  rew=-36.637  swp=59.6  map=6.8  trunc=77%  pl=0.013  vl=0.713  ent=2.447  kl=0.0154  gn=0.722
+step=292608  rew=-36.637  swp=59.6  map=6.8  trunc=77%  pl=-0.010  vl=0.690  ent=3.628  kl=0.0079  gn=0.772
+step=292864  rew=-36.637  swp=59.6  map=6.8  trunc=77%  pl=0.000  vl=1.106  ent=4.350  kl=0.0107  gn=0.707
+step=293120  rew=-34.699  swp=59.6  map=6.8  trunc=77%  pl=-0.024  vl=0.737  ent=1.962  kl=0.0091  gn=0.547
+step=293376  rew=-34.228  swp=57.4  map=6.8  trunc=77%  pl=-0.002  vl=1.054  ent=2.331  kl=0.0107  gn=0.672
+step=293632  rew=-34.228  swp=57.4  map=6.8  trunc=77%  pl=-0.045  vl=0.783  ent=3.105  kl=0.0168  gn=0.512
+step=293888  rew=-34.228  swp=57.4  map=6.8  trunc=77%  pl=0.003  vl=0.939  ent=4.332  kl=0.0266  gn=0.575
+step=294144  rew=-34.772  swp=57.4  map=6.8  trunc=77%  pl=-0.020  vl=0.922  ent=3.385  kl=0.0191  gn=0.447
+step=294400  rew=-34.772  swp=57.4  map=6.8  trunc=77%  pl=-0.026  vl=0.912  ent=3.788  kl=0.0099  gn=0.591
+step=294656  rew=-34.772  swp=57.4  map=6.8  trunc=77%  pl=0.004  vl=0.797  ent=4.310  kl=0.0112  gn=0.566
+step=294912  rew=-31.262  swp=57.4  map=7.2  trunc=77%  pl=-0.015  vl=0.676  ent=3.684  kl=0.0093  gn=0.678
+step=295168  rew=-31.262  swp=57.4  map=7.2  trunc=77%  pl=0.014  vl=0.711  ent=4.324  kl=0.0168  gn=0.623
+step=295424  rew=-31.262  swp=57.4  map=7.2  trunc=77%  pl=0.005  vl=0.744  ent=4.334  kl=0.0175  gn=0.548
+step=295680  rew=-27.705  swp=57.4  map=7.2  trunc=77%  pl=-0.016  vl=0.871  ent=3.916  kl=0.0188  gn=0.578
+step=295936  rew=-27.705  swp=57.4  map=7.2  trunc=77%  pl=-0.001  vl=0.501  ent=1.829  kl=0.0097  gn=0.578
+step=296192  rew=-22.755  swp=73.3  map=7.2  trunc=77%  pl=0.002  vl=0.907  ent=2.394  kl=0.0174  gn=0.805
+step=296448  rew=-22.755  swp=73.3  map=7.2  trunc=77%  pl=-0.015  vl=0.859  ent=4.070  kl=0.0097  gn=0.582
+step=296704  rew=-22.755  swp=73.3  map=7.2  trunc=77%  pl=-0.004  vl=0.844  ent=4.334  kl=0.0110  gn=0.518
+step=296960  rew=-17.750  swp=73.3  map=7.3  trunc=77%  pl=-0.022  vl=1.175  ent=2.332  kl=0.0086  gn=0.624
+step=297216  rew=-14.460  swp=83.8  map=7.3  trunc=77%  pl=-0.037  vl=0.746  ent=2.795  kl=0.0100  gn=0.552
+step=297472  rew=-14.460  swp=83.8  map=7.3  trunc=77%  pl=-0.007  vl=0.681  ent=4.320  kl=0.0156  gn=0.584
+step=297728  rew=-14.460  swp=83.8  map=7.3  trunc=77%  pl=0.003  vl=0.811  ent=4.331  kl=0.0163  gn=0.604
+step=297984  rew=-15.754  swp=83.8  map=7.3  trunc=77%  pl=-0.026  vl=1.229  ent=3.182  kl=0.0100  gn=0.657
+step=298240  rew=-15.754  swp=83.8  map=7.3  trunc=77%  pl=0.002  vl=0.545  ent=4.334  kl=0.0090  gn=0.541
+step=298496  rew=-15.754  swp=83.8  map=7.3  trunc=77%  pl=-0.005  vl=0.762  ent=4.335  kl=0.0096  gn=0.522
+step=298752  rew=-9.888  swp=84.2  map=7.3  trunc=77%  pl=-0.020  vl=1.039  ent=3.409  kl=0.0112  gn=0.610
+step=299008  rew=-9.888  swp=84.2  map=7.3  trunc=77%  pl=-0.012  vl=0.589  ent=3.542  kl=0.0084  gn=0.667
+step=299264  rew=-9.888  swp=84.2  map=7.3  trunc=77%  pl=0.003  vl=0.484  ent=4.342  kl=0.0087  gn=0.545
+step=299520  rew=-15.256  swp=84.2  map=7.3  trunc=77%  pl=-0.016  vl=0.974  ent=3.905  kl=0.0115  gn=0.471
+step=299776  rew=-15.256  swp=84.2  map=7.3  trunc=77%  pl=-0.017  vl=0.968  ent=3.087  kl=0.0107  gn=0.616
+step=300032  rew=-15.256  swp=84.2  map=7.3  trunc=77%  pl=-0.001  vl=0.737  ent=4.365  kl=0.0093  gn=0.474
+Checkpoints in /home/zzy/opencode-server/opencode-docker/projects/rlrouting/scripts/../models/ckpts_tianyan
+Policy saved to /home/zzy/opencode-server/opencode-docker/projects/rlrouting/scripts/../models/policy_tianyan176_phase1.pt
+Done. Models in /home/zzy/opencode-server/opencode-docker/projects/rlrouting/scripts/../models

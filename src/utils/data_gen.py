@@ -24,9 +24,13 @@ class Sample:
 
 
 def random_circuit(num_qubits: int, depth: int, seed: int):
-    """生成不含测量的随机电路（便于态矢量保真度计算）。"""
+    """生成不含测量的随机电路（便于态矢量保真度计算）。
+
+    仅含 1q/2q 门（max_operands=2）：RoutingEnv / CircuitDAG 不支持
+    rcccx/c3sx 等多比特门（它们永远不会进入 front_layer，导致死循环）。
+    """
     from qiskit.circuit.random import random_circuit as _rc
-    qc = _rc(num_qubits, depth, measure=False, seed=seed)
+    qc = _rc(num_qubits, depth, max_operands=2, measure=False, seed=seed)
     return qc
 
 

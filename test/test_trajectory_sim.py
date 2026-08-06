@@ -217,3 +217,55 @@ def test_validate_t2_twice_t1():
     cfg = _config(t1=10.0, t2=30.0)  # 30 > 2*10
     with pytest.raises(ValueError):
         TrajectorySimulator(cfg)
+
+
+# ----------------------------------------------------------------------- #
+# 位序（bitorder）回归：非 GHZ 电路须与 qiskit/Aer 完全一致
+# ----------------------------------------------------------------------- #
+def test_bitorder_matches_qiskit_statevector():
+    """x(q0) 应落在 index 1（little-endian），而非 8（big-endian）。"""
+    from qiskit_aer import AerSimulator
+
+    cfg = _config(n=4, sqe=0.0, tqe=0.0, ro=None, t1=1e6, t2=2e6)
+    ts = TrajectorySimulator(cfg, num_trajectories=8, seed=1)
+
+    def aer(qc):
+        cc = qc.copy()
+        cc.save_statevector()
+        return np.asarray(AerSimulator(method="statevector").run(cc)
+                          .result().data()["statevector"])
+
+    cases = []
+    qc = QuantumCircuit(4); qc.x(0); cases.append(("x(q0)", qc))
+    qc = QuantumCircuit(4); qc.x(3); cases.append(("x(q3)", qc))
+    qc = QuantumCircuit(4); qc.h(0); qc.cx(0, 1); cases.append(("bell(0,1)", qc))
+    QC = QuantumCircuit(4); QC.h(2); QC.cx(2, 3); cases.append(("bell(2,3)", QC))
+    rng = np.random.default_rng(7)
+    qc = QuantumCircuit(4)
+    for _ in range(5):
+        qs = rng.choice(4, 2, replace=False)
+        if rng.random() < 0.5:
+            qc.h(int(qs[0]))
+        else:
+            qc.rx(rng.uniform(0, np.pi), int(qs[0]))
+        qc.cx(int(qs[0]), int(qs[1]))
+    cases.append(("random", qc))
+
+    for label, qc in cases:
+        qc_t = _transpiled(qc, n=4)
+        tr_sv = ts.ideal_statevector(qc_t)
+        aer_sv = aer(qc_t)
+        assert np.max(np.abs(tr_sv - aer_sv)) < 1e-12, (
+            f"{label}: 状态向量与 qiskit/Aer 不一致")
+
+
+def test_bitorder_counts_xq2():
+    """counts 位序：x(q2) 无噪声应只在 '0100' 聚集（qiskit little-endian）。"""
+    cfg = _config(n=4, sqe=0.0, tqe=0.0, ro=None, t1=1e6, t2=2e6, shots=20000)
+    ts = TrajectorySimulator(cfg, num_trajectories=8, seed=1)
+    qc = QuantumCircuit(4, 4)
+    qc.x(2)
+    qc.measure([0, 1, 2, 3], [0, 1, 2, 3])
+    cnt = ts.run(qc, shots=20000)
+    assert cnt.get("0100", 0) > 0.98 * 20000
+    assert sum(cnt.values()) == 20000

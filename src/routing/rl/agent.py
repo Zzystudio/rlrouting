@@ -412,8 +412,16 @@ class PPOAgent:
 
         dones[t] = True 表示 episode 在步 t 结束（无论是 done 还是 truncated），
         此时 λ-bootstrapping 截止，且 δ_t 使用 0 作为 next_value。
+
+        `lam` 可以是标量或与 rewards 等长的数组（自适应 λ：每步使用不同 λ_t，
+        例如随 episode 进度从 0.95 增长到 0.998 以覆盖长电路截断信号）。
         """
         T = len(rewards)
+        lam_arr = np.asarray(lam, dtype=float)
+        if lam_arr.ndim == 0:
+            lam_arr = np.full(T, float(lam_arr))
+        if lam_arr.shape != (T,):
+            raise ValueError(f"lam shape {lam_arr.shape} != rewards shape ({T},)")
         advantages = np.zeros(T, dtype=float)
         last_adv = 0.0
         for t in reversed(range(T)):
@@ -426,7 +434,7 @@ class PPOAgent:
             else:
                 delta = rewards[t] + gamma * values[t + 1] - values[t]
                 next_nonterminal = 1.0
-            last_adv = delta + gamma * lam * next_nonterminal * last_adv
+            last_adv = delta + gamma * lam_arr[t] * next_nonterminal * last_adv
             advantages[t] = last_adv
         returns = advantages + np.array(values)
         if clip_return is not None:

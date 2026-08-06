@@ -1,0 +1,28 @@
+==========================================================
+Tianyan 176 Curriculum Training (60q / 81 edges)
+  device:          cuda:0
+  phase 1 steps:   800000
+  phase 2 steps:   200000 (enabled=0)
+  max qubits:      60
+  max edges:       81
+  max episode len: 800
+  topology:        tianyan176_66q.json
+  curriculum:      large_n10 -> large_n20 -> tianyan
+  GAE lambda:      adaptive 0.95 -> 0.995
+==========================================================
+Curriculum prefixes: ['large_n10', 'large_n20', 'tianyan']  (initial split: large_n10_phase1)
+step=   256  rew=+0.000  swp=0.0  map=0.0  trunc=0%  pl=0.173  vl=0.953  ent=4.393  kl=0.5322  gn=0.213
+step=   512  rew=+0.000  swp=0.0  map=0.0  trunc=0%  pl=0.173  vl=0.874  ent=4.370  kl=0.4123  gn=0.264
+step=   768  rew=+0.000  swp=0.0  map=0.0  trunc=0%  pl=0.141  vl=0.875  ent=4.220  kl=0.2620  gn=0.342
+step=  1024  rew=+7.140  swp=0.0  map=8.0  trunc=100%  pl=0.009  vl=0.967  ent=3.851  kl=0.0949  gn=0.415
+step=  1280  rew=+7.140  swp=0.0  map=8.0  trunc=100%  pl=0.046  vl=0.982  ent=3.491  kl=0.0756  gn=0.469
+step=  1536  rew=+12.483  swp=231.7  map=7.7  trunc=33%  pl=0.007  vl=0.770  ent=3.354  kl=0.0515  gn=0.692
+step=  1792  rew=+14.514  swp=237.2  map=7.8  trunc=25%  pl=0.044  vl=1.227  ent=3.325  kl=0.0578  gn=0.623
+step=  2048  rew=+14.514  swp=237.2  map=7.8  trunc=25%  pl=0.029  vl=0.917  ent=3.273  kl=0.0498  gn=0.519
+step=  2304  rew=+14.433  swp=274.8  map=7.8  trunc=20%  pl=0.049  vl=0.954  ent=3.135  kl=0.0479  gn=0.545
+step=  2560  rew=+15.318  swp=241.9  map=7.9  trunc=14%  pl=-0.006  vl=1.089  ent=3.216  kl=0.0408  gn=0.637
+step=  2816  rew=+15.786  swp=226.9  map=7.9  trunc=12%  pl=0.031  vl=0.816  ent=3.310  kl=0.0397  gn=0.753
+step=  3072  rew=+16.077  swp=245.1  map=7.9  trunc=11%  pl=0.033  vl=1.085  ent=3.132  kl=0.0550  gn=0.530
+step=  3328  rew=+16.077  swp=245.1  map=7.9  trunc=11%  pl=0.031  vl=0.947  ent=3.239  kl=0.0425  gn=0.634
+step=  3584  rew=+16.475  swp=265.2  map=7.9  trunc=10%  pl=0.025  vl=1.159  ent=3.185  kl=0.0528  gn=0.519
+step=  3840  rew=+16.475  swp=265.2  map=7.9  trunc=10%  pl=0.015  vl=1.043  ent=3.315  kl=0.0390  gn=0.555

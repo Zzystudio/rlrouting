@@ -35,9 +35,12 @@ logger = logging.getLogger(__name__)
 # 平均密度矩阵内存上限：超过则禁止 .data（建议改用 TrajectoryResult.fidelity）
 _DENSITY_MEM_LIMIT = 1 << 31  # 2 GiB
 
-# 单比特相对旋转（rz）出参用
+# 单比特相对旋转（rz）出参用；与 qiskit 一致含全局相位 e^{-iθ/2}
 def _rz_matrix(theta: float) -> np.ndarray:
-    return np.array([[1.0, 0.0], [0.0, np.exp(1j * theta)]], dtype=complex)
+    return np.array(
+        [[np.exp(-0.5j * theta), 0.0], [0.0, np.exp(0.5j * theta)]],
+        dtype=complex,
+    )
 
 
 # 基础单/双比特酉矩阵
@@ -166,6 +169,12 @@ class TrajectorySimulator:
         sv[0] = 1.0
         return sv
 
+    @staticmethod
+    def _axis(q: int, n: int) -> int:
+        """qiskit 用 little-endian（qubit 0 为最低位）；
+        numpy reshape 后 axis 0 是最高位，故 qubit q -> axis n-1-q。"""
+        return n - 1 - q
+
     def _transpile(self, circuit: QuantumCircuit) -> QuantumCircuit:
         """转译到基础门（包含 'id'，以便插入空闲时间）。"""
         return transpile(
@@ -185,27 +194,31 @@ class TrajectorySimulator:
     def _apply1(self, sv: np.ndarray, q: int, mat: np.ndarray) -> np.ndarray:
         """作用任意 2x2 门到比特 q（qiskit little-endian 顺序）。"""
         sv = sv.reshape((2,) * self.n_qubits)
-        moved = np.ascontiguousarray(np.moveaxis(sv, q, 0))  # (2, rest...)
+        ax = self._axis(q, self.n_qubits)
+        moved = np.ascontiguousarray(np.moveaxis(sv, ax, 0))  # (2, rest...)
         out = mat @ moved.reshape(2, -1)
-        out = np.moveaxis(out.reshape((2,) * self.n_qubits), 0, q)
+        out = np.moveaxis(out.reshape((2,) * self.n_qubits), 0, ax)
         return out.reshape(-1)
 
     def _apply_cx(self, sv: np.ndarray, ctl: int, tgt: int) -> np.ndarray:
         """CNOT: 控制 ctl，目 tgt。"""
         s = sv.reshape((2,) * self.n_qubits)
-        s = np.moveaxis(s, (ctl, tgt), (0, 1))
+        axc = self._axis(ctl, self.n_qubits)
+        axt = self._axis(tgt, self.n_qubits)
+        s = np.moveaxis(s, (axc, axt), (0, 1))
         s = np.ascontiguousarray(s)
         m = s.reshape(2, 2, -1)
         # 当 ctl=1 时翻转 tgt
         tmp = m[1].copy()
         m[1, 0] = tmp[1]
         m[1, 1] = tmp[0]
-        out = np.moveaxis(s, (0, 1), (ctl, tgt))
+        out = np.moveaxis(s, (0, 1), (axc, axt))
         return out.reshape(-1)
 
     def _apply_swap(self, sv: np.ndarray, a: int, b: int) -> np.ndarray:
         s = sv.reshape((2,) * self.n_qubits)
-        return np.swapaxes(s, a, b).reshape(-1)
+        return np.swapaxes(s, self._axis(a, self.n_qubits),
+                           self._axis(b, self.n_qubits)).reshape(-1)
 
     # ------------------------------------------------------------------ #
     # 噪声通道（Monte Carlo Kraus 采样）
@@ -232,7 +245,8 @@ class TrajectorySimulator:
         p_z = 1.0 - np.exp(time_us / t1 - 2.0 * time_us / t2)
 
         s = sv.reshape((2,) * self.n_qubits)
-        moved = np.ascontiguousarray(np.moveaxis(s, q, 0))
+        ax = self._axis(q, self.n_qubits)
+        moved = np.ascontiguousarray(np.moveaxis(s, ax, 0))
         a = moved.reshape(2, -1)     # a[0]=|0> 分量，a[1]=|1> 分量（视图）
 
         # --- 振幅阻尼 ---
@@ -252,7 +266,7 @@ class TrajectorySimulator:
             a[1] *= np.sqrt(max(1.0 - p_z, 0.0))
         self._renormalize(moved)
 
-        return np.moveaxis(moved, 0, q).reshape(-1)
+        return np.moveaxis(moved, 0, ax).reshape(-1)
 
     @staticmethod
     def _renormalize(arr: np.ndarray) -> None:
@@ -315,6 +329,8 @@ class TrajectorySimulator:
     def _evolve(self, circuit: QuantumCircuit, apply_noise: bool) -> np.ndarray:
         """遍历电路指令，返回末态状态向量（无测量）。"""
         sv = self._initial_state()
+        if circuit.global_phase:
+            sv *= np.exp(1j * float(circuit.global_phase))
         single_time = self.config.single_gate_time
         idle_time = self.config.idle_time
 

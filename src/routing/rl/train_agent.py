@@ -95,10 +95,26 @@ def build_split_paths(data_dir: str, prefix: str = "stage1") -> dict:
     }
 
 
-def pick_circuit(data_dir: str, split_name: str, seed: Optional[int] = None, split_prefix: str = "stage1"):
-    split_map = build_split_paths(data_dir, split_prefix)
+def build_multi_split_map(data_dir: str, prefixes: list[str]) -> dict:
+    """合并多个 prefix 的 split manifest，key 为完整 split 名（如 large_n10_phase1）。"""
+    result = {}
+    for prefix in prefixes:
+        result.update(build_split_paths(data_dir, prefix))
+    return result
+
+
+def pick_circuit(data_dir: str, split_name: str, seed: Optional[int] = None, split_prefix: str = "stage1",
+                 split_map: Optional[dict] = None, max_qubits: Optional[int] = None):
+    """Pick a random circuit from a split; optionally filter by logical-qubit count
+    (must fit the current topology's physical qubits when multi-topo training)."""
+    if split_map is None:
+        split_map = build_split_paths(data_dir, split_prefix)
     split_path = split_map[split_name]
     paths = load_split(split_path)
+    if max_qubits is not None:
+        paths = [p for p in paths if _circuit_qubits(p) <= max_qubits]
+        if not paths:
+            raise ValueError(f"split {split_name}: no circuit with <= {max_qubits} qubits")
     path = random.choice(paths)
     with open(os.path.join(data_dir, path), "rb") as f:
         qc = pickle.load(f)
@@ -107,6 +123,14 @@ def pick_circuit(data_dir: str, split_name: str, seed: Optional[int] = None, spl
         param_dict = {p: rng.uniform(0, 2 * np.pi) for p in qc.parameters}
         qc = qc.assign_parameters(param_dict)
     return CircuitDAG.from_circuit(qc)
+
+
+def _circuit_qubits(path: str) -> int:
+    """Extract logical-qubit count from a pkl path without loading the circuit."""
+    import re
+    name = os.path.basename(path).removesuffix(".pkl")
+    m = re.search(r"_n(\d+)", name)
+    return int(m.group(1)) if m else 0
 
 
 # ---------------------------------------------------------------------------
@@ -137,6 +161,20 @@ def reward_mode_split(reward_mode: str, prefix: str) -> tuple:
         "fidelity_shaping": (f"{prefix}_alg", lambda _: f"{prefix}_alg"),
     }
     return mapping[reward_mode]
+
+
+def curriculum_phase(progress: float, prefixes: list[str], reward_mode: str = "routing") -> str:
+    """跨规模课程：按训练进度切换到不同 split prefix（如 large_n10 → n20 → tianyan），
+    每个 prefix 内部复用 stage1_phase 的深度递进。"""
+    n = len(prefixes)
+    idx = min(int(progress * n), n - 1)
+    prefix = prefixes[idx]
+    local_p = progress * n - idx
+    if reward_mode == "routing":
+        return stage1_phase(local_p, prefix)
+    if reward_mode == "noise_aware":
+        return f"{prefix}_mixed"
+    return f"{prefix}_alg"
 
 
 def lambda_fid_schedule(progress: float, warmup: float, max_val: float) -> float:
@@ -291,6 +329,15 @@ def main():
     parser.add_argument("--mapping-min-swaps", type=int, default=0,
                         help="训练时强制每 episode 至少 N 次虚拟 SWAP 才能 commit "
                              "(0=不强制；建议 2-3 让 agent 学习布局质量)")
+    parser.add_argument("--gae-adaptive", action="store_true", default=False,
+                        help="启用自适应 GAE λ：随 episode 进度线性增长")
+    parser.add_argument("--gae-lam-min", type=float, default=0.95,
+                        help="自适应 λ 下限（episode 开头，默认 0.95）")
+    parser.add_argument("--gae-lam-max", type=float, default=0.995,
+                        help="自适应 λ 上限（episode 末尾，默认 0.995）")
+    parser.add_argument("--curriculum-keys", type=str, default=None,
+                        help="逗号分隔的 split prefix 列表，按训练进度从小规模到大规模递进 "
+                             "(如 large_n10,large_n20,tianyan；默认单 prefix)")
     args = parser.parse_args()
 
     import torch
@@ -315,6 +362,10 @@ def main():
         topo_list = [(config_i, cm_i)]
     num_topos = len(topo_list)
     max_edges = max(len(cm) for _, cm in topo_list)
+    topo_qubits = []
+    for _, cm in topo_list:
+        qs = [q for e in cm for q in e]
+        topo_qubits.append(max(qs) + 1 if qs else 0)
     topo_names = []
     if args.topo_list:
         for path in args.topo_list.split(","):
@@ -329,12 +380,21 @@ def main():
         "noise_aware": "stage2",
         "fidelity_shaping": "stage3",
     }[args.reward_mode]
-    initial_split_key, phase_fn = reward_mode_split(args.reward_mode, split_prefix)
-    print(f"Split prefix: {split_prefix}  (initial split: {initial_split_key})")
+    if args.curriculum_keys:
+        curriculum_prefixes = [p.strip() for p in args.curriculum_keys.split(",") if p.strip()]
+        split_map = build_multi_split_map(args.data_dir, curriculum_prefixes)
+        initial_split_key = curriculum_phase(0.0, curriculum_prefixes, args.reward_mode)
+        phase_fn = lambda p: curriculum_phase(p, curriculum_prefixes, args.reward_mode)
+        print(f"Curriculum prefixes: {curriculum_prefixes}  "
+              f"(initial split: {initial_split_key})")
+    else:
+        split_map = build_split_paths(args.data_dir, split_prefix)
+        initial_split_key, phase_fn = reward_mode_split(args.reward_mode, split_prefix)
+        print(f"Split prefix: {split_prefix}  (initial split: {initial_split_key})")
 
     use_gnn = not args.no_gnn
     sample_dag = pick_circuit(args.data_dir, initial_split_key, seed=args.seed,
-                              split_prefix=split_prefix)
+                              split_prefix=split_prefix, split_map=split_map)
 
     if use_gnn:
         shared_gnn = SubGNN(subgraph="full")
@@ -476,9 +536,7 @@ def main():
 
                 progress = total_steps / args.timesteps
                 split_key = phase_fn(progress)
-                new_dag = pick_circuit(args.data_dir, split_key, seed=args.seed + total_steps,
-                                       split_prefix=split_prefix)
-                # 多拓扑：按 --topo-balance 策略选拓扑
+                # 多拓扑：按 --topo-balance 策略选拓扑（先选拓扑，电路须适配其容量）
                 if num_topos > 1:
                     if args.topo_balance == "steps":
                         max_s = max(topo_steps)
@@ -486,6 +544,10 @@ def main():
                         topo_idx = random.choices(range(num_topos), weights=w, k=1)[0]
                     else:
                         topo_idx = random.randrange(num_topos)
+                new_dag = pick_circuit(args.data_dir, split_key, seed=args.seed + total_steps,
+                                       split_prefix=split_prefix,
+                                       split_map=split_map,
+                                       max_qubits=topo_qubits[topo_idx])
                 noise_config, coupling_map = topo_list[topo_idx]
                 if args.noise_perturb > 0 or args.noise_perturb_t1t2 > 0:
                     noise_config = perturb_noise_config(
@@ -529,9 +591,15 @@ def main():
         else:
             norm_rew = ep_buffer["rew"]
         clip_return = args.clip_return if args.clip_return > 0 else None
+        if args.gae_adaptive:
+            T = len(norm_rew)
+            ratio = np.arange(T) / max(T - 1, 1)
+            lam_t = args.gae_lam_min + (args.gae_lam_max - args.gae_lam_min) * ratio
+        else:
+            lam_t = agent.lam
         adv, ret = PPOAgent.compute_gae(
             norm_rew, ep_buffer["val"], ep_buffer["done"],
-            bootstrap=last_val, gamma=agent.gamma, lam=agent.lam,
+            bootstrap=last_val, gamma=agent.gamma, lam=lam_t,
             clip_return=clip_return,
         )
         train_batch = {

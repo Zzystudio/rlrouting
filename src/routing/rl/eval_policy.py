@@ -572,6 +572,10 @@ def main():
                         help='physical qubits (default linear chain)')
     parser.add_argument('--max-num-qubits', type=int, default=None,
                         help='fixed obs qubit dim for unified models (default=num-qubits)')
+    parser.add_argument('--max-num-edges', type=int, default=None,
+                        help='fixed obs/action edge dim for unified models '
+                             '(default: topology edge count; required when '
+                             'the model was trained with a larger fixed dim)')
     parser.add_argument('--max-episode-steps', type=int, default=200)
     parser.add_argument('--device', type=str, default='cpu')
     parser.add_argument('--seed', type=int, default=0)
@@ -642,12 +646,12 @@ def main():
         max_episode_steps=args.max_episode_steps,
         random_init=False, seed=args.seed,
         gnn=shared_gnn, use_gnn=use_gnn,
-        max_num_edges=(31 if args.max_num_qubits else None),
+        max_num_edges=args.max_num_edges,
         max_num_qubits=args.max_num_qubits,
     )
 
     agent_n_qubits = args.max_num_qubits or sample_dag.num_logical_qubits
-    agent_n_edges = (31 if args.max_num_qubits else len(coupling_map))
+    agent_n_edges = args.max_num_edges or len(coupling_map)
     agent = PPOAgent(
         obs_dim=int(np.prod(sample_env.observation_space.shape)),
         action_dim=agent_n_edges + (1 if args.mapping_phase else 0),
@@ -685,7 +689,7 @@ def main():
                     noise_config=config if args.reward_mode != 'routing' else None,
                     beam_width=args.beam_width,
                     max_num_qubits=args.max_num_qubits,
-                    max_num_edges=(31 if args.max_num_qubits else None),
+                    max_num_edges=args.max_num_edges,
                     random_init=args.random_init,
                 )
             else:
@@ -697,7 +701,7 @@ def main():
                     seed=args.seed + i,
                     noise_config=config if args.reward_mode != 'routing' else None,
                     max_num_qubits=args.max_num_qubits,
-                    max_num_edges=(31 if args.max_num_qubits else None),
+                    max_num_edges=args.max_num_edges,
                     random_init=args.random_init,
                 )
             m.circuit_path = rel_path

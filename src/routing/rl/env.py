@@ -148,6 +148,7 @@ class RoutingEnv(gym.Env):
         self._swap_counter = 0
         self._episode_step = 0
         self._swap_history: list = []
+        self._last_progress_swap: int = 0
         self._xz_errors = np.zeros((n, 2), dtype=float)
         self._phys_circuit = QuantumCircuit(self.hw.num_qubits)
         self._update()
@@ -358,13 +359,35 @@ class RoutingEnv(gym.Env):
     # ------------------------------------------------------------------
     #  死锁检测 (Phase 1)
     # ------------------------------------------------------------------
-    def get_deadlock_mask(self, lookback: int = 2):
-        """返回 (num_edges,) bool 数组，True = 该边因死锁被禁止。"""
+    def get_deadlock_mask(self, lookback: int = 2, max_cycle: int = 6, stall_window: int = 6):
+        """返回 (num_edges,) bool 数组，True = 该边因死锁被禁止。
+
+        检测三种 SWAP 震荡：
+        1. 连续重复同一 SWAP（lookback 步内仅一条边）；
+        2. 末尾出现周期 N>=2 的往返震荡（如 [6, 8, 6, 8, ...]），
+           一旦最近 2N 步构成一致周期序列，则禁止该周期涉及的所有边；
+        3. 无进展失速：最近 stall_window 次 SWAP 均未执行任何门
+           （executed 无增长），则禁止该窗口内出现过的所有边，
+           强制策略脱离死循环。
+        """
         mask = np.zeros(self.num_edges, dtype=bool)
-        if len(self._swap_history) >= lookback:
-            recent = set(self._swap_history[-lookback:])
+        h = self._swap_history
+        n = len(h)
+        if n >= lookback:
+            recent = set(h[-lookback:])
             if len(recent) == 1:
                 mask[list(recent)[0]] = True
+        for N in range(2, max_cycle + 1):
+            if n < 2 * N:
+                break
+            last = h[n - N:]
+            prev = h[n - 2 * N:n - N]
+            if last == prev:
+                for e in set(last):
+                    mask[e] = True
+        if n - self._last_progress_swap >= stall_window:
+            for e in set(h[-stall_window:]):
+                mask[e] = True
         return mask
 
     def get_unmapped_mask(self):
@@ -425,6 +448,7 @@ class RoutingEnv(gym.Env):
         new._swap_counter = self._swap_counter
         new._episode_step = self._episode_step
         new._swap_history = self._swap_history.copy()
+        new._last_progress_swap = self._last_progress_swap
         new._xz_errors = self._xz_errors.copy()
         new._phys_circuit = self._phys_circuit.copy()
         new.executable_2q = self.executable_2q.copy()
@@ -493,6 +517,7 @@ class RoutingEnv(gym.Env):
         while self.executable_2q:
             gate_idx = min(self.executable_2q)
             self.executed.add(gate_idx)
+            self._last_progress_swap = len(self._swap_history)
             g = self.dag.gates[gate_idx]
             if not g.is_measure:
                 pq = [self.mapping[q] for q in g.qubits]

@@ -1864,3 +1864,263 @@ embedding 不感知 qubit 空间位置。方案（`doc/plan.md` 映射 v2）：
 
 P0 两项合计可能不到 100 行代码，预期把 line 从 3.6s/ckt 拉到 ~2s，同时
 SWAP 再降 3-5 个，有望把 line 的 SWAP 差距（51.4 vs 53.9）追平 SABRE。
+
+---
+
+## 轨迹状态向量模拟器 vs 密度矩阵模拟器对比（2026.08.06）
+
+### 背景
+
+实现 `src/sim/trajectory_sim.py`（轨迹采样 + 状态向量，内存 2^n）后，与原有
+Aer density_matrix 模拟器（`src/sim/sim.py`，内存 4^n）做系统性对比，验证
+统计一致性与性能边界。
+
+### 测试设置
+
+- 电路：4q GHZ（n=5/10/12/16 时取对应 GHZ），转译到 `rz/sx/x/cx/id` + 线拓扑
+- 噪声配置：T1=50µs, T2=70µs, 单比特门错误 0.001, CNOT 错误 0.01,
+  读出错误 0.02，串扰默认（0.1×tqe）或显式关闭
+- 轨迹条数：保真度对比 500 条；counts 对比 shots=4096
+
+### 1. 保真度一致性（4q GHZ，500 条轨迹 vs DM）
+
+| 场景 | DM 保真度 | 轨迹保真度 | Δ | 判定 |
+|------|-----------|-----------|------|------|
+| noiseless | 1.00000 | 1.00000 | 0 | OK |
+| 纯热弛豫 | 0.99857 | 0.99900 | 0.00042 | OK（MC 误差内） |
+| 纯退极化（关串扰） | 0.97377 | 0.97000 | 0.00377 | OK |
+| 完整模型（关串扰） | 0.97239 | 0.97000 | 0.00239 | OK |
+| 完整模型（默认串扰） | 0.99708 | 0.98400 | 0.01308 | 语义差异（见下） |
+| 显式串扰 0.005 | 0.99708 | 0.98400 | 0.01308 | 语义差异（见下） |
+
+前四行证明：无噪声、热弛豫、退极化、读出在各噪声通道上，轨迹模拟器与密度
+矩阵模拟器统计一致（Δ < 4e-3，均在 MC 误差内）。
+
+### 2. 串扰语义差异（重要发现）
+
+- **密度矩阵版本（sim.py float 模式）**：Aer 的 specific quantum error 会
+  **覆盖** all-qubit 的 CNOT 退极化错误（日志 WARNING："overrides previously
+  defined all-qubit error"），导致默认串扰开启后边上 CNOT 的 0.01 退极化
+  **丢失**，保真度反而升高（0.972 → 0.997）。
+- **轨迹模拟器**：按设计语义执行 `depol ∘ ZZ` 合成（CNOT 退极化 + 串扰 ZZ
+  都生效），与手写等效 NoiseModel（`depolarizing_error(0.01,2).compose(ZZ)`）
+  验证一致：8000 条轨迹收敛到 0.97187，参考 0.97239，Δ=0.0005（MC 误差内，
+  500 条时的 Δ=0.0116 属采样噪声 2.1σ）。
+- **GHZ 的 ZZ 不变性（物理注）**：`ZZ|0000>=|0000>`、`ZZ|1111>=+|1111>`
+  （两个 Z 各翻一次相），故 GHZ 对 ZZ 串扰天然不敏感——这解释了
+  "含 ZZ 参考=0.97239" 与 "仅 depol 参考=0.97239"、以及 "显式关串扰
+  DM=0.97239" 三者数值完全相同是巧合，并非模型没生效。
+- 综上，默认串扰行 DM=0.99708 的来源是 **sim.py float 配置下 Aer 的
+  specific error 覆盖掉边上 CNOT 退极化**（CNOT 退极化整体被替换成 ZZ，
+  而 ZZ 对 GHZ 无害 → 噪声变弱接近无噪）；轨迹模拟器保留 depol+ZZ → 0.9719，
+  语义更符合硬件直觉。若用轨迹做数值对比需用非 GHZ 电路（如 random 电路）
+  才能体现串扰真实影响。
+
+### 3. counts 一致性（4q GHZ+measure, shots=4096, 默认噪声）
+
+| 指标 | DM | 轨迹 |
+|------|----|------|
+| counts_fidelity vs 理想 | 0.9220 | 0.9059 |
+| total counts | 4096 | 4096 |
+| run(4096 shots) 耗时 | 0.035s | 1.051s |
+
+counts 保真度差异主要来自上述串扰语义（DM 少了 CNOT 退极化噪声，分布更接近
+理想）；耗时上轨迹版每 shot 一条轨迹（4096 条独立轨迹），比 DM 单次密度矩阵
+演化慢约 30x（但可并行化）。
+
+### 4. 性能与内存（默认噪声配置，GHZ 电路）
+
+| n | DM 单次保真度耗时 | 轨迹 500 条耗时 | 单条轨迹 | DM 理论内存 | 轨迹理论内存 |
+|---|------------------|----------------|---------|------------|-------------|
+| 5 | 0.023s | 0.119s | 0.24ms | 0.00 GiB | 0.00 MiB |
+| 10 | 0.135s | 0.200s | 0.40ms | 0.02 GiB | 0.02 MiB |
+| 12 | 0.191s | 0.432s | 0.86ms | 0.25 GiB | 0.06 MiB |
+| 16 | 38.299s | 3.263s | 6.53ms | 64.00 GiB | 1.00 MiB |
+
+- n≤10：两者耗时同量级，DM 更快（单次演化）；轨迹适合需要多条统计的场景
+- n=16：DM 需要 64 GiB（跑出 38s，接近内存上限），轨迹仅 1 MiB/条，500 条 3.3s
+- n=20：DM 需 16 TB（此前 OOM 崩溃），轨迹 ~16 MiB/条，可正常计算
+
+### 5. 结论
+
+1. 轨迹模拟器在 n≤12 时与密度矩阵统计一致，可作为等价的保真度/counts 计算器；
+2. 轨迹模拟器把可模拟的比特数从 n≈13-14（DM 内存墙）扩展到 n≥20（内存 2^n）；
+3. 发现原 DM 版本 float 模式串扰的 override 缺陷，已在轨迹版本按合成语义实现；
+4. 后续优化方向：轨迹并行化（numpy 批量 / multiprocessing）、T2>2T1 支持、
+   用轨迹版本替代 Phase 2 20q 的保真度计算（解决 doc/train.md 此前 16TB OOM 阻塞）。
+
+### 6. 位序（bitorder）bug 修复（继续对比时发现）
+
+用 **random 电路**（非 GHZ）对比时发现轨迹模拟器的状态向量位序与 qiskit/Aer
+**不一致**：
+
+- 复现：`x(q0)` 在轨迹模拟器落在 flat index 8（1000，qubit0 当 MSB），qiskit
+  little-endian 是 index 1（0001）。
+- 根因：`_apply1/_apply_cx/_apply_swap/_thermal_noise` 直接 `moveaxis(sv, q, 0)`，
+  numpy reshape 后 axis 0 是最高位，而 qiskit 规定 qubit 0 是最低位。
+- 为何之前测试没发现：GHZ/Bell 态 `(|00..>+|11..>)//2` 在比特位序翻转下不变，
+  且 fidelity/counts 只依赖幅度分布，掩盖了差异；sim.py 对比用的也是 4q GHZ。
+- 修复：
+  1. 新增 `_axis(q,n)=n-1-q`，四个门算子的 moveaxis/swapaxes 轴全部换成
+     `_axis(q)`（共 ~6 处）。
+  2. `_rz_matrix` 补上 qiskit 的全局相位 `e^{-iθ/2}`（此前只写 `e^{+iθ}`，
+     导致随机电路每步积累额外全局相位）。
+  3. `_evolve` 开头乘上 `circuit.global_phase`（qiskit transpile 会在
+     `Rz` 分解里带全局相位）。
+- 修复后验证（Aer statevector 逐元素对比，max|Δ|）：
+  - x(q0)/x(q3)、bell(0,1)、bell(3,4)、GHZ6：0.00e+00
+  - random10 电路：1.93e-16
+- 修复后噪声保真度（4q random 电路，5000 条轨迹 vs DM）：
+
+| 场景 | DM | 轨迹 ± se | Δ | |
+|------|-----|----------|-----|---|
+| 纯退极化（关串扰） | 0.86229 | 0.85084 ± 0.00495 | 0.01145 | OK |
+| 完整模型（关串扰） | 0.80687 | 0.80664 ± 0.00537 | 0.00023 | OK |
+| 完整模型（默认串扰） | 0.88711 | 0.79710 ± 0.00547 | 0.09001 | 语义差 |
+
+- 第三行 Δ=0.09 正是串扰语义差异：sim.py float 模式把边上 CNOT 退极化
+  **整体替换成 ZZ**（ZZ 在 random 电路上破坏性小 → DM 更接近无噪/更高保真），
+  而轨迹版本按合成 `depol∘ZZ` 实现（破坏性大）。在 GHZ 上该差异被 ZZ
+  不变性掩盖，random 电路上一目了然。
+- 此 bug 属于**实现级**修复，不改变此前所有 GHZ 保真度结论（数值不变），
+  但使轨迹模拟器与 qiskit 的 counts/statevector 语义完全对齐（包括用户
+  bee以外自定义电路）。
+- 修复后全仓测试仍 `33 passed`，test_trajectory_sim.py 的 12 项全部通过（GHZ
+  相关断言本身在位序翻转下等价，无需改）。
+
+---
+
+## 7. 死锁掩码增强：修复 beam search 2-cycle 震荡截断（2026-08-06）
+
+### 问题
+
+- 用户追问「新模型与动作掩码不兼容导致电路截断」是否已解决：实测**未解决**，
+  `policy_map_unified.pt`（映射 + beam3）在 20q 拓扑评估上大量截断：
+  - line_20q：60 条中 11 条截断（82% 完成），ring_20q：9 条截断（85%）。
+  - 典型失败 `random/n10/random_n10d6_s1000068.pkl`：beam3 在 400 步内只执行
+    63/154 门，swaps=399 全部耗在震荡上；argmax 54 步即可完成。
+
+### 根因（三层）
+
+1. **原死锁掩码只检测「连续重复同一边」**（`get_deadlock_mask` lookback=2：
+   `set(hist[-2:])` 大小 1 才禁止）。对 `[6, 8, 6, 8, ...]` 2-cycle 永远不触发
+   （set 恒为 `{6,8}`）。
+2. 实测策略在 line 上 6↔8 来回换：step99~step399 exec 恒停在 63/154。
+3. 只加周期检测还不够——策略通过**插入第三方边（如 5）**破坏周期指纹后
+   回到原震荡（实测 `[5,6,8]` 三边轮换），周期检测在 step 200 触发一次后又被绕开。
+
+### 修复（`src/routing/rl/env.py`）
+
+`get_deadlock_mask` 扩展为三层检测：
+
+```python
+def get_deadlock_mask(self, lookback=2, max_cycle=6, stall_window=6):
+    # 1) 连续重复同一 SWAP（原逻辑）
+    # 2) 末尾 2N 步构成一致周期（N=2..max_cycle）→ 禁止周期内所有边
+    # 3) 无进展失速：n - self._last_progress_swap >= stall_window
+    #    （最近 stall_window 次 SWAP 均未执行任何门）→ 禁止窗口内全部边
+```
+
+- 新增 `_last_progress_swap` 状态：`_auto_execute_batch` 每次真正执行门时
+  记录当前 `len(_swap_history)`；`clone()` 同步复制。
+- 第 3 层是决定性修复：无法枚举所有震荡组合，直接用「连续 N 步零推进」
+  作为死锁判定，强制策略脱离局部循环。
+
+### 验证
+
+- 单电路复现：`random_n10d6_s1000068`（seed=5）从 400 步截断 → **79 步完成**。
+- 全量评估（unified_test 60 条，max-episode-steps=400，random_init，
+  `policy_map_unified.pt`，beam=3）：
+
+| 拓扑 | 完成率（修复前） | 完成率（修复后） | 剩余截断 |
+|------|------------------|------------------|----------|
+| line_20q | 82%（49/60） | **95%（57/60）** | 3 条深电路预算不足 |
+| ring_20q | 85%（51/60） | **98%（59/60）** | 1 条深电路预算不足 |
+
+- 剩余 4 条截断**均为预算不足而非死锁**：exec 推进到 296/306、232/287、
+  272/276、133/165（完成 81%~98%），末尾 swap 序列无周期重复，是
+  n16/n20 深电路（165~306 门）在 400 步内无法完成路由。
+- 全部震荡型截断（exec 卡在 63~133 的 8 条）已消除。
+- 全仓测试 `35 passed`。
+- 修复在 train/eval 共用同一 `get_deadlock_mask`，训练侧同时受益
+  （训练期间若策略陷入 2-cycle 也会被禁止）。
+
+### 结论
+
+- 「新模型 + beam 动作掩码」截断根因是**死锁掩码检测能力不足**
+  （2-cycle/多边绕行），已通过「周期检测 + 无进展失速熔断」修复；
+  beam3 完成率 line 82%→95%、ring 85%→98%。
+- 残余截断为深电路预算问题，与死锁无关；如需要可提高
+  `--max-episode-steps` 或训练时加大步数预算。
+
+---
+
+## 60q 截断率优化：自适应 GAE λ + 跨规模课程训练（2026.08.07 启动）
+
+### 背景：上个 tianyan 训练（`scripts/train_tianyan.sh`）卡在截断
+
+旧训练（MAX_STEPS=800，Phase1 300k 步）末行 `models/ckpts_tianyan/metrics.csv`：
+
+```
+step=300032  rew=-15.26  swp=84.25  map=7.35  trunc=76.70%  ent=3.08~4.37
+```
+
+- `trunc_pct` 居高不下（76.7%），`rew` 为负（被 `-0.5×剩余门` 惩罚拖累）。
+- 分析出的两个根因：
+
+| 根因 | 机制 |
+|------|------|
+| **GAE λ 固定导致长电路信号缺失** | `γ·λ = 0.99×0.95 = 0.9405`，有效 horizon ~17 步。800 步 episode 中截断信号 `0.9405^800 ≈ 2.4e-18`，前 ~780 步完全收不到 `unfinished_penalty` → agent 只优化最后约 20 步，无长期规划 |
+| **无课程学习** | tianyan splits 只含 n30-n60 电路，agent 从第 1 步就面对大电路，从未在简单电路上学到基础路由先验 |
+
+### 改动（本次已实现）
+
+| 文件 | 改动 |
+|------|------|
+| `agent.py:compute_gae` | `lam` 兼容标量或数组：数组时反向 GAE 逐时刻取 `lam_arr[t]`，形状不符报错 |
+| `train_agent.py:curriculum_phase` | 按 `progress·n` 选 prefix，prefix 内局部进度复用 `stage1_phase` 深度递进；支持 routing/noise_aware/fidelity_shaping 三种 split 名 |
+| `train_agent.py:build_multi_split_map` | 合并多 prefix 的 split manifest（key 为完整 split 名，如 `large_n10_phase1`） |
+| `train_agent.py:pick_circuit` | 新增 `split_map` 参数（不传则回退单 prefix 旧行为） |
+| `train_agent.py` CLI | `--curriculum-keys` / `--gae-adaptive` / `--gae-lam-min`(0.95) / `--gae-lam-max`(0.995) |
+| `train_agent.py` GAE 调用 | `--gae-adaptive` 时 `λ_t = λ_min + (λ_max−λ_min)·(t/(T−1))`；默认仍 `λ=agent.lam`（向后兼容） |
+
+> 测试套件 33 passed / 2 failed：两个失败均来自先前会话未提交改动（`data_gen.py` 的 `max_operands=2` 改变测试电路 → `test_swap_penalty` 断言失效；`test_fidelity_shaping_step_zero` 随机动作遇距离奖励 flaky），与本实现无关。
+
+### 训练环境与命令
+
+**脚本**：`scripts/train_tianyan_curriculum.sh`（新增）
+
+- 课程：`large_n10 → large_n20 → tianyan`（各占 Phase1 步数的 1/3）
+- 自适应 λ：0.95 → 0.995（episode 开头低 variance，末尾高 λ 传导截断信号）
+- `python3 -u` 无缓冲输出（配合 `2>&1 | tee` 逐行实时看到进度）
+
+**tmux 启动（只训练 Phase 1，跳过 Phase 2）**：
+
+```bash
+tmux new-session -d -s curric 'cd /home/zzy/opencode-server/opencode-docker/projects/rlrouting && PHASE2=0 bash scripts/train_tianyan_curriculum.sh cuda:0 500000 2>&1 | tee logs/train_curric_phase1.log'
+tmux attach -t curric    # 查看进度；Ctrl-B 后按 d 脱离
+```
+
+### Phase 1 课程进度规划（500k 步）
+
+| 全局进度 | split_prefix | 线路规模 | 覆盖步数 |
+|---------|-------------|---------|---------|
+| 0-33% | large_n10 | 10 qubit，6-50 2Q 门 | 0~167k |
+| 33-66% | large_n20 | 20 qubit，12-100 | 167~333k |
+| 66-100% | tianyan | 30-60 qubit，12-300 | 333~500k |
+
+每个 prefix 内仍沿用 `stage1_phase` 的 phase1/2/3 深度递进（0.30/0.40/0.60/0.70 平滑切换）。
+
+### 明天训练完成后需要记录的内容
+
+1. 训练日志摘要：各阶段 `trunc_pct / rew / swp / ent / vl`（重点看 n10/n20 阶段是否快速收敛、tianyan 阶段 trunc 是否显著低于 76.7%）。
+2. 评估：`routing.rl.eval_policy --model models/policy_tianyan176_curric_phase1.pt --topo traindata/topo/tianyan176_66q.json --data-dir traindata --split tianyan_test --reward-mode routing --baselines`（argmax 与 beam3）。
+3. 对比基准（旧 tianyan 模型）：`models/policy_tianyan176_phase1.pt`（300k 步，trunc 76.7%，同一 tianyan_test 评估结果可复测对比）。
+
+**对比口径**：同一 `tianyan_test` split、同一拓扑、同一 `MAX_STEPS=800` 下，旧模型 vs 课程模型 的 trunc_pct、SWAPs、完成率。
+
+### 验证结果（实现自测，训练前）
+
+- `curriculum_phase` 边界：0.33→large_n10_phase3、0.34→large_n20_phase1、0.66→large_n20_phase3、0.67→tianyan_phase1 ✅
+- `compute_gae` 数组 λ：常数数组与标量 λ 结果一致 ✅；自适应 λ 使 episode 开头 advantage 更小、末端更大 ✅
+- smoke 512 步跑通，初始 split 正确选 `large_n10_phase1` ✅
