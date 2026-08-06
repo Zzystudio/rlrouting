@@ -72,6 +72,9 @@ def physical_circuit_fidelity(
         counts = simulator.run(transpiled, shots=2048, skip_transpile=True)
         ideal_counts = _ideal_counts(transpiled)
         return counts_fidelity(ideal_counts, counts)
+    # 轨迹模拟器返回 TrajectoryResult：优先用 direct fidelity（O(T*2^n)，大 n 安全）
+    if hasattr(noisy_dm, "fidelity"):
+        return float(noisy_dm.fidelity(ideal_sv))
     return state_fidelity(ideal_sv, np.asarray(noisy_dm.data))
 
 

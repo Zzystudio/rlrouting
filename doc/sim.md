@@ -141,6 +141,110 @@ P(0|1) = P(1|0) = err
 3. **run_and_get_statevector**：电路不能包含测量操作
 4. **转译**：`run()` 方法会自动调用 `transpile()` 适配拓扑结构
 
+---
+
+## 轨迹采样状态向量模拟器（TrajectorySimulator）
+
+`sim/trajectory_sim.py` 提供基于 **轨迹采样（蒙特卡洛波函数）+ 状态向量** 的噪声
+模拟器，用于解决密度矩阵 4^n 内存爆炸问题（n=20 需要 ~16 TB）。
+
+### 核心思路
+
+维护单个纯态状态向量（内存 2^n，n=20 时单条轨迹仅 ~16 KB * 8），对每条噪声通道
+逐门做 Kraus 的 Monte-Carlo 采样（量子轨线）：
+
+- **热弛豫**（T1/T2）：三段采样——以概率 `p_reset * P(|1>)` 跳变到 `|0>`；
+  否则以概率 `p_z * P(|1>)` 相位翻转；都无跳变则 `|1>` 分量乘 `exp(-t/T2)`。
+- **单比特门退极化**：等价于 qiskit `depolarizing_error(p, 1)`——恒等概率
+  `1 - 3p/4`，X/Y/Z 各 `p/4`。
+- **双比特 CNOT 退极化**：15 个非单位 Pauli 各 `p/16`（恒等 `1 - 15p/16`）。
+- **串扰 ZZ**：在两比特上以 `crosstalk_strength`（默认 `0.1 * two_q_gate_error`）
+  施加 `Z⊗Z`，与 CNOT 退极化叠加合成（`depol ∘ ZZ`）。
+- **读出错误**：按 `readout_error` 对称翻转测量结果。
+
+保真度用轨迹平均：`F = (1/T) Σ_t |<ψ_ideal|ψ_t>|²`。
+
+### 与 density_matrix 版本的一致性
+
+解开器验证：在相同噪声语义下，`TrajectorySimulator` 与 Aer `density_matrix`
+求解保真度统计一致（同通道两种求解器误差 <0.02）。
+
+**注意** 与 `sim.py` 的一个行为差异：旧版 float 模式串扰会把每条边上的 CNOT
+退极化替换为 ZZ（Aer specific-错误覆盖 all-qubit 错误）；轨迹模拟器按设计意图
+将两者**合成**（`depol ∘ ZZ`），噪声更强也更贴近真实硬件。
+
+### 依赖
+
+```
+numpy
+qiskit >= 2.5
+```
+
+### 快速开始
+
+```python
+from sim.sim import NoiseConfig
+from sim.trajectory_sim import TrajectorySimulator
+from qiskit import QuantumCircuit
+
+config = NoiseConfig(
+    t1_times=[50.0, 50.0, 50.0],
+    t2_times=[70.0, 70.0, 70.0],
+    freq_ghz=[5.0, 5.0, 5.0],
+    single_q_gate_error=0.001,
+    two_q_gate_error=0.01,
+    coupling_map=[(0, 1), (1, 2)],
+    readout_error=[0.02, 0.02, 0.02],
+)
+sim = TrajectorySimulator(config, num_trajectories=256, seed=0)
+
+qc = QuantumCircuit(3)
+qc.h(0); qc.cx(0, 1); qc.cx(1, 2)
+
+# 1) 计数（每 shot 一条独立轨迹，量值与 density_matrix 一致）
+counts = sim.run(qc, shots=2048)
+
+# 2) 保真度（推荐，O(T * 2^n)，大 n 不会 OOM）
+qc2 = qc.copy(); qc2.measure_all()
+fid, *_ = 0.0
+res = sim.run_trajectories(qc, num_trajectories=256)
+fid = res.fidelity(sim.ideal_statevector(qc))
+
+# 3) 兼容旧接口：返回 TrajectoryResult，.data 为平均密度矩阵（大 n 抛错提示改用 fidelity）
+result = sim.run_and_get_statevector(qc)
+rho = result.data          # 2^n x 2^n
+```
+
+### API 参考
+
+| API | 说明 |
+|-----|------|
+| `run(circuit, shots=None, skip_transpile=False)` | 计数 counts。每个 shot 一条独立噪声轨迹 |
+| `run_trajectories(circuit, num_trajectories=None, skip_transpile=False)` | 返回 `TrajectoryResult`（状态向量集合） |
+| `run_and_get_statevector(...)` | 兼容旧接口，返回 `TrajectoryResult` |
+| `run_batch / run_batch_statevector` | 批量执行 |
+| `fidelity(circuit, ideal_sv=None, ...)` | 直接返回平均保真度 |
+| `ideal_statevector(circuit)` | 无噪声状态向量（与 Aer statevector 一致） |
+| `_transpile(circuit)` | 与 `NoiseSimulator._transpile` 兼容 |
+
+### TrajectoryResult
+
+| 成员 | 说明 |
+|------|------|
+| `statevectors` | (T, 2^n) 复数数组，每条轨迹的末态 |
+| `fidelity(ideal_sv)` | `mean_t |<ψ_ideal|ψ_t>|²` |
+| `fidelity_std(ideal_sv)` | 跨轨迹标准差 |
+| `.data` | 平均密度矩阵（内存超 2 GiB 抛 `RuntimeError`，提示改用 `fidelity`） |
+
+### 可扩展方向
+
+- **T2 > 2×T1**：当前做硬件约束校验报错；如需支持需引入独立相位阻尼通道。
+- **轨迹并行化**：`run_trajectories` 目前是串行 for 循环，可对 `_evolve` 做向量化
+  批量演化或用 `numba`/多进程加速。
+- **串扰时序**：可为相邻边在 CX 执行时施加邻近比特 ZZ（当前优化为同比特对叠加）。
+
+---
+
 ## 示例输出
 
 ```
