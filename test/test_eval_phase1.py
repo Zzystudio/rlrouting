@@ -37,9 +37,23 @@ SEED_OFFSET = 1000  # stay clear of training seeds
 #  Topology loader
 # --------------------------------------------------------------------------
 
+def _normalize_dict_keys(d):
+    if not isinstance(d, dict):
+        return d
+    out = {}
+    for k, v in d.items():
+        if isinstance(k, str):
+            try:
+                k = ast.literal_eval(k)
+            except (ValueError, SyntaxError):
+                pass
+        out[k] = v
+    return out
+
+
 def _lists_to_dict(raw, coupling_map):
     if raw is None or isinstance(raw, (int, float, dict)):
-        return raw
+        return _normalize_dict_keys(raw)
     result = {}
     for item in raw:
         q1, q2, v = int(item[0]), int(item[1]), float(item[2])

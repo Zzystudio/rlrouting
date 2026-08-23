@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Train a single unified routing policy that handles all circuit scales
-# (n=8..20) and all topologies (line/ring/grid, 14 total).
+# Train a unified 20q routing policy (line/ring/grid, n=8..20 circuits).
 #
-# The observation/action spaces are padded to the largest sizes
+# Observation/action spaces are padded to the largest sizes
 # (max_num_qubits=20, max_num_edges=31 from grid_5x4), so one model
 # serves all circuit+topology combinations.
 #
-# Phase 1: pure routing (distance reward + SABRE features)
-# Phase 2: noise-aware fine-tuning (optional, set PHASE2=1)
+# Phase 1: route-only (distance reward + SABRE features)
+# Phase 2: noise-aware fine-tuning with state-vector (trajectory) simulator
+#          (--fidelity-sim trajectory, O(2^n) 内存，20q 不再 OOM；
+#           P0 优化后默认 16 条轨迹 + 批量向量化演化)
 #
 # Usage:
 #   scripts/train_unified.sh [DEVICE] [PHASE1_STEPS] [PHASE2_STEPS]
@@ -32,13 +33,7 @@ mkdir -p "$MODELS_DIR"
 
 # 3 large topologies (all have 20 physical qubits = max_num_qubits)
 # line_20q: 20 edges, ring_20q: 20 edges, grid_5x4_20q: 31 edges
-TOPO_LIST="line_20q.json,ring_20q.json,grid_5x4_20q.json"
-
-TOPO_ARGS=""
-for t in ${TOPO_LIST//,/ }; do
-  TOPO_ARGS="$TOPO_ARGS,$DATA_DIR/topo/$t"
-done
-TOPO_ARGS="${TOPO_ARGS:1}"
+TOPO_LIST="$DATA_DIR/topo/line_20q.json,$DATA_DIR/topo/ring_20q.json,$DATA_DIR/topo/grid_5x4_20q.json"
 
 PH1_OUT="$MODELS_DIR/policy_unified_phase1.pt"
 PH2_OUT="$MODELS_DIR/policy_unified_noiseaware.pt"
@@ -46,22 +41,23 @@ CKPT_DIR="$MODELS_DIR/ckpts_unified"
 MAX_STEPS=400
 
 echo "=========================================================="
-echo "Unified Policy Training"
+echo "Unified 20q Policy Training (line/ring/grid, n=8..20)"
 echo "  device:          $DEVICE"
 echo "  phase 1 steps:   $PH1"
 echo "  phase 2 steps:   $PH2 (enabled=$PHASE2)"
 echo "  max qubits:      20"
 echo "  max edges:       31 (grid_5x4)"
 echo "  max episode len: $MAX_STEPS"
-echo "  topologies:      3 (line_20q, ring_20q, grid_5x4_20q)"
+echo "  topologies:      line_20q, ring_20q, grid_5x4_20q"
 echo "  split:           unified"
+echo "  phase 2 sim:     trajectory (state-vector, O(2^n))"
 echo "=========================================================="
 
 # ---- Phase 1: route-only ----
-PYTHONPATH="$ROOT/src" python3 -m routing.rl.train_agent \
+PYTHONPATH="$ROOT/src" python3 -u -m routing.rl.train_agent \
   --data-dir "$DATA_DIR" \
   --split-prefix unified \
-  --topo-list "$TOPO_ARGS" \
+  --topo-list "$TOPO_LIST" \
   --topo-balance episodes \
   --reward-mode routing \
   --timesteps "$PH1" \
@@ -74,10 +70,10 @@ PYTHONPATH="$ROOT/src" python3 -m routing.rl.train_agent \
 
 # ---- Phase 2: noise-aware fine-tuning ----
 if [ "$PHASE2" = "1" ]; then
-  PYTHONPATH="$ROOT/src" python3 -m routing.rl.train_agent \
+  PYTHONPATH="$ROOT/src" python3 -u -m routing.rl.train_agent \
     --data-dir "$DATA_DIR" \
     --split-prefix unified \
-    --topo-list "$TOPO_ARGS" \
+    --topo-list "$TOPO_LIST" \
     --topo-balance episodes \
     --reward-mode noise_aware \
     --timesteps "$PH2" \
@@ -85,6 +81,8 @@ if [ "$PHASE2" = "1" ]; then
     --max-num-qubits 20 \
     --load "$PH1_OUT" \
     --device "$DEVICE" \
+    --fidelity-sim trajectory \
+    --traj-trajectories 16 \
     --checkpoint-dir "${CKPT_DIR}_ph2" \
     --out "$PH2_OUT"
 fi

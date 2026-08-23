@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import os
 import pickle
@@ -60,9 +61,23 @@ class SummaryStats:
 #  Hardware helpers
 # ---------------------------------------------------------------------------
 
+def _normalize_dict_keys(d):
+    if not isinstance(d, dict):
+        return d
+    out = {}
+    for k, v in d.items():
+        if isinstance(k, str):
+            try:
+                k = ast.literal_eval(k)
+            except (ValueError, SyntaxError):
+                pass
+        out[k] = v
+    return out
+
+
 def _lists_to_dict(raw, coupling_map):
     if raw is None or isinstance(raw, (int, float, dict)):
-        return raw
+        return _normalize_dict_keys(raw)
     result = {}
     for item in raw:
         q1, q2, v = int(item[0]), int(item[1]), float(item[2])
@@ -132,6 +147,35 @@ def compute_fidelity(qc, config, mapping, executed) -> Optional[float]:
     return None
 
 
+def build_fidelity_fn(fidelity_sim: str, config, num_trajectories: int = 64, seed: Optional[int] = None):
+    """构造 RoutingEnv 的 fidelity_fn（--fidelity-sim trajectory 时启用）。"""
+    if fidelity_sim == "trajectory":
+        from sim.trajectory_sim import make_trajectory_fidelity_fn
+        return make_trajectory_fidelity_fn(config, num_trajectories=num_trajectories, seed=seed)
+    return None
+
+
+def phys_fidelity(phys, config, fidelity_sim: str, num_trajectories: int = 64, seed: Optional[int] = None) -> Optional[float]:
+    """对路由结果电路计算保真度（基线用）：aer=counts overlap，trajectory=态保真度。"""
+    if fidelity_sim == "trajectory":
+        from sim.trajectory_sim import trajectory_circuit_fidelity
+        return trajectory_circuit_fidelity(phys, config, num_trajectories=num_trajectories, seed=seed)
+    from sim.sim import NoiseSimulator
+    from qiskit_aer import AerSimulator
+    meas = phys.copy()
+    meas.measure_all()
+    noise_sim = NoiseSimulator(config)
+    meas_t = noise_sim._transpile(meas)
+    shots = config.shots
+    ideal_sim = AerSimulator()
+    ideal_job = ideal_sim.run(meas_t, shots=shots)
+    ideal_counts = ideal_job.result().get_counts()
+    noisy_counts = noise_sim.run(meas_t, shots=shots, skip_transpile=True)
+    all_outcomes = set(ideal_counts.keys()) | set(noisy_counts.keys())
+    overlap = sum(min(ideal_counts.get(k, 0), noisy_counts.get(k, 0)) for k in all_outcomes)
+    return overlap / shots
+
+
 # ---------------------------------------------------------------------------
 #  Single-circuit evaluation: PPO agent
 # ---------------------------------------------------------------------------
@@ -150,6 +194,7 @@ def evaluate_circuit(
     max_num_qubits: Optional[int] = None,
     max_num_edges: Optional[int] = None,
     random_init: bool = False,
+    fidelity_fn=None,
 ) -> CircuitMetrics:
     import torch
     env = RoutingEnv(
@@ -161,6 +206,7 @@ def evaluate_circuit(
         max_num_qubits=max_num_qubits,
         max_num_edges=max_num_edges,
         mapping_phase=agent.with_commit,
+        fidelity_fn=fidelity_fn,
     )
 
     obs, _ = env.reset()
@@ -224,6 +270,7 @@ def evaluate_circuit_beam(
     max_num_qubits: Optional[int] = None,
     max_num_edges: Optional[int] = None,
     random_init: bool = False,
+    fidelity_fn=None,
 ) -> CircuitMetrics:
     import torch
     env = RoutingEnv(
@@ -235,6 +282,7 @@ def evaluate_circuit_beam(
         max_num_qubits=max_num_qubits,
         max_num_edges=max_num_edges,
         mapping_phase=agent.with_commit,
+        fidelity_fn=fidelity_fn,
     )
 
     obs, _ = env.reset()
@@ -337,6 +385,7 @@ def evaluate_random(
     seed: int = 0,
     noise_config: Optional[NoiseConfig] = None,
     random_init: bool = False,
+    fidelity_fn=None,
 ) -> CircuitMetrics:
     env = RoutingEnv(
         dag, hw, coupling_map, reward_mode=reward_mode,
@@ -344,6 +393,7 @@ def evaluate_random(
         random_init=random_init, seed=seed,
         use_gnn=False,
         noise_config=noise_config if reward_mode != 'routing' else None,
+        fidelity_fn=fidelity_fn,
     )
 
     obs, _ = env.reset()
@@ -380,32 +430,16 @@ def evaluate_greedy(
     qc,
     config: NoiseConfig,
     reward_mode: str = 'routing',
+    fidelity_sim: str = 'aer',
+    num_trajectories: int = 64,
+    seed: int = 0,
 ) -> CircuitMetrics:
-    from sim.sim import NoiseSimulator
-    from qiskit_aer import AerSimulator
-
     dag = CircuitDAG.from_circuit(qc)
     t0 = time.perf_counter()
     phys, info = greedy_route(qc, config)
     wall_time_ms = (time.perf_counter() - t0) * 1000
 
-    fid = None
-    if reward_mode != 'routing':
-        meas = phys.copy()
-        meas.measure_all()
-        noise_sim = NoiseSimulator(config)
-        meas_t = noise_sim._transpile(meas)
-        shots = config.shots
-
-        ideal_sim = AerSimulator()
-        ideal_job = ideal_sim.run(meas_t, shots=shots)
-        ideal_counts = ideal_job.result().get_counts()
-
-        noisy_counts = noise_sim.run(meas_t, shots=shots, skip_transpile=True)
-
-        all_outcomes = set(ideal_counts.keys()) | set(noisy_counts.keys())
-        overlap = sum(min(ideal_counts.get(k, 0), noisy_counts.get(k, 0)) for k in all_outcomes)
-        fid = overlap / shots
+    fid = phys_fidelity(phys, config, fidelity_sim, num_trajectories, seed) if reward_mode != 'routing' else None
 
     return CircuitMetrics(
         circuit_path='',
@@ -431,31 +465,15 @@ def evaluate_sabre(
     heuristic: str = 'decay',
     swap_trials: int = 20,
     seed: int = 0,
+    fidelity_sim: str = 'aer',
+    num_trajectories: int = 64,
 ) -> CircuitMetrics:
     dag = CircuitDAG.from_circuit(qc)
     t0 = time.perf_counter()
     phys, info = sabre_route(qc, config, heuristic=heuristic, swap_trials=swap_trials, seed=seed)
     wall_time_ms = (time.perf_counter() - t0) * 1000
 
-    fid = None
-    if reward_mode != 'routing':
-        from sim.sim import NoiseSimulator
-        from qiskit_aer import AerSimulator
-        meas = phys.copy()
-        meas.measure_all()
-        noise_sim = NoiseSimulator(config)
-        meas_t = noise_sim._transpile(meas)
-        shots = config.shots
-
-        ideal_sim = AerSimulator()
-        ideal_job = ideal_sim.run(meas_t, shots=shots)
-        ideal_counts = ideal_job.result().get_counts()
-
-        noisy_counts = noise_sim.run(meas_t, shots=shots, skip_transpile=True)
-
-        all_outcomes = set(ideal_counts.keys()) | set(noisy_counts.keys())
-        overlap = sum(min(ideal_counts.get(k, 0), noisy_counts.get(k, 0)) for k in all_outcomes)
-        fid = overlap / shots
+    fid = phys_fidelity(phys, config, fidelity_sim, num_trajectories, seed) if reward_mode != 'routing' else None
 
     return CircuitMetrics(
         circuit_path='',
@@ -594,6 +612,8 @@ def main():
                         help='also run random, greedy, and SABRE baselines')
     parser.add_argument('--no-random', action='store_true', default=False,
                         help='skip the random baseline (keep greedy and SABRE)')
+    parser.add_argument('--no-greedy', action='store_true', default=False,
+                        help='skip the greedy baseline (keep random and SABRE)')
     parser.add_argument('--sabre-heuristic', type=str, default='decay',
                         choices=['basic', 'decay', 'lookahead'],
                         help='SABRE heuristic (default: decay)')
@@ -605,6 +625,14 @@ def main():
                         help='beam width for 1-step lookahead (0 = argmax)')
     parser.add_argument('--verbose', action='store_true', default=False,
                         help='print per-circuit results')
+    parser.add_argument('--fidelity-sim', type=str, default='aer',
+                        choices=['aer', 'trajectory'],
+                        help='保真度模拟器: aer=density_matrix/counts (n<=12), '
+                             'trajectory=轨迹状态向量 (O(2^n) 内存，20q+ 必选)')
+    parser.add_argument('--traj-trajectories', type=int, default=16,
+                        help='轨迹模拟器采样条数')
+    parser.add_argument('--traj-seed', type=int, default=None,
+                        help='轨迹模拟器随机种子')
     parser.add_argument('--out', type=str, default=None,
                         help='save per-circuit results as JSON')
     args = parser.parse_args()
@@ -673,6 +701,9 @@ def main():
             print(f'  [{i+1}/{total}] {method}...', end=' ', flush=True)
 
     label = f'PPO_beam{args.beam_width}' if args.beam_width > 0 else 'PPO'
+    traj_seed = args.traj_seed if args.traj_seed is not None else args.seed
+    fid_fn = build_fidelity_fn(args.fidelity_sim, config, args.traj_trajectories, traj_seed) \
+        if args.reward_mode != 'routing' else None
 
     def evaluate_agent_on_circuits():
         results = []
@@ -691,6 +722,7 @@ def main():
                     max_num_qubits=args.max_num_qubits,
                     max_num_edges=args.max_num_edges,
                     random_init=args.random_init,
+                    fidelity_fn=fid_fn,
                 )
             else:
                 m = evaluate_circuit(
@@ -703,6 +735,7 @@ def main():
                     max_num_qubits=args.max_num_qubits,
                     max_num_edges=args.max_num_edges,
                     random_init=args.random_init,
+                    fidelity_fn=fid_fn,
                 )
             m.circuit_path = rel_path
             if args.verbose:
@@ -733,6 +766,7 @@ def main():
                     seed=args.seed + i + 1000,
                     noise_config=config if args.reward_mode != 'routing' else None,
                     random_init=args.random_init,
+                    fidelity_fn=fid_fn,
                 )
                 m.circuit_path = rel_path
                 if args.verbose:
@@ -744,16 +778,20 @@ def main():
 
         # Greedy
         greedy_metrics = []
-        for i, rel_path in enumerate(rel_paths):
-            _progress(i, len(rel_paths), 'Greedy')
-            qc = load_qc(args.data_dir, rel_path)
-            m = evaluate_greedy(qc, config, reward_mode=args.reward_mode)
-            m.circuit_path = rel_path
-            if args.verbose:
-                print(f'OK swaps={m.num_swaps} {m.wall_time_ms:.0f}ms')
-            greedy_metrics.append(m)
-        greedy_stats = aggregate(greedy_metrics)
-        print_report('Greedy', greedy_stats, show_fidelity=show_fid)
+        if not args.no_greedy:
+            for i, rel_path in enumerate(rel_paths):
+                _progress(i, len(rel_paths), 'Greedy')
+                qc = load_qc(args.data_dir, rel_path)
+                m = evaluate_greedy(qc, config, reward_mode=args.reward_mode,
+                                    fidelity_sim=args.fidelity_sim,
+                                    num_trajectories=args.traj_trajectories,
+                                    seed=args.seed + i + 1000)
+                m.circuit_path = rel_path
+                if args.verbose:
+                    print(f'OK swaps={m.num_swaps} {m.wall_time_ms:.0f}ms')
+                greedy_metrics.append(m)
+            greedy_stats = aggregate(greedy_metrics)
+            print_report('Greedy', greedy_stats, show_fidelity=show_fid)
 
         # SABRE
         sabre_metrics = []
@@ -766,6 +804,8 @@ def main():
                 heuristic=args.sabre_heuristic,
                 swap_trials=args.sabre_trials,
                 seed=args.seed + i + 2000,
+                fidelity_sim=args.fidelity_sim,
+                num_trajectories=args.traj_trajectories,
             )
             m.circuit_path = rel_path
             if args.verbose:
@@ -800,7 +840,8 @@ def main():
         if args.baselines:
             if not args.no_random:
                 out['random'] = [_asdict(m) for m in random_metrics]
-            out['greedy'] = [_asdict(m) for m in greedy_metrics]
+            if not args.no_greedy:
+                out['greedy'] = [_asdict(m) for m in greedy_metrics]
             out['sabre'] = [_asdict(m) for m in sabre_metrics]
         with open(args.out, 'w') as f:
             json.dump(out, f, indent=2)

@@ -1,0 +1,38 @@
+[resume] models/policy_unified_phase1.pt: step=0 best_metric=-1.00000
+Split prefix: unified  (initial split: unified_mixed)
+Loaded pretrained model: models/policy_unified_phase1.pt
+step=   256  rew=+103.035  swp=52.0  map=0.8  trunc=0%  pl=0.001  vl=0.542  ent=1.690  kl=0.0719  gn=0.474  fid=0.1022
+  line_20q         1ep | trunc=0%  swp=40.0±0.0  fid=0.0001  rew=+37.96
+  ring_20q         3ep | trunc=0%  swp=56.0±77.1  fid=0.1363  rew=+124.73
+step=   512  rew=+92.413  swp=47.5  map=1.3  trunc=0%  pl=0.002  vl=0.960  ent=1.171  kl=0.2677  gn=0.906  fid=0.0508
+  line_20q         4ep | trunc=0%  swp=26.0±15.9  fid=0.0170  rew=+72.62
+  ring_20q         5ep | trunc=0%  swp=70.8±74.0  fid=0.0825  rew=+118.75
+  grid_5x4_20q     1ep | trunc=0%  swp=17.0±0.0  fid=0.0283  rew=+39.93
+step=   768  rew=+102.220  swp=43.3  map=0.9  trunc=0%  pl=-0.012  vl=0.547  ent=1.502  kl=0.2858  gn=0.283  fid=0.0550
+  line_20q         6ep | trunc=0%  swp=35.5±36.6  fid=0.0113  rew=+124.90
+  ring_20q         6ep | trunc=0%  swp=66.2±68.4  fid=0.0698  rew=+109.27
+  grid_5x4_20q     3ep | trunc=0%  swp=13.3±3.3  fid=0.1129  rew=+42.77
+step=  1024  rew=+94.271  swp=47.0  map=0.8  trunc=0%  pl=-0.010  vl=0.183  ent=1.243  kl=0.0944  gn=1.271  fid=0.0641
+  line_20q         8ep | trunc=0%  swp=44.9±48.2  fid=0.0549  rew=+108.86
+  ring_20q         8ep | trunc=0%  swp=66.0±59.5  fid=0.0524  rew=+93.16
+  grid_5x4_20q     5ep | trunc=0%  swp=18.8±7.4  fid=0.0847  rew=+61.45
+step=  1280  rew=+78.390  swp=36.5  map=0.4  trunc=0%  pl=0.003  vl=1.407  ent=0.695  kl=0.1242  gn=1.700  fid=0.0753
+  line_20q        10ep | trunc=0%  swp=38.5±45.3  fid=0.0626  rew=+104.83
+  ring_20q         9ep | trunc=0%  swp=65.9±56.1  fid=0.0512  rew=+89.01
+  grid_5x4_20q    10ep | trunc=0%  swp=20.9±12.3  fid=0.0900  rew=+60.26
+step=  1536  rew=+63.645  swp=29.6  map=0.8  trunc=0%  pl=-0.023  vl=0.421  ent=0.994  kl=0.2062  gn=0.787  fid=0.0809
+  line_20q        14ep | trunc=0%  swp=35.1±38.9  fid=0.0561  rew=+88.36
+  ring_20q        10ep | trunc=0%  swp=59.3±56.8  fid=0.0604  rew=+89.58
+  grid_5x4_20q    12ep | trunc=0%  swp=24.7±20.2  fid=0.0878  rew=+64.56
+step=  1792  rew=+63.211  swp=26.4  map=1.2  trunc=0%  pl=-0.032  vl=0.514  ent=0.896  kl=0.2214  gn=0.988  fid=0.0715
+  line_20q        15ep | trunc=0%  swp=39.9±41.6  fid=0.0524  rew=+89.24
+  ring_20q        12ep | trunc=0%  swp=51.1±55.1  fid=0.0551  rew=+85.87
+  grid_5x4_20q    19ep | trunc=0%  swp=21.8±17.3  fid=0.0906  rew=+62.71
+step=  2048  rew=+79.816  swp=26.6  map=1.1  trunc=0%  pl=0.001  vl=0.497  ent=1.126  kl=0.0533  gn=0.541  fid=0.0919
+  line_20q        21ep | trunc=0%  swp=34.4±40.1  fid=0.0776  rew=+94.01
+  ring_20q        13ep | trunc=0%  swp=54.8±54.5  fid=0.0509  rew=+88.20
+  grid_5x4_20q    21ep | trunc=0%  swp=22.3±17.2  fid=0.0875  rew=+63.69
+step=  2304  rew=+78.137  swp=25.9  map=1.2  trunc=0%  pl=-0.008  vl=0.512  ent=1.420  kl=0.0364  gn=1.399  fid=0.1167
+  line_20q        22ep | trunc=0%  swp=34.9±39.3  fid=0.0742  rew=+91.62
+  ring_20q        15ep | trunc=0%  swp=49.5±52.6  fid=0.0639  rew=+82.03
+  grid_5x4_20q    24ep | trunc=0%  swp=23.2±20.0  fid=0.1116  rew=+64.99

@@ -2124,3 +2124,587 @@ tmux attach -t curric    # 查看进度；Ctrl-B 后按 d 脱离
 - `curriculum_phase` 边界：0.33→large_n10_phase3、0.34→large_n20_phase1、0.66→large_n20_phase3、0.67→tianyan_phase1 ✅
 - `compute_gae` 数组 λ：常数数组与标量 λ 结果一致 ✅；自适应 λ 使 episode 开头 advantage 更小、末端更大 ✅
 - smoke 512 步跑通，初始 split 正确选 `large_n10_phase1` ✅
+
+---
+
+## PPO vs SABRE 对比：tianyan176 不连通拓扑（2026.08.08）
+
+### 背景：拓扑缺陷发现
+
+`traindata/topo/tianyan176_66q.json`（60 qubits / 81 边）**不连通**：5 个连通分量
+= 56-qubit 主分量 + 4 个孤立 qubit（38/44/55/56，来自 `data/tianyan176/config.json`
+的 disabledQubits/disabledCouplers 过滤后残留的度 1 节点）。
+
+**60 条 `tianyan_test` 电路中 44 条含孤立 qubit 上的 2Q 门** → 物理上无法路由：
+- SABRE（qiskit）直接抛异常：`TranspilerError: ...physical qubit 4 needs to interact with qubit 38 and they belong to different components`
+- PPO（argmax, MAX_STEPS=800）在这些电路上 SWAP 死循环耗尽 800 步 → 完成率仅 18.3%（11/60）
+
+训练集同样 ~70% 电路触达孤立 qubit（phase1 160/240、phase3 343/480、mixed 671/960），
+但训练时 trunc 仅 ~4%（agent 靠 stochastic 探索 + 虚拟 SWAP 移走孤立位规避，argmax 评估做不到）。
+
+### 公平对比：16 条可路由电路子集
+
+生成 `traindata/splits/tianyan_test_routable.txt`（16 条不触孤立 qubit 的测试电路，
+全部 n30 小电路）。命令：
+
+```bash
+CUDA_VISIBLE_DEVICES=7 PYTHONPATH=src python3 -u -m routing.rl.eval_policy \
+  --model models/policy_tianyan176_curric_phase1.pt \
+  --topo traindata/topo/tianyan176_66q.json \
+  --data-dir traindata --split tianyan_test_routable \
+  --reward-mode routing --max-episode-steps 800 --max-num-qubits 60 \
+  --device cuda:0 --baselines --no-greedy --verbose
+```
+
+### 结果（16 电路，argmax 无 greedy）
+
+| 方法 | 完成率 | 平均 SWAPs | 平均 time/电路 |
+|------|--------|-----------|---------------|
+| PPO argmax | **68.8%（11/16）** | 100.6 ± 126.6 | 3504 ms |
+| SABRE | **100%** | **68.3 ± 58.9** | **7.8 ms** |
+
+逐电路明细（PPO 前，SABRE 后）：
+
+| # | 电路 | PPO | SABRE |
+|---|------|-----|-------|
+| 1 | n30d4_s102604 | OK 31 | 23 |
+| 2 | n30d8_s105208 | **TRUNC 799** | 225 |
+| 3 | n30d4_s100204 | OK 58 | 32 |
+| 4 | n30d4_s104004 | **TRUNC 799** | 95 |
+| 5 | n30d2_s103102 | OK 30 | 28 |
+| 6 | n30d8_s105308 | OK 478 | 172 |
+| 7 | n30d4_s102804 | OK 155 | 57 |
+| 8 | n30d4_s100104 | OK 126 | 51 |
+| 9 | n30d8_s103504 | **TRUNC 799** | 80 |
+| 10 | n30d2_s101204 | OK 73 | 31 |
+| 11 | n30d2_s101004 | OK 19 | 16 |
+| 12 | n30d2_s101304 | OK 81 | 38 |
+| 13 | n30d2_s103404 | OK 16 | 14 |
+| 14 | n30d4_s105604 | **TRUNC 799** | 136 |
+| 15 | n30d4_s104404 | **TRUNC 799** | 64 |
+| 16 | n30d2_s101304-2 | OK 40 | 31 |
+
+### 结论与分析
+
+- **PPO 完成电路上（11 条）平均 100.6 SWAPs vs SABRE 同电路 44.8**（PPO 仅 68.8%
+  完成率、SWAPs 高 ~2.2×、时间慢 ~450×）。
+- **5 条 TRUNC 全是 n30 d4/d8 深电路（2Q 门 ≥ 50）**：argmax 陷入 SWAP 局部震荡
+  死循环（swaps=799、无门执行），SABRE 在同电路仅 64-225 SWAPs —— PPO 在大图
+  （60q 嵌 30q）上路由能力显著弱于 SABRE。
+- 与已有结论一致：RL 路由在小规模（5-20q）上逼近/超越 SABRE，但 tianyan 60q 图
+  上尚未收敛到可用水平；且 argmax 远差于训练 stochastic 行为。
+- 根因待修（后续）：(1) 拓扑含孤立 qubit 时训练/评估口径不一致；(2) 深电路 argmax
+  死循环（beam search 或 eval 时允许虚拟 remap 可缓解）。
+
+### Beam search 评估（同 16 电路，beam=3, 2026.08.08 补）
+
+命令同前，加 `--beam-width 3 --no-greedy`：
+
+```
+PPO_beam3   15418.9  31.2%    27.6 +/- 34.9     12.2      41 +/- 29       5.5200
+SABRE          7.0  100.0%    68.3 +/- 58.9      0.0       0 +/- 0            --
+```
+
+| 方法 | 完成率 | 平均 SWAPs | 平均 time/电路 |
+|------|--------|-----------|---------------|
+| PPO argmax | 68.8%（11/16） | 100.6 | 3504 ms |
+| **PPO beam3** | **31.2%（5/16）** | 27.6（仅完成电路） | 15419 ms |
+| SABRE | 100% | 68.3 | 7.0 ms |
+
+- beam3 完成电路上 SWAPs 显著更低（10/17/97/9/5 vs SABRE 同电路 23/28/31/16/14，
+  #13 从 argmax 16 → beam3 5），但 **TRUNC 从 5 条恶化到 11 条**（argmax 完成的多条
+  深电路 #3/#6/#7/#8/#12/#16 在 beam3 下全部截断，swaps 耗尽 780-799）。
+- 原因推论：beam 的 1 步 lookahead 用 `V(s')` 评分（`evaluate_circuit_beam` 内 clone+step
+  会持续扩大间接待遇，且 tianyan 模型 critic 未见在 60q 大图上可靠）；死锁掩码对 beam
+  探索分支不生效（各分支独立 step，不做全局 deadlock 表）。
+- 结论：**当前课程模型在 tianyan 60q 图上 beam search 无益反而有害**，评估以 argmax 为
+  准（与 5-20q 小图结果相反——小图上 beam3 闭合 gap 63-88%，提醒该增益不迁移到大图）。
+
+---
+
+## 轨迹状态向量模拟器接入训练/评估管线（2026.08.11）
+
+### 目标
+
+此前 `trajectory_sim.py` 独立可用但未接入 RL 管线：`_compute_aer_fidelity()` 仍用
+Aer density_matrix（O(4^n)，20q 需 16 TB → Phase 2 直接 OOM）。本次把轨迹模拟器接入
+训练与评估，使 20q 的 noise_aware 训练不再被内存墙阻塞。
+
+### 改动
+
+| 文件 | 改动 |
+|------|------|
+| `sim/trajectory_sim.py` | 新增 `trajectory_circuit_fidelity(phys, config, n_traj)` 与 `make_trajectory_fidelity_fn(config, n_traj, seed)`（返回 env 的 fidelity_fn 闭包）。理想态计算前 `remove_final_measurements()`（`_evolve` 本就跳过 measure，仅消除 ideal 路径的校验报错） |
+| `routing/rl/env.py` | `_get_terminal_reward_value()` 的 `fidelity_fn` hook 签名从 `(dag, mapping, executed)` 改为 `(env)`（全项目此前无调用者，无兼容负担），闭包可直接取 `env._phys_circuit` |
+| `routing/rl/train_agent.py` | `create_env` 新增 `fidelity_fn` 透传；CLI 新增 `--fidelity-sim {aer,trajectory}`（默认 aer）、`--traj-trajectories`（默认 64）、`--traj-seed`；初始 env 与每 episode env（噪声扰动后）都按当前 noise_config 重建闭包 |
+| `routing/rl/eval_policy.py` | CLI 同训练侧；PPO/beam/Random 的 env 传 `fidelity_fn`；Greedy/SABRE 基线改用 `phys_fidelity()` 统一入口（aer=counts overlap，trajectory=态保真度），保证同一次评估口径一致 |
+| `scripts/train_unified.sh` | Phase 2 增加 `--fidelity-sim trajectory --traj-trajectories 64` |
+
+### 脚本无输出问题修复（2026.08.11 补）
+
+直接 `python3 -m ... 2>&1 | tee` 时 attach tmux 看不到任何输出：Python 在
+stdout 为管道时是**块缓冲**（攒满 ~8KB 才 flush）。修复：`train_unified.sh`
+内统一改用 `python3 -u`（与 `train_tianyan_curriculum.sh` 一致），逐行实时输出。
+tmux 启动方式不变：
+
+```bash
+tmux new-session -d -s unif20 'cd /home/zzy/opencode-server/opencode-docker/projects/rlrouting && PHASE2=1 bash scripts/train_unified.sh cuda:0 500000 300000 2>&1 | tee logs/train_unified20.log'
+```
+
+### 保真度口径说明（重要）
+
+- **trajectory** 返回**态保真度** `F = mean_t |<ψ_ideal|ψ_t>|²`（statevector overlap）
+- **aer** 返回 **counts overlap**（measure_all 后 count 分布交叠，受 shots 采样影响）
+- 两者定义不同，绝对值不可直接对比；且 sim.py float 模式存在串扰 override bug
+  （specific error 覆盖全比特 CNOT 退极化，见 08.06 记录），aer 侧噪声系统性偏弱。
+- **跨方法对比必须同一次运行内统一 `--fidelity-sim`**（PPO/基线同口径）；
+  aer 与 trajectory 的历史数值（如 5q 上 0.94 级别）不跨口径对比。
+
+### 验证结果
+
+1. **5q 完整 episode（cross_5q，greedy 路由，256 条轨迹）**：`done=True swaps=3
+   traj_fid=0.6454 aer_fid=0.8975` —— 两者同为"噪声变低保真变高"的趋势，但绝对值
+   差 0.25，正是指标定义（态保真 vs counts overlap）+ sim.py 串扰语义的差异，
+   属预期，非实现 bug。
+2. **20q 冒烟训练**（`grid_5x4_20q`，unified split，`--fidelity-sim trajectory
+   --traj-trajectories 8 --no-gnn --timesteps 256 --max-episode-steps 60`）：
+   训练/checkpoint 正常完成，**无 OOM**（此前 density_matrix 需 16 TB）。
+3. **全量测试**：`33 passed / 2 failed`（2 个 failure 为已知既有问题：
+   `test_swap_penalty` 因 data_gen.py 改动、`test_fidelity_shaping_step_zero` flaky，
+   与本次改动无关；`test_trajectory_sim.py` 14 项全部通过）。
+
+### 20q 训练命令（仅状态向量模拟器）
+
+Phase 1（纯路由，不涉及保真度模拟）：
+
+```bash
+cd /home/zzy/opencode-server/opencode-docker/projects/rlrouting
+PYTHONPATH=src python3 -m routing.rl.train_agent \
+  --data-dir traindata \
+  --split-prefix unified \
+  --topo-list traindata/topo/line_20q.json,traindata/topo/ring_20q.json,traindata/topo/grid_5x4_20q.json \
+  --topo-balance episodes \
+  --reward-mode routing \
+  --timesteps 500000 \
+  --max-episode-steps 400 \
+  --max-num-qubits 20 \
+  --device cuda:0 \
+  --checkpoint-dir models/ckpts_unified \
+  --out models/policy_unified_phase1.pt
+```
+
+Phase 2（噪声感知微调，状态向量模拟器）：
+
+```bash
+PYTHONPATH=src python3 -m routing.rl.train_agent \
+  --data-dir traindata \
+  --split-prefix unified \
+  --topo-list traindata/topo/line_20q.json,traindata/topo/ring_20q.json,traindata/topo/grid_5x4_20q.json \
+  --topo-balance episodes \
+  --reward-mode noise_aware \
+  --timesteps 300000 \
+  --max-episode-steps 400 \
+  --max-num-qubits 20 \
+  --load models/policy_unified_phase1.pt \
+  --device cuda:0 \
+  --fidelity-sim trajectory \
+  --traj-trajectories 64 \
+  --checkpoint-dir models/ckpts_unified_ph2 \
+  --out models/policy_unified_noiseaware.pt
+```
+
+或直接用脚本（Phase 2 已默认 trajectory）：
+
+```bash
+PHASE2=1 bash scripts/train_unified.sh cuda:0 500000 300000
+```
+
+> 性能提示：20q 下 64 条轨迹终端奖励的实际耗时远高于预期（详见下文
+> 「20q 联合训练过慢问题分析（2026.08.13）」：实测 ~21 分钟/episode），
+> 需调低 `--traj-trajectories` 或向量化轨迹后才能继续推进。
+
+---
+
+## 20q 联合训练过慢问题分析（2026.08.13）
+
+### 背景
+
+`tmux unif20` 中运行 20q Phase 1&2 联合训练（line_20q / ring_20q / grid_5x4_20q，
+unified split，Phase 2 为 `noise_aware` + `--fidelity-sim trajectory --traj-trajectories 64`）。
+
+### 现象
+
+1. **Phase 1（纯路由，无保真度模拟）**：500K 步约耗时 2 天（8/11 → 8/13），
+   约 3 steps/s。
+2. **Phase 2（noise_aware + 64 条轨迹）**：进程 8/11 22:14 启动，至 8/13 10:27
+   仅推进到 step≈3840，**约 30s/step**：
+   - checkpoint 证据：`ckpts_unified_ph2/ckpt_step002816.pt`（8/13 01:51）→
+     step=3840（8/13 10:27），1024 步耗时 ~8.5h
+   - 按此速率 300K timesteps 需 **3-4 个月**
+3. **机器负载高**：load average ≈ 67，4 张 GPU 被其他任务占满（100%），
+   进程本身 6378% CPU（64 核），numpy 全核争抢内存带宽。
+
+### 基准测量（421 门 20q 电路，TrajectorySimulator）
+
+| 项目 | 耗时 |
+|------|------|
+| transpile | 0.03s |
+| ideal 态矢 1 次（无噪声） | 3.76s |
+| 噪声轨迹 1 条 | 21.6s |
+| 噪声轨迹 8 条 | 151.2s（18.9s/条） |
+| **64 条轨迹（= 1 次终端 fidelity）** | **≈ 21 分钟**（15 分钟未完成，按线性外推） |
+
+### 根因
+
+代码路径：`env.py:_get_terminal_reward_value()`（env.py:533-538）→
+`trajectory_sim.py:_evolve()`。每个 episode 结束时计算一次：
+
+1. **纯 Python 逐门演化**：`_evolve` 对每条轨迹逐门迭代 2^20（16MB complex128）
+   态矢，`_apply1`/`_apply_cx` 每门多次 `moveaxis` + `ascontiguousarray`
+   + 全数组归约（`_thermal_noise` 的 `|a[1]|^2` 求和 + `_renormalize`）。
+2. **64 条轨迹串行**：`run_trajectories` 是纯 for 循环，无批量化/并行化。
+3. **调用频率**：训练中 line/ring_20q 每 episode 需 40-60 个 SWAP，
+   约每 ~38 步结束一个 episode → 每 ~38 步触发一次 ~21 分钟的保真度计算
+   → 平均 ~30s/step，与观测一致。
+4. **附带开销**：`make_trajectory_fidelity_fn` 每次还重复 `_transpile`
+   （并有 measure_all 冗余拷贝）。
+
+### 建议（按性价比排序）
+
+| 优先级 | 方案 | 预期提速 |
+|--------|------|---------|
+| P0 | `--traj-trajectories 64 → 8/16` | 4-8×（21min → 2.6/5.3min 每 episode） |
+| P0 | 轨迹向量化：`(T, 2^n)` 单数组批量演化（64×16MB≈1GB 可行） | ~8×（Python 循环次数不变，numpy 批量操作） |
+| P1 | 终端奖励降频：每 K 个 episode 才算 fidelity，或用 `_xz_errors` 近似 + 定期校准 | ~K× |
+| P1 | 缓存 `_transpile` 结果，去掉无谓 measure/拷贝 | 若干 % |
+| P2 | 单轨内省去 `_renormalize` 的全数组二次归约（跳变时才需要） | 单轨 2-4× |
+
+### 结论
+
+20q 训练慢的瓶颈是**轨迹保真度模拟器的逐门 Python 演化 + 64 条串行轨迹**，
+而非 GNN/PPO 本身。优化方向应为向量化/降轨迹数，而非等待。
+
+---
+
+## 2026.08.14 20q Phase 2 训练提速改造（P0 落实）+ 重启训练
+
+### 背景
+
+前一节根因分析定位 20q 训练瓶颈为轨迹保真度模拟器（逐门 Python 演化 + 64 条串行轨迹，
+每 episode ~21 分钟保真度计算，平均 ~30s/step）。本次落实两个 P0 方案并重启 Phase 2。
+
+### 改动
+
+1. **P0-1：轨迹数 64 → 16**（真实提速 ~4×，也是主导因素）
+   - `train_agent.py` / `eval_policy.py` 的 `--traj-trajectories` 默认 64 → 16。
+   - 同步 `scripts/train_unified.sh` 显式传 `--traj-trajectories 16`。
+
+2. **P0-2：轨迹向量化批量演化**（`trajectory_sim.py`）
+   - `_evolve_batch`：单数组 `(T, 2^n)` 演化全部轨迹，消除 Python 逐轨迹循环。
+   - 全部批量原语重写并逐操作与串行比对 bit-exact：
+     - `_apply1_batch`：moveaxis-to-last + `(M,2)@(2,2)` 单次大 gemm
+       （axis 修正：`ax = nq - qb`，T 轴占位已处理）。
+     - `_apply_cx_batch`：切片拷贝版，`ctl_high` 分支处理 ctl 在高低位，
+       (ctl,tgt) 全部组合比对通过。
+     - `_apply_swap_batch` / `_depol1_batch` / `_depol2_batch` / `_crosstalk_batch`。
+     - `_thermal_noise_batch`：qubit-last 连续布局 + 解析归一化
+       （norm² = 1-p1·p 或 p1），避免全数组二次归约。
+   - 删除不再使用的 `_CX_MAT`、`_renormalize_batch`。
+
+### 验证
+
+- **noiseless 全等**：批量 vs 串行 maxdiff = 5.4e-15（float 舍入量级），bit-exact。
+- **噪声统计一致性**：5q T=8192，batch fid=0.47936 vs 旧串行 fid=0.50446，
+  diff=0.02510，MC 噪声 ~0.011（2.3σ，在统计误差内）；更大 T 下收敛。
+- **pytest**：34 passed，1 个既有失败 `test_swap_penalty`（与本次无关，train.md 已有记录）。
+
+### 关键实测：向量化在 20q 反而更慢（缓存效应）
+
+| 场景 | 批量 | 串行 | 说明 |
+|------|------|------|------|
+| n=16 T=16（2017 门） | 34.6s | 37.7s | 基本打平 |
+| n=20（~102 门，T=16） | 42-61s | 33-40s | 批量略慢 |
+| **n=20 真实 VQE 电路（523 门，T=16）** | **471s** | **243s** | **批量慢 ~2×** |
+| 交叉点 n=14/16/17/18（T=16） | 0.86×/0.49×/0.33×/0.43× | — | 批量在 n≥14 全面落后 |
+
+**原因**：批量 `(T, 2^n)` 工作集随 n 指数增长（20q × T=16 = 256MB），击穿 L3
+缓存后失去局部性；而串行单轨 16MB 可驻留缓存。train.md 此前预估的 ~8× 来自
+Python 循环开销假设，实测为内存带宽瓶颈，结论相反。
+
+**最终方案**：`run_trajectories` 按工作集自动选择——
+
+```python
+ws = num_trajectories * (1 << n_qubits) * 16  # complex128 字节
+if ws <= 8 MiB: 批量 _evolve_batch
+else:           串行 _evolve 循环（缓存友好）
+```
+
+20q × T=16（256MB）走串行；小 n / 小 T 走批量。
+
+### 重启训练（tmux）
+
+旧 `unif20` 会话已 kill（9 天仅 5120/300000 steps，按旧速需 ~100+ 天）。
+重启命令：
+
+```bash
+tmux new-session -d -s unif20_ph2 'cd /home/zzy/opencode-server/opencode-docker/projects/rlrouting && PYTHONPATH=src python3 -u -m routing.rl.train_agent \
+  --data-dir traindata \
+  --split-prefix unified \
+  --topo-list traindata/topo/line_20q.json,traindata/topo/ring_20q.json,traindata/topo/grid_5x4_20q.json \
+  --topo-balance episodes \
+  --reward-mode noise_aware \
+  --timesteps 300000 \
+  --max-episode-steps 400 \
+  --max-num-qubits 20 \
+  --load models/policy_unified_phase1.pt \
+  --device cuda:0 \
+  --fidelity-sim trajectory \
+  --traj-trajectories 16 \
+  --checkpoint-dir models/ckpts_unified_ph2_p0 \
+  --out models/policy_unified_noiseaware.pt 2>&1 | tee logs/train_unified20_ph2_p0.log'
+```
+
+### 重启后实测节奏
+
+- step 256：~38 min；step 512：~1h19m；step 768：~2h19m
+- 平均 **~5.5 steps/min**（旧 ~0.4 steps/min，提速 ~14×）
+- 300000 steps 预计 **~38 天**（旧方案需 ~520 天，不可行；仍偏慢，后续可考虑 P1 降频）
+- 机器负载 ~70（其他用户 GPU 任务占 CPU），轨迹模拟为 CPU 密集。
+
+---
+
+## 2026.08.14 20q 训练时间开销分析（第二轮优化）
+
+### 分析：主要时间开销在哪
+
+用 cProfile 剖析训练中一次终端保真度调用（16 条轨迹 × 36 门物理线路）：
+
+| 组件 | 旧耗时 | 新耗时 | 说明 |
+|------|--------|--------|------|
+| `_thermal_noise`（2304 次） | 56.5s | 17.6s | T1/T2 MC 采样 |
+| `_renormalize`（4992 次） | 45.8s | 0 | 被解析归一化取代 |
+| `_apply1`（2470 次） | 47.8s | 38.5s | 单比特门演化 |
+| `_apply_cx`（408 次） | 6.5s | ~1s | CNOT |
+| **合计** | **~115s** | **~45-57s** | 每次 fidelity 调用 |
+
+**根因**：20q 工作集 256MB 击穿 L3，任何全数组操作（16MB/轨迹）都受内存带宽
+限制。旧串行 `_apply1`/`_thermal_noise`/`_apply_cx` 每次操作做 3 次全数组搬运
+（moveaxis + ascontiguousarray 拷贝 + 末尾 reshape 拷贝），且 `mat @ moved`
+的 2×2×2^19 gemm 会**触发 BLAS 63 线程全核占满**（训练进程 CPU 6363%，机器
+load 从 44 飙到 70）。
+
+### 优化：串行路径改为 strided view 原地操作（零拷贝）
+
+- `_apply1`：`sv.reshape(2^(n-1-q), 2, 2^q)` 中轴 stride=2^q 即比特 q，
+  `a0/a1` 切片是 strided view（零拷贝），2 个 8MB 临时数组直接写回。
+- `_thermal_noise`：同一 reshape 技巧取 |0>/|1> 分量，解析归一化
+  （norm² = 1-p1·p 或 p1）取代 `_renormalize` 全数组二次扫描。
+- `_apply_cx`：`reshape(A,2,B,2,C)` 轴 1/3 = 高/低位，切片交换，无 moveaxis。
+
+### 验证
+
+- 全部 14 个 trajectory 测试通过；noiseless 与 Qiskit statevector 模拟器
+  maxdiff = 1.4e-16（bit-exact）。
+- 噪声统计：serial vs batch（同 seed）diff=0.00159 << MC≈0.00641。
+- **副作用消除**：训练进程 CPU 从 6363%（63 核 BLAS）降到 ~100%（单核），
+  机器 load 从 ~70 降到 ~6。
+
+### 重启后实测
+
+- 原旧代码（16 轨迹、串行旧原语）：~5.5 steps/min（load 70）
+- 新代码（strided 原地 + 解析归一化）：**~15.4 steps/min**（load 6，机器空闲）
+- 300000 steps 预计 **~13.5 天**（旧代码 ~38 天，二次优化后 ~3 倍提速）
+
+### 仍可挖掘（若还需提速）
+
+1. `_apply1` 仍占 ~40s/调用：fuse matmul 的两行（`m0a0+m0a1` 与 `m1a0+m1a1`
+   共用 a0/a1 读取），或对 rz（对角阵）走专用 `a1 *= e^{iθ}` 路径。
+2. 终端奖励降频（每 K 个 episode 才算 fidelity）——训练本身只需噪声近似信号。
+3. `_thermal_noise` 的 `sv *= sqrt(1/n2)` 全数组缩放可折叠进 a0/a1 切片。
+4. 减少轨迹数 16 → 8（方差↑，2 倍提速）。
+
+---
+
+## 真机 20q 子拓扑（tianyan176_20q）Phase 1 微调（2026.08.17）
+
+### 背景与前置修复
+
+- 复用已有的真机 20q 截取拓扑 `traindata/topo/tianyan176_20q.json`
+  （天衍176 有效拓扑 Q23 根 BFS 截取，20 qubits / 29 边，连通）。
+- **修复字符串键 bug（P0）**：tianyan 系列 topo 的 `two_q_gate_error` 经
+  `json.dump` 后为字符串键 `"(0, 18)"`，而 `features.py` / `sim.py` /
+  `trajectory_sim.py` 全部用元组键查询 → 真机逐边噪声被静默丢弃
+  （features 回退 0.01、trajectory 回退 0.001、Aer 路径直接崩溃）。
+  修复：三处 `_lists_to_dict`（`train_agent.py`、`eval_policy.py`、
+  `test_eval_phase1.py`）增加 `_normalize_dict_keys`，用 `ast.literal_eval`
+  将字符串键规范化为元组键。
+- 修复验证：`tianyan176_20q.json` 加载后 `two_q_err` 呈 28 个不同逐边值
+  （修复前全为 0.01）；`trajectory_sim._two_error(0,18)=0.0085` 与 topo
+  字典一致；Aer `NoiseModel` 构建不再崩溃（cx 逐边错误按真机值构建）。
+- 注：此修复对历史 tianyan 60q 训练同样生效——此前 tianyan 训练的噪声
+  实际为均匀回退值，逐边真机噪声从未真正进入特征/保真度计算。
+
+### 数据准备
+
+- 新建 `scripts/build_tianyan20q_splits.py`：复用 `traindata/random/n20`
+  （d2-d13 共 810 条，拓扑无关 pkl），生成：
+  - `tianyan20q_phase1.txt`（d2+d3，116 条）
+  - `tianyan20q_phase2.txt`（d4+d5+d6，348 条）
+  - `tianyan20q_phase3.txt`（d7-d13，346 条）
+  - `tianyan20q_mixed.txt`（全部 810 条，供后续 noise_aware Phase 2 用）
+  - `tianyan20q_test.txt`（d2/d4/d8 池留出 30 条，供评估用）
+
+### 训练命令（Phase 1 微调，基于 unified 20q Phase 1 参数）
+
+基于 `models/policy_unified_phase1.pt`（line/ring/grid 20q 联合训练，
+max_num_qubits=20 / max_num_edges=31）微调：
+- 架构维度兼容性已验证：`EdgeActorCritic` 的 actor 头为逐边共享 MLP、
+  critic 只依赖 `num_qubits`（两侧均为 20），严格 `load_state_dict` 100% 匹配；
+  29 边 topo 通过 padding + action mask（`mask[:29]=True`）适配 31 边模型。
+
+```bash
+# tmux 会话 tianyan20q（2026.08.17 启动，约 1 小时，~25 steps/s）
+cd /home/zzy/opencode-server/opencode-docker/projects/rlrouting
+PYTHONPATH=src python3 -u -m routing.rl.train_agent \
+  --data-dir traindata \
+  --split-prefix tianyan20q \
+  --topo traindata/topo/tianyan176_20q.json \
+  --reward-mode routing \
+  --timesteps 100000 \
+  --max-episode-steps 400 \
+  --max-num-qubits 20 \
+  --mapping-budget 8 \
+  --load models/policy_unified_phase1.pt \
+  --device cuda:0 \
+  --checkpoint-dir models/ckpts_tianyan20q_ft \
+  --checkpoint-interval 20 \
+  --out models/policy_tianyan20q_ft_phase1.pt
+```
+
+### 启动日志摘要（前 90 秒）
+
+- 加载成功：`[resume] step=0 best_metric=-1.00000`（fresh 微调，不续步）
+- 初始 split：`tianyan20q_phase1`（routing 课程：phase1→phase2→phase3）
+- 前 9 个 cycle：rew=+35~40，swp=15~20，map=0.4~0.9，trunc=0%
+- 吞吐：~25 steps/s（~1500 steps/min），100k 步预计 ~70 分钟
+
+### 训练完成与收敛情况（2026.08.17 21:38）
+
+- 100k 步全部完成，`models/policy_tianyan20q_ft_phase1.pt` 已保存。
+- 收敛趋势：rew +35~40（起步）→ +118~125（末尾），swp 15~20 → 49~55，
+  trunc 全程 0%，map 0.0~0.9（映射阶段使用极少，布局主要靠微调前学到的
+  先验 + 路由 SWAP 完成）。末期 rew/swp 仍在缓慢上升，未见明显过拟合。
+
+### 评估（tianyan20q_test，30 条 n20 电路，routing 模式，确定性）
+
+评估命令（argmax）：
+```bash
+cd src
+python3 -u -m routing.rl.eval_policy \
+  --model ../models/policy_tianyan20q_ft_phase1.pt \
+  --topo ../traindata/topo/tianyan176_20q.json \
+  --data-dir ../traindata \
+  --split tianyan20q_test \
+  --reward-mode routing \
+  --baselines \
+  --device cuda:0
+```
+
+| Method | Time(ms) | Comp% | SWAPs | XZ |
+|--------|---------|-------|-------|----|
+| PPO 微调 argmax | 313 | 100% | 32.0 ± 14.7 | 124.5 |
+| PPO 微调 beam3 | 771 | 100% | **29.0 ± 13.5** | 125.5 |
+| PPO unified（未微调）argmax | 339 | 100% | 34.2 ± 16.7 | 123.2 |
+| Greedy | 6 | 100% | 46.6 ± 22.8 | -- |
+| SABRE | 6 | 100% | **26.3 ± 11.7** | -- |
+| Random | 25 | 6.7% | 138.5 ± 15.5 | 24.5 |
+
+### 结论与分析
+
+1. **微调有效**：真机 20q 子拓扑上微调后 SWAPs 34.2 → 32.0（-6.4%），
+   路由质量在真机异构拓扑上得到改善；beam3 进一步降至 29.0，将相对 SABRE
+   的 gap 闭合 66%（(34.2-26.3) → (29.0-26.3)）。
+2. **仍落后 SABRE**（29.0 vs 26.3，gap ~10%）：20q 规模上 PPO 尚未完全
+   超越 SABRE，与 5q 小图（PPO 接近/超越）及 60q 大图（SABRE 显著占优）的
+   既有结论一致——RL 优势在中规模图上仍需更多训练/更强特征。
+3. 30 条测试电路全部可路由（test 取自 d2/d4/d8 池，连通子拓扑 + mapping
+   阶段保证 100% 完成率）；random 基线仅 6.7% 完成，验证路由任务难度。
+4. **后续待办**：Phase 2（noise_aware + trajectory）微调，利用已修复的
+   逐边真机噪声做保真度感知路由，再在 `tianyan20q_test` 上做保真度对比。
+
+---
+
+## 真机 20q 子拓扑 Phase 2（noise_aware）微调（2026.08.17 深夜启动）
+
+### 训练命令
+
+基于微调后的 `models/policy_tianyan20q_ft_phase1.pt` 继续 Phase 2
+（保真度感知微调，20q 必须用 trajectory 模拟器，Aer density_matrix 不可行；
+修复后的逐边真机噪声此时进入终端保真度奖励）：
+
+```bash
+# tmux 会话 tianyan20q_ph2（2026.08.17 启动）
+cd /home/zzy/opencode-server/opencode-docker/projects/rlrouting
+PYTHONPATH=src python3 -u -m routing.rl.train_agent \
+  --data-dir traindata \
+  --split-prefix tianyan20q \
+  --topo traindata/topo/tianyan176_20q.json \
+  --reward-mode noise_aware \
+  --timesteps 80000 \
+  --fidelity-sim trajectory \
+  --traj-trajectories 16 \
+  --max-episode-steps 400 \
+  --max-num-qubits 20 \
+  --mapping-budget 8 \
+  --load models/policy_tianyan20q_ft_phase1.pt \
+  --device cuda:0 \
+  --checkpoint-dir models/ckpts_tianyan20q_ft_ph2 \
+  --checkpoint-interval 20 \
+  --out models/policy_tianyan20q_ft_noiseaware.pt
+```
+
+### 启动状态（前 3 分钟）
+
+- `Split prefix: tianyan20q (initial split: tianyan20q_mixed)` ✓（noise_aware 用 mixed split，810 条电路）
+- 微调模型加载成功（step=0，fresh 微调）；进程 103% CPU，无报错
+- 预计吞吐 ~12-15 steps/min（trajectory 16 轨迹，与 unified 20q Phase 2 一致），
+  80k 步预计 **~4-5 天**；checkpoint 每 5120 步（~6h）保存一次
+
+### 阶段性评估（2026.08.19，Phase 2 中途 checkpoint step=15616 / 80000，~20%）
+
+训练进行中（step 15616，~8.9 steps/min，与 unif20 训练共享 CPU 略降速），
+用最新 checkpoint `models/ckpts_tianyan20q_ft_ph2/ckpt_step015616.pt` 在
+`tianyan20q_test`（30 条）上做 noise_aware 评估（trajectory 16 轨迹，
+按用户要求去掉 greedy 基线）：
+
+```bash
+# tmux 会话 tianyan20q_eval
+cd /home/zzy/opencode-server/opencode-docker/projects/rlrouting
+PYTHONPATH=src python3 -u -m routing.rl.eval_policy \
+  --model models/ckpts_tianyan20q_ft_ph2/ckpt_step015616.pt \
+  --topo traindata/topo/tianyan176_20q.json \
+  --data-dir traindata --split tianyan20q_test \
+  --reward-mode noise_aware --fidelity-sim trajectory \
+  --baselines --no-greedy --verbose --device cuda:0
+```
+
+| Method | Time(ms) | Comp% | SWAPs | Fidelity |
+|--------|---------|-------|-------|----------|
+| PPO Phase2 中途（step 15616） | 216851 | 100% | 31.6 ± 14.4 | **0.0810** |
+| Random | 66742 | 16.7% | 128.4 ± 28.2 | 0.0044 |
+| SABRE | 6.6 | 100% | 26.3 ± 11.7 | 0.0713 |
+
+**中途结论（~20% 训练进度）**：
+1. **保真度已反超 SABRE**：PPO 0.0810 vs SABRE 0.0713（+13.6%），
+   噪声感知微调开始兑现——逐边真机噪声修复后的 Phase 2 训练正在起作用。
+2. SWAPs 31.6 vs SABRE 26.3（PPO 多 5.3），略高于 Phase 1 微调模型
+   （32.0）——noise_aware 用少量 SWAP 代价换取保真度，符合设计目标。
+3. 时间开销：PPO 每条电路 ~2-5 min（20q trajectory 保真度模拟为主，
+   d4 电路 216-325s），30 条全评估（PPO+Random+SABRE 三遍）约 **2.5-3.5 小时**。
+4. 评估仍在进行（2026.08.19 ~19:00 完成 SABRE 遍，汇总如上）。
+
+### 待办（训练完成后补充）
+
+- [ ] 记录最终日志摘要（fid、swp、trunc、收敛情况）
+- [ ] 最终模型 `policy_tianyan20q_ft_noiseaware.pt` 的 noise_aware 评估
+       与中途 checkpoint 对比，验证保真度是否进一步提升

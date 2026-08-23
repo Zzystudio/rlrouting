@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import copy
 import csv
 import json
@@ -24,10 +25,25 @@ from routing.gnn.encoder import SubGNN
 # ---------------------------------------------------------------------------
 #  Hardware config from JSON
 # ---------------------------------------------------------------------------
+def _normalize_dict_keys(d):
+    """Normalize string keys like "(0, 18)" (json round-trip of tuples) to tuple keys."""
+    if not isinstance(d, dict):
+        return d
+    out = {}
+    for k, v in d.items():
+        if isinstance(k, str):
+            try:
+                k = ast.literal_eval(k)
+            except (ValueError, SyntaxError):
+                pass
+        out[k] = v
+    return out
+
+
 def _lists_to_dict(raw, coupling_map):
     """Convert [[q1,q2,val],...] to {(q1,q2): val, (q2,q1): val} dict."""
     if raw is None or isinstance(raw, (int, float, dict)):
-        return raw
+        return _normalize_dict_keys(raw)
     result = {}
     for item in raw:
         q1, q2, v = int(item[0]), int(item[1]), float(item[2])
@@ -187,7 +203,7 @@ def lambda_fid_schedule(progress: float, warmup: float, max_val: float) -> float
 # ---------------------------------------------------------------------------
 #  create_env helper
 # ---------------------------------------------------------------------------
-def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_init, seed, gnn=None, use_gnn=True, max_num_edges=None, max_num_qubits=None, noise_config=None, lambda_fid=None, eta_dist=None, mapping_budget=None, mapping_phase=True):
+def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_init, seed, gnn=None, use_gnn=True, max_num_edges=None, max_num_qubits=None, noise_config=None, lambda_fid=None, eta_dist=None, mapping_budget=None, mapping_phase=True, fidelity_fn=None):
     kw = dict(
         dag=dag, hw=hw, coupling_map=coupling_map,
         reward_mode=reward_mode,
@@ -211,8 +227,22 @@ def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_ini
         kw["eta_dist"] = eta_dist
     if mapping_budget is not None:
         kw["mapping_budget"] = mapping_budget
+    if fidelity_fn is not None:
+        kw["fidelity_fn"] = fidelity_fn
     kw["mapping_phase"] = mapping_phase
     return RoutingEnv(**kw)
+
+
+def build_fidelity_fn(fidelity_sim: str, noise_config, num_trajectories: int = 64, seed=None):
+    """按 --fidelity-sim 构造 env 终端保真度函数；routing 模式或 aer 模式返回 None。
+
+    aer: 使用 env 内置 NoiseSimulator（density_matrix + counts overlap，n<=12）。
+    trajectory: 使用轨迹状态向量模拟器（O(2^n) 内存，20q+ 可用）。
+    """
+    if fidelity_sim == "trajectory":
+        from sim.trajectory_sim import make_trajectory_fidelity_fn
+        return make_trajectory_fidelity_fn(noise_config, num_trajectories=num_trajectories, seed=seed)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -338,6 +368,14 @@ def main():
     parser.add_argument("--curriculum-keys", type=str, default=None,
                         help="逗号分隔的 split prefix 列表，按训练进度从小规模到大规模递进 "
                              "(如 large_n10,large_n20,tianyan；默认单 prefix)")
+    parser.add_argument("--fidelity-sim", type=str, default="aer",
+                        choices=["aer", "trajectory"],
+                        help="终端保真度模拟器: aer=density_matrix/counts (小比特数), "
+                             "trajectory=轨迹状态向量 (O(2^n) 内存，20q+ 必选)")
+    parser.add_argument("--traj-trajectories", type=int, default=16,
+                        help="轨迹模拟器采样条数（越大方差越小，训练越慢）")
+    parser.add_argument("--traj-seed", type=int, default=None,
+                        help="轨迹模拟器随机种子（默认 None=不可复现）")
     args = parser.parse_args()
 
     import torch
@@ -374,6 +412,19 @@ def main():
     else:
         topo_names = [f"topo{i}" for i in range(max(1, num_topos))]
 
+    # Resume: 从上一 checkpoint 恢复 step 计数与课程进度
+    resume_step = 0
+    resume_best = -1.0
+    if args.load:
+        try:
+            _st = torch.load(args.load, map_location="cpu", weights_only=False)
+            resume_step = int(_st.get("step", 0))
+            resume_best = float(_st.get("best_metric", -1.0))
+            print(f"[resume] {args.load}: step={resume_step} best_metric={resume_best:.5f}")
+        except Exception as e:
+            print(f"[resume] 无法读取 {args.load} 的 step/best_metric（普通权重或旧格式）：{e}")
+    resume_progress = resume_step / args.timesteps if args.timesteps else 0.0
+
     # Dataset
     split_prefix = args.split_prefix or {
         "routing": "stage1",
@@ -383,7 +434,7 @@ def main():
     if args.curriculum_keys:
         curriculum_prefixes = [p.strip() for p in args.curriculum_keys.split(",") if p.strip()]
         split_map = build_multi_split_map(args.data_dir, curriculum_prefixes)
-        initial_split_key = curriculum_phase(0.0, curriculum_prefixes, args.reward_mode)
+        initial_split_key = curriculum_phase(resume_progress, curriculum_prefixes, args.reward_mode)
         phase_fn = lambda p: curriculum_phase(p, curriculum_prefixes, args.reward_mode)
         print(f"Curriculum prefixes: {curriculum_prefixes}  "
               f"(initial split: {initial_split_key})")
@@ -416,7 +467,11 @@ def main():
                      lambda_fid=0.0 if args.reward_mode != "routing" else None,
                      eta_dist=args.eta_dist,
                      mapping_budget=args.mapping_budget,
-                     mapping_phase=args.mapping_phase)
+                     mapping_phase=args.mapping_phase,
+                     fidelity_fn=build_fidelity_fn(
+                         args.fidelity_sim, noise_config,
+                         num_trajectories=args.traj_trajectories, seed=args.traj_seed,
+                     ) if args.reward_mode != "routing" else None)
 
     agent_n_qubits = args.max_num_qubits or sample_dag.num_logical_qubits
     agent_action_dim = max_edges + (1 if args.mapping_phase else 0)
@@ -433,18 +488,35 @@ def main():
         with_commit=args.mapping_phase,
     )
     if args.load:
-        agent.load(args.load)
+        state = agent.load_checkpoint(args.load)
         print(f"Loaded pretrained model: {args.load}")
+        if "step" in state:
+            resume_step = int(state["step"])
+            resume_best = float(state.get("best_metric", -1.0))
+            print(f"  -> resume at step {resume_step}, best_metric={resume_best:.5f}")
 
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
 
     # --- checkpoint 初始化 ---
     ckpt_dir = args.checkpoint_dir or os.path.join(os.path.dirname(args.out) or ".", "ckpts")
     os.makedirs(ckpt_dir, exist_ok=True)
-    _metrics_fh = open(os.path.join(ckpt_dir, "metrics.csv"), "w", newline="")
+    _metrics_path = os.path.join(ckpt_dir, "metrics.csv")
     _metrics_fields = ["step", "reward", "swaps", "map_swaps", "trunc_pct", "pl", "vl", "ent", "kl", "grad", "fid"]
-    _metrics_writer = csv.DictWriter(_metrics_fh, fieldnames=_metrics_fields)
-    _metrics_writer.writeheader()
+    # 续训时追加而非覆盖；已有行丢到 resume_step 为止，避免旧行与新续训混合
+    if resume_step > 0 and os.path.exists(_metrics_path):
+        _metrics_fh = open(_metrics_path, "r", newline="")
+        _rows = list(csv.DictReader(_metrics_fh))
+        _metrics_fh.close()
+        kept = [r for r in _rows if int(r["step"] or 0) < resume_step]
+        _metrics_fh = open(_metrics_path, "w", newline="")
+        _metrics_writer = csv.DictWriter(_metrics_fh, fieldnames=_metrics_fields)
+        _metrics_writer.writeheader()
+        _metrics_writer.writerows(kept)
+        _metrics_fh.flush()
+    else:
+        _metrics_fh = open(_metrics_path, "w", newline="")
+        _metrics_writer = csv.DictWriter(_metrics_fh, fieldnames=_metrics_fields)
+        _metrics_writer.writeheader()
 
     obs, _ = env.reset()
     ep_buffer = {"act": [], "logp": [], "val": [], "rew": [], "done": []}
@@ -474,8 +546,8 @@ def main():
     topo_fids_lists = [[] for _ in range(num_topos)]
     topo_rewards_lists = [[] for _ in range(num_topos)]
 
-    total_steps = 0
-    best_metric = -1.0
+    total_steps = resume_step
+    best_metric = resume_best if resume_best > -1.0 else -1.0
     cycle_idx = 0
 
     while total_steps < args.timesteps:
@@ -571,7 +643,12 @@ def main():
                                  lambda_fid=cur_lambda_fid,
                                  eta_dist=args.eta_dist,
                                  mapping_budget=args.mapping_budget,
-                                 mapping_phase=args.mapping_phase)
+                                 mapping_phase=args.mapping_phase,
+                                 fidelity_fn=build_fidelity_fn(
+                                     args.fidelity_sim, noise_config,
+                                     num_trajectories=args.traj_trajectories,
+                                     seed=args.traj_seed,
+                                 ) if args.reward_mode != "routing" else None)
                 obs, _ = env.reset()
                 ep_total_reward = 0.0
 

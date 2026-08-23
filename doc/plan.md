@@ -1339,3 +1339,146 @@ tianyan 训练（`scripts/train_tianyan.sh`，MAX_STEPS=800）在 ~300k 步时 `
 tmux new-session -d -s curric 'cd /home/zzy/opencode-server/opencode-docker/projects/rlrouting && bash scripts/train_tianyan_curriculum.sh cuda:0 500000 200000 2>&1 | tee logs/train_curric.log'
 tmux attach -t curric   # 查看进度；按 Ctrl-B 然后 d 脱离
 ```
+
+---
+
+# Plan: 端到端联合优化框架 v2 —— 单策略 + 相位切换（真正端到端）
+
+> 状态：方案设计，待实施（写自 2026.08.07）
+> 前置：上一节「方案 A/B/C」只覆盖了调度动作空间候选；本节给出**完整框架**，
+>       让 agent 同时决定"何时 SWAP、执行哪些门、以什么顺序执行"（真正端到端）。
+> 用户决策：第一阶段先用原 agent + 贪心固定调度（timing_aware），本框架为后续
+>       升级到 agent 自主调度预留可插拔接口，逐步替换，不推倒重来。
+
+## 一、现状关键事实（决定改造方式）
+
+| 事实 | 代码位置 | 影响 |
+|------|---------|------|
+| `_update()` 自动执行所有 1Q 门，`_auto_execute_batch()` 按 `min(executable_2q)` 串行执行 2Q 门，零时间、零并行 | env.py:191 / env.py:513 | 调度完全由环境决定，agent 无任何直接控制 |
+| `mapping_phase + commit` 范式已存在（phase 标志切换动作空间、`>=num_edges` 为 commit） | env.py:589 `_step_mapping` | 调度阶段 = 该范式的直接推广，复用同一模式 |
+| GNN 已编码门节点嵌入，但 `node_embeddings()` 只返回 qubit 行，gate 段 `h[:G]` 被丢弃 | encoder.py:150 | 需暴露 `gate_embeddings()` 供调度头使用 |
+| 动作空间固定维（边长），调度动作数随 ready 门数变化 | agent.py:72 | 需 padding + mask 映射成固定维 |
+| 单策略、单 critic、统一 GAE | agent.py:409 `compute_gae` | 联合优化无需分层 RL，保持单一 PPO |
+
+## 二、核心 MDA 设计：单一策略 + 相位切换
+
+沿用 `mapping_phase` 范式，把"门调度"变成同一 agent 的第二个决策维度：
+
+```
+phase ∈ {mapping, routing, scheduling}
+
+step 时序:
+  routing 阶段:  agent 选 {(SWAP 边) ×E 或 END}      （现有逻辑，不变）
+    ↓ 路由后自动进入 scheduling 阶段
+  scheduling:    agent 逐个选 {ready 且 qubit 空闲的门} 或 END_SCHEDULE
+    ↓ END 后时钟推进到完成事件，回到 routing
+  循环直至线路跑完 → 终端 Aer 保真度奖励
+```
+
+- **同一策略网络**，按 phase 切换激活的动作头（类似 commit 动作的 phase 掩码）
+- **不引入分层 RL**（方案 C）：调度决策也是普通 step，统一进入 GAE
+
+## 三、可插拔调度器（贪心 → E2E 的支点）
+
+```python
+class GreedyScheduler:      # 第 1 步：criticality 排序，agent 不参与
+    def priority(self, g, dag, timing, hw): ...   # 返回排序键
+
+class PolicyScheduler:      # 第 2 步：agent 逐门决策（真正 E2E）
+    def next_action(self, ready_gates, feats, ...): return agent.act_gate(...)
+```
+
+- 环境只调 `scheduler.next(ready_gates, ...)`，routing/env 主体零改动
+- **阶段一（近期）**：实现 `GreedyScheduler` + timing_aware，验证时序建模本身
+- **阶段二（远期）**：实现 `PolicyScheduler`，把 agent 的 gate 决策接进来
+
+## 四、时序仿真内核（门并行/关键路径/串扰的根本）
+
+环境升级为**离散事件仿真**（非串行）：
+
+- `CircuitTiming` 扩展：`qubit_free[q]`（物理 qubit 空闲时刻）+ 全局 `clock`
+- `step_gate(g)` 语义：
+  ```
+  start = max(qubit_free[qa], qubit_free[qb])     # 两 qubit 都空闲才可执行
+  qubit_free[qa] = qubit_free[qb] = start + duration(g)
+  clock = max(clock, start + duration(g))          # 互斥 qubit 上的门并行运行
+  ```
+- 计时用 `GATE_DURATION_TABLE`（rz=0 / sx≈35ns / cx≈300ns），SWAP 也计时（0.3µs）
+- **并行度由 agent 连续选门自然产生**：互斥 qubit 上的门可连续选择、同时 in-flight
+- `CircuitTiming` 记录 `total_time / idle_time / active_gates / crosstalk_events /
+  rounds`，含 `clone()` 供 GNN beam search 复用
+
+## 五、观测空间（State）
+
+观测 = 现有路由特征 + 门层面特征 + timing 全局特征：
+
+| 模块 | 内容 | 维度 |
+|------|------|------|
+| `edge_feats` | 现有 per-edge SABRE 特征（不动） | E × d |
+| `ready_gate_feats` | 每条 ready 门 `[h_g, h_q1, h_q2, h_q1-h_q2, duration_norm, criticality]`（`h_g` 来自新暴露的 gate 嵌入） | K × d' |
+| `global` | `map_vec` + `progress` + `phase` + `[clock_norm, idle_norm, crosstalk_ratio, parallelism]` | 固定 |
+
+- 门节点特征补 `duration_norm` + `relative_criticality`（到线路终点的剩余深度，
+  调度最重要启发式）→ 由上一节「图编码 timing 扩展」的 dim 27/28 提供
+
+## 六、动作空间（固定维 + phase 掩码）
+
+| 阶段 | 动作空间 | 掩码 |
+|------|---------|------|
+| mapping | `Discrete(num_edges + 1)`（现有） | commit 仅映射阶段有效 |
+| routing | `Discrete(num_edges + 1)`（现有） | 死锁/未映射掩码 |
+| scheduling | `Discrete(K_max + 1)`，K_max = 数据集最大 ready 门数 | 仅 ready 且 qubit 空闲的门 + END_SCHEDULE |
+
+- `K_max` 取数据集统计上界（≤ num_edges 量级），不足部分 mask 掉
+- 同一 `JointActorCritic.forward` 依 phase 只激活对应头，共享 critic
+
+## 七、奖励设计（全为即时信号，GAE 回流到路由决策）
+
+| 项 | 公式 | 作用 |
+|----|------|------|
+| `r_time` | `-η_t·(clock_after − clock_before)` | 每次选门的时间代价 → 门延迟/换门时机 |
+| `r_crosstalk` | `-η_x·Σ hw.zz[并行邻居]` | 与相邻占用 qubit 的 zz 惩罚 |
+| `r_idle` | `-η_i·新增 idle 时间` | 避免 qubit 空转（T1/T2 衰减） |
+| `r_dist` | 现有 SABRE 距离（routing 阶段） | 路由 |
+| 终端 | `λ_fid·fidelity`（Aer，noise_aware） | 收尾 |
+
+- 训练：单一 PPO + 单一 critic，整条 episode 统一 GAE（调度决策也视作 step 参与）
+- 课程：Phase1 routing（贪心调度）→ Phase1.5 timing_aware（贪心）→
+  Phase2 E2E（PolicyScheduler，warm-start 现有 policy）→ Phase3 noise
+
+## 八、代码改动清单（依赖顺序）
+
+| 顺序 | 文件 | 改动 |
+|------|------|------|
+| 1 | `src/routing/timing.py`（新建） | `GATE_DURATION_TABLE`、`CircuitTiming`（含 qubit_free/clock）、`schedule_round()` 贪心实现 |
+| 2 | `src/routing/graph/circuit_dag.py` | `build_routing_graph(..., timing=)` 填 gate 时长/criticality 特征；`GateRecord.duration` |
+| 3 | `src/routing/gnn/encoder.py` | 新增 `gate_embeddings()`（返回 `h[:G]`） |
+| 4 | `src/routing/rl/env.py` | `_update`/`_auto_execute_batch` 改为可替换调度器（`self.scheduler`）；`reward_mode="timing_aware"`；新 `_step_gate()` + phase 状态机 + `_obs` 追加 timing/gate feats + mask；`clone()` 复制 timing |
+| 5 | `src/routing/rl/agent.py` | `EdgeActorCritic` → `JointActorCritic`（新增 `gate_mlp` 头，共享 critic/backbone） |
+| 6 | `src/routing/rl/train_agent.py` | `--reward-mode timing_aware/e2e`；obs 维度适配；metrics 扩展 |
+| 7 | `src/routing/rl/eval_policy.py` | beam search 分支调度（依赖 `clone()` 支持 timing） |
+
+## 九、待确认决策（3 点）
+
+1. **1Q 门是否纳入调度？** 建议 1Q 维持环境自动执行（仅占 qubit busy 时间、影响极小），
+   只让 2Q 门参与 agent 调度，动作空间小得多。
+2. **crosstalk 是否同时进观测与奖励？** 建议两者都要（`crosstalk_ratio` 进 obs 特征 +
+   zz 惩罚进 reward）。
+3. **gate 嵌入是否补 criticality 特征？** 建议补（到线路终点的剩余深度是调度最关键
+   启发式之一）。
+
+## 十、验证
+
+1. `PYTHONPATH=src python3 -m pytest test/ -q`
+2. 5q 三拓扑短训练（`--timesteps 5000`）：确认 timing_aware 下 parallelism > 1、
+   crosstalk 非零、线路时间比 routing 模式短
+3. E2E 阶段（方案 A gate_score_head 先行）：对比固定调度版
+   - 期望：parallelism_factor 提升、crosstalk_events 下降、circuit_time 下降
+4. 20q 评估，三指标（SWAPs / circuit_time / fidelity）对比 SABRE
+
+## 十一、风险
+
+- 调度决策使 episode 步数变长 → 信用分配更难；缓解：即时 r_time/r_xt/r_idle 信号 +
+  课程学习
+- 变长 ready 门动作空间 → padding 维度需按数据集上界固定，mask 处理
+- obs/动作空间变更影响面大 → 同步更新 `_forward_obs` / `_build_edge_obs` / 测试断言

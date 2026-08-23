@@ -8,6 +8,8 @@ and PPO with SABRE-inspired features, distance reward, deadlock masking, and bea
 
 - **磁盘 `/dev/sda1`（挂载于 `/data1`）已损坏**：所有操作（读写文件、训练/评估的输入输出、checkpoint、日志、临时文件等）**严禁涉及该硬盘**。不要创建、修改、读取或计划任何位于 `/data1` 下的路径；可用磁盘为 `/dev/nvme0n1p5`（挂载于 `/home`，项目所在）与 `/dev/sdb1`（挂载于 `/data2`）。临时文件请使用 `src/`、`/home` 或 `/tmp`（非 `/data1`）。
 - **每次跑完实验后，必须将实验结果写入 `doc/train.md`**：包括训练/评估命令、设置、关键日志摘要、评估结果表格以及结论与分析，按时间顺序追加到该文件末尾，并保持现有格式风格（`---` 分节、中文描述、代码块命令、markdown 表格）。
+- **所有训练必须在 `tmux` 会话中后台进行**：使用 `tmux new -s <会话名>` 启动（或用 `tmux attach -t <会话名>` 恢复），训练命令在会话内运行，避免终端断开导致训练中断。
+- **评估基线只保留 SABRE**：对比测试一律使用 `--baselines --no-greedy --no-random`（不考虑 greedy 与 random 算法），仅与 SABRE 对比。
 
 ## Language / Framework / Package Manager
 
@@ -132,7 +134,7 @@ rlrouting/
     --data-dir ../traindata \
     --split stage1_phase3 \
     --reward-mode routing \
-    --baselines
+    --baselines --no-greedy --no-random
   ```
 
 - **Evaluate PPO（beam search）**:
@@ -144,7 +146,7 @@ rlrouting/
     --data-dir ../traindata \
     --split stage1_phase1 \
     --beam-width 3 \
-    --baselines
+    --baselines --no-greedy --no-random
   ```
 
 - **Lint / typecheck / fmt**: 尚未配置（建议 ruff / mypy / black）

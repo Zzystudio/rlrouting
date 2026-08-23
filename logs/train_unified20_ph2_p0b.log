@@ -1,0 +1,294 @@
+[resume] models/policy_unified_phase1.pt: step=0 best_metric=-1.00000
+Split prefix: unified  (initial split: unified_mixed)
+Loaded pretrained model: models/policy_unified_phase1.pt
+step=   256  rew=+103.035  swp=52.0  map=0.8  trunc=0%  pl=0.001  vl=0.542  ent=1.690  kl=0.0719  gn=0.474  fid=0.1683
+  line_20q         1ep | trunc=0%  swp=40.0±0.0  fid=0.0265  rew=+37.96
+  ring_20q         3ep | trunc=0%  swp=56.0±77.1  fid=0.2155  rew=+124.73
+step=   512  rew=+92.413  swp=47.5  map=1.3  trunc=0%  pl=0.002  vl=0.960  ent=1.171  kl=0.2677  gn=0.906  fid=0.1100
+  line_20q         4ep | trunc=0%  swp=26.0±15.9  fid=0.0559  rew=+72.62
+  ring_20q         5ep | trunc=0%  swp=70.8±74.0  fid=0.1302  rew=+118.75
+  grid_5x4_20q     1ep | trunc=0%  swp=17.0±0.0  fid=0.2247  rew=+39.93
+step=   768  rew=+102.220  swp=43.3  map=0.9  trunc=0%  pl=-0.012  vl=0.547  ent=1.502  kl=0.2858  gn=0.283  fid=0.0863
+  line_20q         6ep | trunc=0%  swp=35.5±36.6  fid=0.0373  rew=+124.90
+  ring_20q         6ep | trunc=0%  swp=66.2±68.4  fid=0.1094  rew=+109.27
+  grid_5x4_20q     3ep | trunc=0%  swp=13.3±3.3  fid=0.1383  rew=+42.77
+step=  1024  rew=+94.271  swp=47.0  map=0.8  trunc=0%  pl=-0.011  vl=0.183  ent=1.243  kl=0.0944  gn=1.271  fid=0.0923
+  line_20q         8ep | trunc=0%  swp=44.9±48.2  fid=0.0843  rew=+108.86
+  ring_20q         8ep | trunc=0%  swp=66.0±59.5  fid=0.0825  rew=+93.16
+  grid_5x4_20q     5ep | trunc=0%  swp=18.8±7.4  fid=0.1075  rew=+61.45
+step=  1280  rew=+78.390  swp=36.5  map=0.4  trunc=0%  pl=0.003  vl=1.407  ent=0.695  kl=0.1242  gn=1.700  fid=0.1068
+  line_20q        10ep | trunc=0%  swp=38.5±45.3  fid=0.1034  rew=+104.83
+  ring_20q         9ep | trunc=0%  swp=65.9±56.1  fid=0.0733  rew=+89.01
+  grid_5x4_20q    10ep | trunc=0%  swp=20.9±12.3  fid=0.1316  rew=+60.26
+step=  1536  rew=+63.645  swp=29.6  map=0.8  trunc=0%  pl=-0.023  vl=0.421  ent=0.994  kl=0.2062  gn=0.787  fid=0.1098
+  line_20q        14ep | trunc=0%  swp=35.1±38.9  fid=0.0918  rew=+88.36
+  ring_20q        10ep | trunc=0%  swp=59.3±56.8  fid=0.0710  rew=+89.58
+  grid_5x4_20q    12ep | trunc=0%  swp=24.7±20.2  fid=0.1247  rew=+64.56
+step=  1792  rew=+63.211  swp=26.4  map=1.2  trunc=0%  pl=-0.032  vl=0.514  ent=0.896  kl=0.2214  gn=0.988  fid=0.0908
+  line_20q        15ep | trunc=0%  swp=39.9±41.6  fid=0.0857  rew=+89.24
+  ring_20q        12ep | trunc=0%  swp=51.1±55.1  fid=0.0767  rew=+85.87
+  grid_5x4_20q    19ep | trunc=0%  swp=21.8±17.3  fid=0.1166  rew=+62.71
+step=  2048  rew=+79.816  swp=26.6  map=1.1  trunc=0%  pl=0.001  vl=0.497  ent=1.126  kl=0.0533  gn=0.541  fid=0.0889
+  line_20q        21ep | trunc=0%  swp=34.4±40.1  fid=0.0857  rew=+94.01
+  ring_20q        13ep | trunc=0%  swp=54.8±54.5  fid=0.0708  rew=+88.20
+  grid_5x4_20q    21ep | trunc=0%  swp=22.3±17.2  fid=0.1128  rew=+63.69
+step=  2304  rew=+78.137  swp=25.9  map=1.2  trunc=0%  pl=-0.008  vl=0.512  ent=1.420  kl=0.0365  gn=1.400  fid=0.0961
+  line_20q        22ep | trunc=0%  swp=34.9±39.3  fid=0.0819  rew=+91.62
+  ring_20q        15ep | trunc=0%  swp=49.5±52.6  fid=0.0675  rew=+82.03
+  grid_5x4_20q    24ep | trunc=0%  swp=23.2±20.0  fid=0.1258  rew=+64.99
+step=  2560  rew=+77.642  swp=34.8  map=1.0  trunc=0%  pl=-0.037  vl=0.223  ent=1.326  kl=0.3084  gn=1.001  fid=0.1043
+  line_20q        24ep | trunc=0%  swp=38.1±39.6  fid=0.0751  rew=+89.59
+  ring_20q        18ep | trunc=0%  swp=49.5±55.9  fid=0.0946  rew=+80.83
+  grid_5x4_20q    27ep | trunc=0%  swp=22.9±18.8  fid=0.1182  rew=+65.59
+step=  2816  rew=+72.987  swp=39.4  map=0.9  trunc=0%  pl=0.013  vl=0.743  ent=1.529  kl=0.1511  gn=1.095  fid=0.1023
+  line_20q        26ep | trunc=0%  swp=40.1±38.7  fid=0.0693  rew=+87.06
+  ring_20q        20ep | trunc=0%  swp=50.5±54.5  fid=0.0956  rew=+80.40
+  grid_5x4_20q    27ep | trunc=0%  swp=22.9±18.8  fid=0.1182  rew=+65.59
+step=  3072  rew=+55.657  swp=33.0  map=1.7  trunc=0%  pl=0.024  vl=1.000  ent=0.259  kl=0.0670  gn=1.321  fid=0.1288
+  line_20q        32ep | trunc=0%  swp=38.3±36.2  fid=0.0682  rew=+80.58
+  ring_20q        21ep | trunc=0%  swp=48.1±54.2  fid=0.1038  rew=+81.07
+  grid_5x4_20q    30ep | trunc=0%  swp=21.3±18.5  fid=0.1370  rew=+61.59
+step=  3328  rew=+53.311  swp=35.5  map=2.1  trunc=0%  pl=-0.001  vl=0.605  ent=0.714  kl=0.0793  gn=1.290  fid=0.0923
+  line_20q        35ep | trunc=0%  swp=37.5±34.9  fid=0.0643  rew=+77.48
+  ring_20q        23ep | trunc=0%  swp=49.1±52.4  fid=0.0948  rew=+78.92
+  grid_5x4_20q    30ep | trunc=0%  swp=21.3±18.5  fid=0.1370  rew=+61.59
+step=  3584  rew=+81.089  swp=27.7  map=2.1  trunc=0%  pl=0.010  vl=0.554  ent=1.220  kl=0.1376  gn=0.781  fid=0.0851
+  line_20q        36ep | trunc=0%  swp=36.5±35.0  fid=0.0625  rew=+82.45
+  ring_20q        24ep | trunc=0%  swp=47.0±52.2  fid=0.0911  rew=+86.64
+  grid_5x4_20q    35ep | trunc=0%  swp=23.9±19.3  fid=0.1197  rew=+66.44
+step=  3840  rew=+93.037  swp=36.5  map=2.5  trunc=0%  pl=-0.015  vl=0.503  ent=1.615  kl=0.0325  gn=1.101  fid=0.0448
+  line_20q        38ep | trunc=0%  swp=35.2±34.6  fid=0.0623  rew=+82.37
+  ring_20q        25ep | trunc=0%  swp=49.6±52.7  fid=0.0874  rew=+86.43
+  grid_5x4_20q    36ep | trunc=0%  swp=25.2±20.6  fid=0.1164  rew=+69.30
+step=  4096  rew=+105.604  swp=49.6  map=1.2  trunc=0%  pl=0.014  vl=0.746  ent=1.561  kl=0.0931  gn=1.105  fid=0.0271
+  line_20q        40ep | trunc=0%  swp=40.8±44.5  fid=0.0592  rew=+84.72
+  ring_20q        26ep | trunc=0%  swp=51.2±52.3  fid=0.0842  rew=+87.02
+  grid_5x4_20q    36ep | trunc=0%  swp=25.2±20.6  fid=0.1164  rew=+69.30
+step=  4352  rew=+86.687  swp=42.8  map=1.2  trunc=0%  pl=-0.027  vl=0.454  ent=0.877  kl=0.1548  gn=0.492  fid=0.1125
+  line_20q        44ep | trunc=0%  swp=40.2±44.4  fid=0.0561  rew=+89.20
+  ring_20q        29ep | trunc=0%  swp=46.5±51.5  fid=0.1168  rew=+81.51
+  grid_5x4_20q    41ep | trunc=0%  swp=23.7±19.8  fid=0.1224  rew=+66.23
+step=  4608  rew=+93.543  swp=20.4  map=0.9  trunc=0%  pl=-0.024  vl=0.494  ent=0.918  kl=0.2304  gn=0.408  fid=0.1343
+  line_20q        45ep | trunc=0%  swp=40.6±44.0  fid=0.0549  rew=+89.49
+  ring_20q        33ep | trunc=0%  swp=42.5±50.1  fid=0.1141  rew=+92.35
+  grid_5x4_20q    44ep | trunc=0%  swp=23.8±19.4  fid=0.1181  rew=+66.88
+step=  4864  rew=+88.547  swp=26.4  map=1.2  trunc=0%  pl=-0.011  vl=0.594  ent=1.247  kl=0.0512  gn=1.681  fid=0.1170
+  line_20q        45ep | trunc=0%  swp=40.6±44.0  fid=0.0549  rew=+89.49
+  ring_20q        34ep | trunc=0%  swp=45.6±52.6  fid=0.1108  rew=+93.64
+  grid_5x4_20q    49ep | trunc=0%  swp=24.0±18.9  fid=0.1129  rew=+66.43
+step=  5120  rew=+91.819  swp=37.1  map=0.7  trunc=0%  pl=0.010  vl=0.562  ent=1.466  kl=0.0337  gn=0.912  fid=0.0911
+  line_20q        48ep | trunc=0%  swp=41.0±43.5  fid=0.0616  rew=+88.00
+  ring_20q        35ep | trunc=0%  swp=47.5±53.0  fid=0.1076  rew=+93.62
+  grid_5x4_20q    50ep | trunc=0%  swp=23.7±18.8  fid=0.1165  rew=+66.11
+step=  5376  rew=+90.852  swp=49.0  map=0.7  trunc=0%  pl=0.018  vl=0.841  ent=1.024  kl=0.0750  gn=1.040  fid=0.0817
+  line_20q        49ep | trunc=0%  swp=43.2±45.5  fid=0.0604  rew=+87.44
+  ring_20q        36ep | trunc=0%  swp=49.3±53.3  fid=0.1046  rew=+93.19
+  grid_5x4_20q    51ep | trunc=0%  swp=23.4±18.8  fid=0.1188  rew=+65.31
+step=  5632  rew=+91.325  swp=48.3  map=0.7  trunc=0%  pl=-0.004  vl=0.531  ent=2.038  kl=0.0208  gn=1.657  fid=0.0814
+  line_20q        49ep | trunc=0%  swp=43.2±45.5  fid=0.0604  rew=+87.44
+  ring_20q        36ep | trunc=0%  swp=49.3±53.3  fid=0.1046  rew=+93.19
+  grid_5x4_20q    52ep | trunc=0%  swp=23.7±18.7  fid=0.1165  rew=+65.91
+step=  5888  rew=+73.416  swp=64.9  map=0.9  trunc=0%  pl=0.012  vl=0.208  ent=1.301  kl=0.1718  gn=0.969  fid=0.0823
+  line_20q        50ep | trunc=0%  swp=48.5±58.5  fid=0.0592  rew=+88.88
+  ring_20q        37ep | trunc=0%  swp=48.3±53.0  fid=0.1055  rew=+91.09
+  grid_5x4_20q    54ep | trunc=0%  swp=24.1±19.0  fid=0.1151  rew=+66.09
+step=  6144  rew=+69.653  swp=56.9  map=0.8  trunc=0%  pl=-0.019  vl=0.515  ent=1.014  kl=0.0445  gn=0.529  fid=0.0858
+  line_20q        53ep | trunc=0%  swp=48.7±57.4  fid=0.0582  rew=+87.21
+  ring_20q        41ep | trunc=0%  swp=46.3±51.4  fid=0.1002  rew=+90.79
+  grid_5x4_20q    56ep | trunc=0%  swp=23.8±18.8  fid=0.1175  rew=+65.32
+step=  6400  rew=+66.978  swp=55.4  map=1.1  trunc=0%  pl=-0.004  vl=0.542  ent=1.482  kl=0.0564  gn=1.185  fid=0.0663
+  line_20q        54ep | trunc=0%  swp=48.3±56.9  fid=0.0575  rew=+86.45
+  ring_20q        42ep | trunc=0%  swp=45.9±50.9  fid=0.0998  rew=+89.69
+  grid_5x4_20q    57ep | trunc=0%  swp=24.4±19.0  fid=0.1155  rew=+65.09
+step=  6656  rew=+71.363  swp=43.0  map=1.1  trunc=0%  pl=-0.012  vl=0.185  ent=1.448  kl=0.0400  gn=0.981  fid=0.0796
+  line_20q        56ep | trunc=0%  swp=52.2±66.3  fid=0.0557  rew=+88.51
+  ring_20q        43ep | trunc=0%  swp=44.8±50.8  fid=0.1037  rew=+89.01
+  grid_5x4_20q    60ep | trunc=0%  swp=24.3±18.8  fid=0.1160  rew=+65.20
+step=  6912  rew=+70.892  swp=41.5  map=1.0  trunc=0%  pl=-0.011  vl=0.396  ent=1.245  kl=0.0337  gn=1.200  fid=0.0620
+  line_20q        58ep | trunc=0%  swp=52.1±65.4  fid=0.0559  rew=+86.77
+  ring_20q        44ep | trunc=0%  swp=44.5±50.2  fid=0.1029  rew=+87.98
+  grid_5x4_20q    62ep | trunc=0%  swp=24.2±18.5  fid=0.1128  rew=+65.04
+step=  7168  rew=+81.232  swp=48.8  map=0.8  trunc=0%  pl=0.006  vl=0.591  ent=1.301  kl=0.0237  gn=0.535  fid=0.0874
+  line_20q        61ep | trunc=0%  swp=52.8±65.4  fid=0.0546  rew=+88.14
+  ring_20q        46ep | trunc=0%  swp=45.0±50.5  fid=0.1131  rew=+87.25
+  grid_5x4_20q    62ep | trunc=0%  swp=24.2±18.5  fid=0.1128  rew=+65.04
+step=  7424  rew=+84.939  swp=37.6  map=0.8  trunc=0%  pl=0.001  vl=0.553  ent=0.914  kl=0.0699  gn=0.861  fid=0.1023
+  line_20q        65ep | trunc=0%  swp=51.6±64.3  fid=0.0604  rew=+89.25
+  ring_20q        48ep | trunc=0%  swp=43.3±50.1  fid=0.1101  rew=+88.71
+  grid_5x4_20q    64ep | trunc=0%  swp=24.9±18.7  fid=0.1093  rew=+66.11
+step=  7680  rew=+91.329  swp=46.8  map=0.8  trunc=0%  pl=-0.032  vl=0.203  ent=1.098  kl=0.1616  gn=1.146  fid=0.0814
+  line_20q        65ep | trunc=0%  swp=51.6±64.3  fid=0.0604  rew=+89.25
+  ring_20q        49ep | trunc=0%  swp=45.9±52.6  fid=0.1079  rew=+89.46
+  grid_5x4_20q    67ep | trunc=0%  swp=25.1±18.5  fid=0.1057  rew=+66.31
+step=  7936  rew=+83.541  swp=39.2  map=0.9  trunc=0%  pl=-0.051  vl=0.473  ent=1.334  kl=0.1331  gn=1.556  fid=0.0710
+  line_20q        67ep | trunc=0%  swp=52.0±63.8  fid=0.0618  rew=+88.15
+  ring_20q        51ep | trunc=0%  swp=44.9±52.0  fid=0.1055  rew=+88.77
+  grid_5x4_20q    70ep | trunc=0%  swp=24.9±18.2  fid=0.1059  rew=+65.84
+step=  8192  rew=+75.644  swp=36.6  map=1.0  trunc=0%  pl=-0.013  vl=0.435  ent=0.967  kl=0.1547  gn=0.536  fid=0.0777
+  line_20q        70ep | trunc=0%  swp=50.9±62.8  fid=0.0604  rew=+89.30
+  ring_20q        55ep | trunc=0%  swp=44.4±50.5  fid=0.0990  rew=+88.04
+  grid_5x4_20q    70ep | trunc=0%  swp=24.9±18.2  fid=0.1059  rew=+65.84
+step=  8448  rew=+73.284  swp=38.4  map=0.7  trunc=0%  pl=-0.028  vl=0.430  ent=1.419  kl=0.1010  gn=2.302  fid=0.0514
+  line_20q        72ep | trunc=0%  swp=51.8±62.2  fid=0.0587  rew=+88.34
+  ring_20q        57ep | trunc=0%  swp=44.5±49.9  fid=0.0967  rew=+86.81
+  grid_5x4_20q    71ep | trunc=0%  swp=24.9±18.1  fid=0.1057  rew=+66.41
+step=  8704  rew=+83.318  swp=48.7  map=0.5  trunc=0%  pl=-0.028  vl=0.715  ent=1.038  kl=0.0799  gn=1.552  fid=0.0634
+  line_20q        74ep | trunc=0%  swp=51.9±61.9  fid=0.0627  rew=+87.70
+  ring_20q        57ep | trunc=0%  swp=44.5±49.9  fid=0.0967  rew=+86.81
+  grid_5x4_20q    72ep | trunc=0%  swp=26.4±22.0  fid=0.1043  rew=+68.98
+step=  8960  rew=+87.392  swp=56.1  map=0.5  trunc=0%  pl=0.040  vl=0.990  ent=1.878  kl=0.0617  gn=1.099  fid=0.0634
+  line_20q        74ep | trunc=0%  swp=51.9±61.9  fid=0.0627  rew=+87.70
+  ring_20q        58ep | trunc=0%  swp=47.1±53.1  fid=0.0951  rew=+87.88
+  grid_5x4_20q    72ep | trunc=0%  swp=26.4±22.0  fid=0.1043  rew=+68.98
+step=  9216  rew=+88.675  swp=58.6  map=0.5  trunc=0%  pl=0.003  vl=0.601  ent=1.547  kl=0.0271  gn=1.149  fid=0.0534
+  line_20q        75ep | trunc=0%  swp=51.5±61.6  fid=0.0635  rew=+87.18
+  ring_20q        60ep | trunc=0%  swp=48.5±53.5  fid=0.0920  rew=+87.95
+  grid_5x4_20q    72ep | trunc=0%  swp=26.4±22.0  fid=0.1043  rew=+68.98
+step=  9472  rew=+97.413  swp=66.5  map=0.7  trunc=0%  pl=0.002  vl=0.429  ent=1.416  kl=0.0494  gn=0.477  fid=0.0425
+  line_20q        77ep | trunc=0%  swp=51.4±61.1  fid=0.0622  rew=+86.32
+  ring_20q        63ep | trunc=0%  swp=50.3±54.6  fid=0.0876  rew=+90.67
+  grid_5x4_20q    72ep | trunc=0%  swp=26.4±22.0  fid=0.1043  rew=+68.98
+step=  9728  rew=+88.818  swp=61.2  map=0.6  trunc=0%  pl=-0.002  vl=0.522  ent=1.047  kl=0.0457  gn=1.173  fid=0.1057
+  line_20q        81ep | trunc=0%  swp=50.2±60.1  fid=0.0733  rew=+84.14
+  ring_20q        64ep | trunc=0%  swp=50.5±54.2  fid=0.0863  rew=+90.52
+  grid_5x4_20q    75ep | trunc=0%  swp=26.2±21.7  fid=0.1054  rew=+69.23
+step=  9984  rew=+70.258  swp=42.2  map=0.5  trunc=0%  pl=0.007  vl=0.259  ent=1.380  kl=0.0342  gn=1.082  fid=0.1022
+  line_20q        83ep | trunc=0%  swp=51.0±59.7  fid=0.0716  rew=+83.80
+  ring_20q        66ep | trunc=0%  swp=49.7±53.6  fid=0.0855  rew=+89.02
+  grid_5x4_20q    77ep | trunc=0%  swp=25.8±21.6  fid=0.1056  rew=+68.93
+step= 10240  rew=+62.904  swp=38.0  map=0.3  trunc=0%  pl=-0.025  vl=0.266  ent=1.302  kl=0.0392  gn=0.861  fid=0.1226
+  line_20q        86ep | trunc=0%  swp=51.4±59.4  fid=0.0742  rew=+83.89
+  ring_20q        68ep | trunc=0%  swp=49.3±52.8  fid=0.0833  rew=+87.89
+  grid_5x4_20q    78ep | trunc=0%  swp=25.8±21.4  fid=0.1054  rew=+69.14
+step= 10496  rew=+65.175  swp=38.5  map=0.3  trunc=0%  pl=-0.012  vl=0.410  ent=1.307  kl=0.0796  gn=2.278  fid=0.0626
+  line_20q        89ep | trunc=0%  swp=50.3±58.8  fid=0.0737  rew=+83.01
+  ring_20q        69ep | trunc=0%  swp=49.5±52.5  fid=0.0823  rew=+87.27
+  grid_5x4_20q    81ep | trunc=0%  swp=26.0±21.5  fid=0.1033  rew=+69.84
+step= 10752  rew=+71.338  swp=43.1  map=0.2  trunc=0%  pl=-0.026  vl=0.359  ent=1.142  kl=0.0552  gn=1.520  fid=0.0531
+  line_20q        92ep | trunc=0%  swp=49.8±58.0  fid=0.0731  rew=+82.07
+  ring_20q        71ep | trunc=0%  swp=49.6±51.9  fid=0.0800  rew=+86.75
+  grid_5x4_20q    82ep | trunc=0%  swp=26.2±21.5  fid=0.1021  rew=+70.72
+step= 11008  rew=+58.224  swp=32.2  map=0.6  trunc=0%  pl=0.035  vl=0.599  ent=1.074  kl=0.2982  gn=1.801  fid=0.0761
+  line_20q        94ep | trunc=0%  swp=49.7±57.5  fid=0.0736  rew=+81.63
+  ring_20q        73ep | trunc=0%  swp=49.1±51.3  fid=0.0783  rew=+86.27
+  grid_5x4_20q    87ep | trunc=0%  swp=26.0±21.2  fid=0.1060  rew=+69.09
+step= 11264  rew=+66.115  swp=34.4  map=0.6  trunc=0%  pl=-0.031  vl=0.218  ent=1.570  kl=0.1255  gn=0.917  fid=0.0745
+  line_20q        95ep | trunc=0%  swp=50.5±57.7  fid=0.0728  rew=+81.86
+  ring_20q        75ep | trunc=0%  swp=48.1±51.0  fid=0.0772  rew=+86.20
+  grid_5x4_20q    90ep | trunc=0%  swp=25.9±20.9  fid=0.1044  rew=+69.15
+step= 11520  rew=+83.496  swp=30.1  map=0.6  trunc=0%  pl=-0.013  vl=0.492  ent=0.949  kl=0.1223  gn=1.107  fid=0.0811
+  line_20q        99ep | trunc=0%  swp=49.2±57.0  fid=0.0754  rew=+82.51
+  ring_20q        78ep | trunc=0%  swp=47.0±50.4  fid=0.0754  rew=+85.75
+  grid_5x4_20q    93ep | trunc=0%  swp=26.4±20.9  fid=0.1018  rew=+70.97
+step= 11776  rew=+103.099  swp=34.9  map=0.4  trunc=0%  pl=0.001  vl=1.061  ent=0.779  kl=0.1615  gn=1.060  fid=0.0659
+  line_20q        99ep | trunc=0%  swp=49.2±57.0  fid=0.0754  rew=+82.51
+  ring_20q        79ep | trunc=0%  swp=46.7±50.1  fid=0.0752  rew=+85.13
+  grid_5x4_20q    98ep | trunc=0%  swp=27.3±22.2  fid=0.1003  rew=+75.22
+step= 12032  rew=+105.599  swp=38.2  map=0.5  trunc=0%  pl=0.029  vl=0.901  ent=1.820  kl=0.0732  gn=1.026  fid=0.0567
+  line_20q       100ep | trunc=0%  swp=49.4±56.7  fid=0.0747  rew=+82.38
+  ring_20q        79ep | trunc=0%  swp=46.7±50.1  fid=0.0752  rew=+85.13
+  grid_5x4_20q    99ep | trunc=0%  swp=27.4±22.1  fid=0.0993  rew=+74.96
+step= 12288  rew=+87.744  swp=41.8  map=0.8  trunc=0%  pl=0.003  vl=0.520  ent=1.344  kl=0.1254  gn=0.986  fid=0.0615
+  line_20q       102ep | trunc=0%  swp=48.8±56.4  fid=0.0753  rew=+82.13
+  ring_20q        84ep | trunc=0%  swp=47.8±51.5  fid=0.0743  rew=+84.87
+  grid_5x4_20q   101ep | trunc=0%  swp=27.1±21.9  fid=0.0993  rew=+74.49
+step= 12544  rew=+91.094  swp=47.5  map=0.7  trunc=0%  pl=0.022  vl=0.737  ent=2.141  kl=0.0285  gn=0.832  fid=0.0613
+  line_20q       102ep | trunc=0%  swp=48.8±56.4  fid=0.0753  rew=+82.13
+  ring_20q        85ep | trunc=0%  swp=49.2±52.6  fid=0.0735  rew=+85.43
+  grid_5x4_20q   101ep | trunc=0%  swp=27.1±21.9  fid=0.0993  rew=+74.49
+step= 12800  rew=+79.431  swp=52.0  map=1.1  trunc=0%  pl=-0.005  vl=0.584  ent=1.295  kl=0.0556  gn=0.946  fid=0.0478
+  line_20q       105ep | trunc=0%  swp=48.3±55.9  fid=0.0737  rew=+82.26
+  ring_20q        87ep | trunc=0%  swp=50.5±52.9  fid=0.0718  rew=+85.98
+  grid_5x4_20q   103ep | trunc=0%  swp=26.9±21.8  fid=0.0991  rew=+74.10
+step= 13056  rew=+73.358  swp=43.0  map=1.1  trunc=0%  pl=0.008  vl=0.219  ent=1.702  kl=0.0559  gn=0.813  fid=0.0826
+  line_20q       107ep | trunc=0%  swp=47.6±55.6  fid=0.0786  rew=+81.52
+  ring_20q        90ep | trunc=0%  swp=50.5±52.5  fid=0.0713  rew=+85.70
+  grid_5x4_20q   105ep | trunc=0%  swp=26.6±21.7  fid=0.0994  rew=+73.70
+step= 13312  rew=+85.789  swp=54.5  map=1.1  trunc=0%  pl=-0.008  vl=0.391  ent=1.830  kl=0.0285  gn=0.494  fid=0.0727
+  line_20q       109ep | trunc=0%  swp=49.3±59.5  fid=0.0776  rew=+82.97
+  ring_20q        90ep | trunc=0%  swp=50.5±52.5  fid=0.0713  rew=+85.70
+  grid_5x4_20q   105ep | trunc=0%  swp=26.6±21.7  fid=0.0994  rew=+73.70
+step= 13568  rew=+75.006  swp=41.1  map=1.4  trunc=0%  pl=-0.017  vl=0.430  ent=1.360  kl=0.0393  gn=1.447  fid=0.1049
+  line_20q       111ep | trunc=0%  swp=49.0±59.1  fid=0.0816  rew=+82.13
+  ring_20q        90ep | trunc=0%  swp=50.5±52.5  fid=0.0713  rew=+85.70
+  grid_5x4_20q   108ep | trunc=0%  swp=26.6±21.5  fid=0.0980  rew=+73.70
+step= 13824  rew=+77.086  swp=47.2  map=1.3  trunc=0%  pl=-0.002  vl=0.830  ent=0.890  kl=0.0676  gn=1.550  fid=0.1053
+  line_20q       114ep | trunc=0%  swp=49.8±59.1  fid=0.0795  rew=+81.73
+  ring_20q        92ep | trunc=0%  swp=49.7±52.2  fid=0.0724  rew=+85.21
+  grid_5x4_20q   110ep | trunc=0%  swp=26.9±21.8  fid=0.0967  rew=+74.40
+step= 14080  rew=+81.152  swp=46.9  map=1.2  trunc=0%  pl=0.004  vl=0.453  ent=1.616  kl=0.0428  gn=0.443  fid=0.0800
+  line_20q       116ep | trunc=0%  swp=49.1±58.8  fid=0.0796  rew=+82.49
+  ring_20q        94ep | trunc=0%  swp=49.7±51.7  fid=0.0713  rew=+84.52
+  grid_5x4_20q   112ep | trunc=0%  swp=26.9±21.8  fid=0.0976  rew=+73.96
+step= 14336  rew=+73.195  swp=42.2  map=0.9  trunc=0%  pl=-0.024  vl=0.436  ent=1.077  kl=0.1394  gn=1.010  fid=0.0777
+  line_20q       116ep | trunc=0%  swp=49.1±58.8  fid=0.0796  rew=+82.49
+  ring_20q        97ep | trunc=0%  swp=50.6±51.5  fid=0.0691  rew=+84.08
+  grid_5x4_20q   112ep | trunc=0%  swp=26.9±21.8  fid=0.0976  rew=+73.96
+step= 14592  rew=+88.018  swp=32.6  map=0.9  trunc=0%  pl=0.010  vl=0.226  ent=1.437  kl=0.0799  gn=0.665  fid=0.1065
+  line_20q       119ep | trunc=0%  swp=47.9±58.5  fid=0.0811  rew=+83.71
+  ring_20q       100ep | trunc=0%  swp=49.9±50.9  fid=0.0720  rew=+82.74
+  grid_5x4_20q   117ep | trunc=0%  swp=27.1±23.2  fid=0.0994  rew=+75.77
+step= 14848  rew=+97.434  swp=38.6  map=0.7  trunc=0%  pl=0.005  vl=0.308  ent=1.801  kl=0.0396  gn=1.155  fid=0.0981
+  line_20q       121ep | trunc=0%  swp=48.9±59.2  fid=0.0799  rew=+83.66
+  ring_20q       101ep | trunc=0%  swp=49.4±50.9  fid=0.0727  rew=+83.22
+  grid_5x4_20q   118ep | trunc=0%  swp=27.3±23.2  fid=0.0986  rew=+75.98
+step= 15104  rew=+97.505  swp=43.0  map=0.6  trunc=0%  pl=-0.006  vl=0.266  ent=1.780  kl=0.0238  gn=1.179  fid=0.0929
+  line_20q       123ep | trunc=0%  swp=49.5±59.8  fid=0.0792  rew=+84.26
+  ring_20q       102ep | trunc=0%  swp=49.9±50.9  fid=0.0720  rew=+83.19
+  grid_5x4_20q   119ep | trunc=0%  swp=27.4±23.2  fid=0.0977  rew=+76.16
+step= 15360  rew=+81.844  swp=46.5  map=0.3  trunc=0%  pl=-0.031  vl=0.362  ent=1.885  kl=0.0700  gn=0.632  fid=0.0745
+  line_20q       126ep | trunc=0%  swp=50.0±60.1  fid=0.0789  rew=+83.89
+  ring_20q       104ep | trunc=0%  swp=49.4±50.6  fid=0.0707  rew=+83.62
+  grid_5x4_20q   119ep | trunc=0%  swp=27.4±23.2  fid=0.0977  rew=+76.16
+step= 15616  rew=+82.979  swp=56.9  map=0.9  trunc=0%  pl=-0.027  vl=0.341  ent=1.609  kl=0.0718  gn=0.633  fid=0.0524
+  line_20q       129ep | trunc=0%  swp=49.9±59.7  fid=0.0772  rew=+83.82
+  ring_20q       105ep | trunc=0%  swp=49.9±50.6  fid=0.0700  rew=+83.59
+  grid_5x4_20q   119ep | trunc=0%  swp=27.4±23.2  fid=0.0977  rew=+76.16
+step= 15872  rew=+84.784  swp=52.5  map=1.2  trunc=0%  pl=-0.017  vl=0.552  ent=1.199  kl=0.1169  gn=1.266  fid=0.0557
+  line_20q       131ep | trunc=0%  swp=49.8±59.3  fid=0.0765  rew=+83.43
+  ring_20q       106ep | trunc=0%  swp=50.3±50.6  fid=0.0694  rew=+83.71
+  grid_5x4_20q   122ep | trunc=0%  swp=27.2±23.1  fid=0.1003  rew=+75.87
+step= 16128  rew=+74.894  swp=43.1  map=1.3  trunc=0%  pl=-0.009  vl=0.272  ent=1.274  kl=0.0688  gn=1.568  fid=0.0705
+  line_20q       133ep | trunc=0%  swp=49.3±59.0  fid=0.0781  rew=+83.05
+  ring_20q       108ep | trunc=0%  swp=50.3±50.1  fid=0.0682  rew=+83.35
+  grid_5x4_20q   125ep | trunc=0%  swp=27.2±22.9  fid=0.0992  rew=+75.83
+step= 16384  rew=+76.371  swp=45.5  map=1.6  trunc=0%  pl=0.004  vl=0.663  ent=1.948  kl=0.0476  gn=0.799  fid=0.0608
+  line_20q       134ep | trunc=0%  swp=49.8±59.1  fid=0.0775  rew=+83.03
+  ring_20q       109ep | trunc=0%  swp=50.9±50.3  fid=0.0675  rew=+83.54
+  grid_5x4_20q   125ep | trunc=0%  swp=27.2±22.9  fid=0.0992  rew=+75.83
+step= 16640  rew=+71.432  swp=46.9  map=1.4  trunc=0%  pl=-0.022  vl=0.631  ent=1.172  kl=0.0531  gn=1.556  fid=0.0875
+  line_20q       135ep | trunc=0%  swp=49.6±58.9  fid=0.0775  rew=+82.67
+  ring_20q       111ep | trunc=0%  swp=51.4±50.9  fid=0.0694  rew=+83.49
+  grid_5x4_20q   128ep | trunc=0%  swp=27.2±22.8  fid=0.0984  rew=+75.70
+step= 16896  rew=+61.224  swp=46.0  map=1.6  trunc=0%  pl=-0.026  vl=0.568  ent=1.220  kl=0.0403  gn=1.315  fid=0.0717
+  line_20q       139ep | trunc=0%  swp=49.4±58.3  fid=0.0773  rew=+81.33
+  ring_20q       113ep | trunc=0%  swp=51.2±50.6  fid=0.0696  rew=+82.68
+  grid_5x4_20q   129ep | trunc=0%  swp=27.2±22.7  fid=0.0976  rew=+75.63
+step= 17152  rew=+91.335  swp=47.1  map=1.5  trunc=0%  pl=0.000  vl=0.692  ent=0.988  kl=0.0545  gn=1.187  fid=0.0872
+  line_20q       140ep | trunc=0%  swp=49.1±58.1  fid=0.0793  rew=+81.00
+  ring_20q       114ep | trunc=0%  swp=50.7±50.6  fid=0.0690  rew=+85.41
+  grid_5x4_20q   131ep | trunc=0%  swp=27.9±23.5  fid=0.0961  rew=+77.87
+step= 17408  rew=+85.057  swp=39.6  map=0.8  trunc=0%  pl=0.016  vl=0.551  ent=1.484  kl=0.0413  gn=1.400  fid=0.1055
+  line_20q       141ep | trunc=0%  swp=50.1±59.0  fid=0.0787  rew=+80.97
+  ring_20q       118ep | trunc=0%  swp=49.6±50.3  fid=0.0753  rew=+83.97
+  grid_5x4_20q   132ep | trunc=0%  swp=28.1±23.5  fid=0.0955  rew=+78.05
+step= 17664  rew=+91.443  swp=45.2  map=0.8  trunc=0%  pl=-0.010  vl=0.481  ent=1.716  kl=0.0377  gn=1.218  fid=0.0967
+  line_20q       143ep | trunc=0%  swp=50.9±59.4  fid=0.0776  rew=+80.67
+  ring_20q       119ep | trunc=0%  swp=49.1±50.2  fid=0.0747  rew=+84.26
+  grid_5x4_20q   134ep | trunc=0%  swp=28.0±23.4  fid=0.0959  rew=+78.03
+step= 17920  rew=+97.920  swp=47.6  map=1.2  trunc=0%  pl=-0.017  vl=0.480  ent=1.257  kl=0.0393  gn=0.811  fid=0.0803
+  line_20q       144ep | trunc=0%  swp=50.8±59.2  fid=0.0772  rew=+80.53
+  ring_20q       124ep | trunc=0%  swp=48.9±49.5  fid=0.0741  rew=+83.43
+  grid_5x4_20q   134ep | trunc=0%  swp=28.0±23.4  fid=0.0959  rew=+78.03
+step= 18176  rew=+67.402  swp=40.8  map=1.8  trunc=0%  pl=0.024  vl=0.469  ent=1.296  kl=0.0356  gn=1.093  fid=0.0549
+  line_20q       145ep | trunc=0%  swp=50.6±59.0  fid=0.0767  rew=+80.33
+  ring_20q       126ep | trunc=0%  swp=49.0±49.2  fid=0.0730  rew=+82.92
+  grid_5x4_20q   137ep | trunc=0%  swp=27.9±23.2  fid=0.0948  rew=+77.71
+step= 18432  rew=+63.230  swp=37.5  map=2.2  trunc=0%  pl=0.003  vl=0.211  ent=1.430  kl=0.0551  gn=1.054  fid=0.0722
+  line_20q       145ep | trunc=0%  swp=50.6±59.0  fid=0.0767  rew=+80.33
+  ring_20q       128ep | trunc=0%  swp=49.2±48.9  fid=0.0720  rew=+82.64
+  grid_5x4_20q   139ep | trunc=0%  swp=28.0±23.3  fid=0.0986  rew=+77.34
+step= 18688  rew=+62.926  swp=49.4  map=2.2  trunc=0%  pl=-0.006  vl=0.671  ent=1.987  kl=0.0265  gn=0.900  fid=0.0722
+  line_20q       146ep | trunc=0%  swp=52.2±61.7  fid=0.0761  rew=+80.51
+  ring_20q       128ep | trunc=0%  swp=49.2±48.9  fid=0.0720  rew=+82.64
+  grid_5x4_20q   139ep | trunc=0%  swp=28.0±23.3  fid=0.0986  rew=+77.34

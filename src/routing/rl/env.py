@@ -532,7 +532,7 @@ class RoutingEnv(gym.Env):
     # ------------------------------------------------------------------
     def _get_terminal_reward_value(self) -> float:
         if self.fidelity_fn is not None:
-            return self.fidelity_fn(self.dag, self.mapping, self.executed)
+            return self.fidelity_fn(self)
         if self.noise_config is not None:
             return self._compute_aer_fidelity()
         return 0.0
