@@ -138,6 +138,7 @@ class TrajectorySimulator:
         self.seed = seed
         self.rng = np.random.default_rng(seed)
         self.n_qubits = len(config.t1_times)
+        self._all = None  # 惰性分配：crosstalk 相位索引用的全比特基态数组
         self._validate_config()
 
     # ------------------------------------------------------------------ #
@@ -207,20 +208,22 @@ class TrajectorySimulator:
         return sv
 
     def _apply1_batch(self, svs: np.ndarray, q: int, mat: np.ndarray) -> np.ndarray:
-        """批量作用 2x2 门：svs (T, 2^n) -> (T, 2^n)。
+        """批量作用 2x2 门：svs (T, 2^n) -> (T, 2^n)，原地、零拷贝 strided 视图。
 
-        把比特轴移到末位后扁平化为 (M, 2) @ (2, 2) 一次大 gemm（BLAS
-        高效，与 q 无关），而非在 (T,A,2,B) 上做 T*A 次小矩阵乘法。
+        把比特 q 置于中间轴的 strided 形状 (T, A, 2, C)，|0>/|1> 分量直接
+        做 2x2 线性组合；避免 moveaxis/ascontiguousarray 的整块 gather
+        （2^n 数组上的 gather 延迟受限，是旧版单轨迹 31s 的次因）。
         """
         T = svs.shape[0]
         nq = self.n_qubits
-        qb = q  # little-endian 平坦索引中 qubit q 的比特位（权重 2^q）
-        s = svs.reshape(T, *((2,) * nq))
-        ax = nq - qb  # numpy 轴（T 轴占 0，qubit q 在 (T,2,..,2) 中位于 nq-qb）
-        moved = np.ascontiguousarray(np.moveaxis(s, ax, -1))  # (T, ..., 2)
-        out = moved.reshape(-1, 2) @ mat.T  # (T*2^(n-1), 2) 一次 gemm
-        out = np.moveaxis(out.reshape(T, *((2,) * nq)), -1, ax)
-        return out.reshape(T, -1)
+        s = svs.reshape(T, 1 << (nq - 1 - q), 2, 1 << q)  # 零拷贝视图
+        a0 = s[:, :, 0, :]
+        a1 = s[:, :, 1, :]
+        tmp = mat[0, 0] * a0 + mat[0, 1] * a1
+        a1_new = mat[1, 0] * a0 + mat[1, 1] * a1
+        a1[...] = a1_new
+        a0[...] = tmp
+        return svs
 
     def _apply_pauli1_batch(self, svs: np.ndarray, q: int, kind: str) -> np.ndarray:
         mat = {"X": _U1["x"], "Y": _U1["y"], "Z": _U1["z"]}[kind]
@@ -339,57 +342,52 @@ class TrajectorySimulator:
         return sv
 
     def _thermal_noise_batch(self, svs: np.ndarray, q: int,
-                             time_us: float) -> np.ndarray:
+                              time_us: float) -> np.ndarray:
         """
         批量单比特 T1/T2 热弛豫（MC 采样逐轨迹独立，向量化实现）。
         语义与 _thermal_noise 完全一致：每条轨迹独立抛骰子做
         振幅阻尼 + 相位阻尼两段 Kraus 采样。
 
-        优化：qubit 轴移到末位做一次连续拷贝，|0>/|1> 分量为末轴
-        连续切片（cache 友好）；归一化用解析式 norm² = 1 - p1*p
-        （无跳变）或 p1（跳变），避免逐轨迹全数组 sum/renorm。
+        性能关键：用零拷贝 strided 视图把比特 q 放到轴 2（形状
+        (T, A, 2, C)），直接在原状态向量上做 |0>/|1> 分量运算，
+        避免 moveaxis/ascontiguousarray 导致的整块 gather（2^n 数组上的
+        gather 是延迟受限、极慢，是旧版单轨迹 31s 的主因）。归一化
+        用解析式 norm² = 1 - p1*p（无跳变）或 p1（跳变）。
         """
         T = svs.shape[0]
         t1 = self.config.t1_times[q]
         t2 = self.config.t2_times[q]
         p_reset = 1.0 - np.exp(-time_us / t1)
-        # 相位阻尼概率：需要 t2 <= 2*t1 才非负
-        p_z = 1.0 - np.exp(time_us / t1 - 2.0 * time_us / t2)
-
+        p_z = 1.0 - np.exp(time_us / t1 - 2.0 * time_us / t2)  # t2<=2t1 非负
         nq = self.n_qubits
-        qb = q  # little-endian 比特位
-        ax = nq - qb  # numpy 轴（T 轴占 0）
-        s = svs.reshape(T, *((2,) * nq))
-        moved = np.ascontiguousarray(np.moveaxis(s, ax, -1))  # (T, ..., 2)
-        a = moved.reshape(T, -1, 2)
-        a0 = a[..., 0]
-        a1 = a[..., 1]
+        # 比特 q 置于中间轴的 strided 视图（无拷贝、无 gather）
+        s = svs.reshape(T, 1 << (nq - 1 - q), 2, 1 << q)
+        a0 = s[:, :, 0, :]
+        a1 = s[:, :, 1, :]
 
         # --- 振幅阻尼 ---
-        p1 = np.sum(np.abs(a1) ** 2, axis=1)  # (T,)
+        p1 = np.sum(np.abs(a1.reshape(T, -1)) ** 2, axis=1)  # 连续视图上求和，避免 strided gather
         jump = self.rng.random(T) < p_reset * p1
         if jump.any():
-            a0[jump] = a1[jump]                     # K1：跳变到 |0>
+            a0[jump] = a1[jump]
             a1[jump] = 0.0
         nojump = ~jump
         if nojump.any():
-            a1[nojump] *= np.sqrt(max(1.0 - p_reset, 0.0))  # K0
-        # 解析归一化：无跳变 norm²=1-p1*p_reset；跳变 norm²=p1
+            a1[nojump] *= np.sqrt(max(1.0 - p_reset, 0.0))
         n2 = np.where(jump, p1, 1.0 - p1 * p_reset)
-        moved /= np.sqrt(np.maximum(n2, 1e-30)).reshape(T, *([1] * (nq - 1)), 1)
+        s *= np.sqrt(1.0 / np.maximum(n2, 1e-30)).reshape(T, 1, 1, 1)
 
         # --- 相位阻尼 ---
-        p1 = np.sum(np.abs(a1) ** 2, axis=1)
+        p1 = np.sum(np.abs(a1.reshape(T, -1)) ** 2, axis=1)
         jump = self.rng.random(T) < p_z * p1
         if jump.any():
-            a0[jump] = 0.0                           # 只保留 |1> 分量
+            a0[jump] = 0.0
         nojump = ~jump
         if nojump.any():
             a1[nojump] *= np.sqrt(max(1.0 - p_z, 0.0))
         n2 = np.where(jump, p1, 1.0 - p1 * p_z)
-        moved /= np.sqrt(np.maximum(n2, 1e-30)).reshape(T, *([1] * (nq - 1)), 1)
-
-        return np.moveaxis(moved, -1, ax).reshape(T, -1)
+        s *= np.sqrt(1.0 / np.maximum(n2, 1e-30)).reshape(T, 1, 1, 1)
+        return svs
 
     @staticmethod
     def _renormalize(arr: np.ndarray) -> None:
@@ -459,42 +457,62 @@ class TrajectorySimulator:
                         svs[sel] = sub
         return svs
 
+    def _zz_xor_indices(self, q1: int, q2: int) -> np.ndarray:
+        """返回比特 q1、q2 取值不同的基态索引（exp(-iθ Z⊗Z) 中相位为 e^{+iθ} 的子集）。
+
+        惰性分配 self._all（2^n 整数数组）并按需复用；每对不缓存，避免大 n 下
+        字典内存爆炸（调用成本仅一次 O(n) 位运算，相对 70 波演化可忽略）。
+        """
+        if self._all is None:
+            self._all = np.arange(2 ** self.n_qubits)
+        b1 = (self._all >> q1) & 1
+        b2 = (self._all >> q2) & 1
+        return np.nonzero(b1 != b2)[0]
+
     def _crosstalk(self, sv: np.ndarray, q1: int, q2: int) -> np.ndarray:
-        """串扰：在两比特上施加 ZZ 错误（概率由 crosstalk_strength 决定）。"""
-        p = self._crosstalk_prob(q1, q2)
-        if p > 0 and self.rng.random() < p:
-            # ZZ = Z1 * Z2
-            sv = self._apply_pauli1(sv, q1, "Z")
-            sv = self._apply_pauli1(sv, q2, "Z")
+        """相干 ZZ 串扰：在交叉对 (q1,q2) 施加 U = exp(-iθ·Z⊗Z)。
+
+        diag(e^{-iθ}, e^{+iθ}, e^{+iθ}, e^{-iθ}) for (00,01,10,11)：先整体乘
+        e^{-iθ}，再对 q1⊕q2=1 的基态乘 e^{+2iθ}。
+
+        相比旧的硬 Z 翻转（概率性 Pauli-Z，命中叠加态即正交归零 → 保真度 0/1
+        二值），相干旋转是平滑、确定性的小幅损伤（每轨迹保真度 ≈ cos²θ），
+        既符合真实 ZZ 串扰物理（小角度相干旋转），也消除 0/1 采样病态、显著降低
+        评估所需轨迹数。θ（弧度）由边强度决定，与奖励侧 xtalk 代理同源。
+        """
+        theta = self._crosstalk_theta(q1, q2)
+        if theta != 0.0:
+            sv *= np.exp(-1j * theta)
+            sv[self._zz_xor_indices(q1, q2)] *= np.exp(2j * theta)
         return sv
 
     def _crosstalk_batch(self, svs: np.ndarray, q1: int, q2: int) -> np.ndarray:
-        """批量串扰 ZZ。"""
-        T = svs.shape[0]
-        p = self._crosstalk_prob(q1, q2)
-        if p > 0:
-            jump = self.rng.random(T) < p
-            idx = np.where(jump)[0]
-            if idx.size:
-                svs[idx] = self._apply_pauli1_batch(svs[idx], q1, "Z")
-                svs[idx] = self._apply_pauli1_batch(svs[idx], q2, "Z")
+        """批量相干 ZZ 串扰（svs 形状 (T, 2^n)，按比特轴共享的 xor 索引一次性作用）。"""
+        theta = self._crosstalk_theta(q1, q2)
+        if theta != 0.0:
+            svs *= np.exp(-1j * theta)
+            svs[:, self._zz_xor_indices(q1, q2)] *= np.exp(2j * theta)
         return svs
 
-    def _crosstalk_prob(self, q1: int, q2: int) -> float:
+    def _crosstalk_theta(self, q1: int, q2: int) -> float:
+        """相干 ZZ 旋转角 θ（弧度）。
+
+        若显式给定 crosstalk_strength，则直接作为 θ（合成拓扑的标称值，量级
+        0.005–0.025 rad）；否则回落到 0.1 × 该耦合边的双比特门错误率（与旧
+        硬 Z 模型同量级标定，但此处解释为相干旋转角而非破坏概率）。
+        """
         if self.config.crosstalk_strength is not None:
-            p = self.config.crosstalk_strength.get(
+            s = self.config.crosstalk_strength.get(
                 (q1, q2), self.config.crosstalk_strength.get((q2, q1), 0.0)
             )
         else:
-            # 默认强度 = 0.1 * 双比特门错误率（与 sim.py 一致）
             tqe = self.config.two_q_gate_error
             if isinstance(tqe, dict):
-                vals = [v for k, v in tqe.items() if k[0] < k[1]]
-                base = float(np.mean(vals)) if vals else 0.001
+                base = tqe.get((q1, q2), tqe.get((q2, q1), 0.001))
             else:
                 base = float(tqe)
-            p = 0.1 * base
-        return float(p)
+            s = 0.1 * base
+        return float(s)
 
     # ------------------------------------------------------------------ #
     # 电路执行
@@ -527,7 +545,7 @@ class TrajectorySimulator:
                     sv = self._thermal_noise(sv, qubits[0], idle_time)
             else:
                 # 单比特门
-                mat = self._gate_matrix(name, op.params)
+                mat = self._single_qubit_matrix(op, name)
                 sv = self._apply1(sv, qubits[0], mat)
                 if apply_noise:
                     sv = self._thermal_noise(sv, qubits[0], single_time)
@@ -580,6 +598,219 @@ class TrajectorySimulator:
     def _one_error(self, q: int) -> float:
         e = self.config.single_q_gate_error
         return float(e[q]) if isinstance(e, (list, tuple)) else float(e)
+
+    # ------------------------------------------------------------------ #
+    # 调度感知演化（scheduling-aware）：按波（wave）推进，每比特独立时钟
+    # 建模空闲退相干 + 同波不相交双比特门间隔一个耦合边的 1-hop 动态串扰。
+    # ------------------------------------------------------------------ #
+    def _wave_dynamic_crosstalk_pairs(self, gates) -> List[Tuple[int, int]]:
+        """同波内两对不相交双比特门，其交叉比特对若在某耦合边相邻（1-hop），
+        则该交叉对承受额外 ZZ 串扰。返回本波所有此类相邻交叉对（去重）。
+
+        仅统计真正不相交的双比特门对：调度器强制同波比特互不相交，故「相邻边
+        共享比特」（如 (0,1) 与 (1,2) 同波）在真实调度下不可能出现，无需建模。
+        """
+        two_q = [(qs[0], qs[1]) for (_, qs, is_2q) in gates if is_2q]
+        if len(two_q) < 2:
+            return []
+        adj = set()
+        for (p1, p2) in self.config.coupling_map:
+            adj.add((p1, p2))
+            adj.add((p2, p1))
+        seen = set()
+        pairs = []
+        for i in range(len(two_q)):
+            for j in range(i + 1, len(two_q)):
+                a, b = two_q[i]
+                c, d = two_q[j]
+                for x, y in ((a, c), (a, d), (b, c), (b, d)):
+                    if (x, y) in adj:
+                        key = (min(x, y), max(x, y))
+                        if key not in seen:
+                            seen.add(key)
+                            pairs.append((x, y))
+        return pairs
+
+    @staticmethod
+    def _single_qubit_matrix(op, name: str) -> np.ndarray:
+        """支持的单比特门用查表/解析式，其余回退到 qiskit Operator 通用展开。"""
+        if name in _U1 or name == "rz":
+            return _U1[name] if name in _U1 else _rz_matrix(float(op.params[0]))
+        from qiskit.quantum_info import Operator
+        return np.asarray(Operator(op).data, dtype=complex)
+
+    def evolve_scheduled(self, circuit: QuantumCircuit, waves, apply_noise: bool) -> np.ndarray:
+        """按调度波形演化，返回末态状态向量（无测量）。
+
+         与 _evolve（串行、忽略编排）不同，这里：
+          - 维护每比特「上次门结束时刻」t_last_end[q]，空闲区间施加热弛豫；
+          - 同波内两对不相交双比特门，其交叉比特对若在某耦合边相邻（1-hop），
+            在该交叉对上额外施加一次 ZZ 串扰。
+         串行调度（每波一门）退化为与 _evolve 一致的噪声（仅门时长退相干），
+         并行调度因空闲比特退相干更少 → 保真度更高。
+        """
+        sv = self._initial_state()
+        if circuit.global_phase:
+            sv *= np.exp(1j * float(circuit.global_phase))
+        single_time = self.config.single_gate_time
+        two_time = self.config.two_gate_time
+        t_last_end = [0.0] * self.n_qubits
+        t = 0.0
+        total_time = float(sum(dw for (dw, _g) in waves))
+
+        for (dw, gates) in waves:
+            active_qs = set()
+            for (_, qs, _is2) in gates:
+                for q in qs:
+                    active_qs.add(q)
+            # 空闲退相干（马尔可夫：exp(-γT) 可复合）统一在「下一次该比特被使用
+            # 前」由门前空闲热弛豫施加（见下），无需逐波对每个空闲比特整波施一次；
+            # 这样把每波 ~O(n_idle) 次热弛豫降到每门 ~O(1) 次，结果等价且更快。
+            # 处理本波各门
+            for (phys_idx, qs, is_2q) in gates:
+                op = circuit.data[phys_idx].operation
+                name = op.name.lower()
+                if name == "swap":
+                    sv = self._apply_swap(sv, qs[0], qs[1])
+                    t_last_end[qs[0]] = t + two_time
+                    t_last_end[qs[1]] = t + two_time
+                    continue
+                if is_2q:
+                    ctl, tgt = qs[0], qs[1]
+                    gtime = two_time
+                else:
+                    ctl = tgt = qs[0]
+                    gtime = single_time
+                # 门前的空闲退相干
+                if apply_noise:
+                    if t - t_last_end[ctl] > 0:
+                        sv = self._thermal_noise(sv, ctl, t - t_last_end[ctl])
+                    if is_2q and t - t_last_end[tgt] > 0:
+                        sv = self._thermal_noise(sv, tgt, t - t_last_end[tgt])
+                if is_2q:
+                    sv = self._apply_cx(sv, ctl, tgt)
+                    if apply_noise:
+                        edge_err = self._two_error(ctl, tgt)
+                        sv = self._depol2(sv, ctl, tgt, edge_err)
+                        sv = self._crosstalk(sv, ctl, tgt)
+                else:
+                    mat = self._single_qubit_matrix(op, name)
+                    sv = self._apply1(sv, ctl, mat)
+                    if apply_noise:
+                        sv = self._depol1(sv, ctl, self._one_error(ctl))
+                if apply_noise:
+                    sv = self._thermal_noise(sv, ctl, gtime)
+                    if is_2q:
+                        sv = self._thermal_noise(sv, tgt, gtime)
+                t_last_end[ctl] = t + gtime
+                if is_2q:
+                    t_last_end[tgt] = t + gtime
+            # 同波内多对不相交双比特门（间隔一个耦合边）的 1-hop 动态 ZZ 串扰
+            if apply_noise:
+                for (x, y) in self._wave_dynamic_crosstalk_pairs(gates):
+                    sv = self._crosstalk(sv, x, y)
+            t += dw
+        # 收尾：对整段电路末尾（最后一次门之后）仍空闲的比特施加剩余退相干
+        if apply_noise:
+            for q in range(self.n_qubits):
+                idle = total_time - t_last_end[q]
+                if idle > 1e-12:
+                    sv = self._thermal_noise(sv, q, idle)
+        return sv
+
+    def evolve_scheduled_batch(self, svs: np.ndarray, circuit: QuantumCircuit,
+                                waves, apply_noise: bool) -> np.ndarray:
+        """向量化版 evolve_scheduled：svs 形状 (T, 2^n)，逐波对所有轨迹同时演化。
+
+        每比特时钟（t_last_end）是确定性的（与 MC 采样无关），故可跨轨迹共享；
+        门噪声（退极化/串扰/热弛豫）各自逐轨迹独立采样（用 *_batch kernel）。
+        """
+        T = svs.shape[0]
+        single_time = self.config.single_gate_time
+        two_time = self.config.two_gate_time
+        t_last_end = [0.0] * self.n_qubits
+        t = 0.0
+        total_time = float(sum(dw for (dw, _g) in waves))
+        for (dw, gates) in waves:
+            active_qs = set()
+            for (_, qs, _is2) in gates:
+                for q in qs:
+                    active_qs.add(q)
+            # 空闲退相干统一在「下一次该比特被使用前」由门前空闲热弛豫施加（见下），
+            # 无需逐波对每个空闲比特整波施一次（结果等价，且省去 O(n_idle) 次全数组遍历）。
+            for (phys_idx, qs, is_2q) in gates:
+                op = circuit.data[phys_idx].operation
+                name = op.name.lower()
+                if name == "swap":
+                    svs = self._apply_swap_batch(svs, qs[0], qs[1])
+                    t_last_end[qs[0]] = t + two_time
+                    t_last_end[qs[1]] = t + two_time
+                    continue
+                if is_2q:
+                    ctl, tgt = qs[0], qs[1]
+                    gtime = two_time
+                else:
+                    ctl = tgt = qs[0]
+                    gtime = single_time
+                if apply_noise:
+                    if t - t_last_end[ctl] > 0:
+                        svs = self._thermal_noise_batch(svs, ctl, t - t_last_end[ctl])
+                    if is_2q and t - t_last_end[tgt] > 0:
+                        svs = self._thermal_noise_batch(svs, tgt, t - t_last_end[tgt])
+                if is_2q:
+                    svs = self._apply_cx_batch(svs, ctl, tgt)
+                    if apply_noise:
+                        edge_err = self._two_error(ctl, tgt)
+                        svs = self._depol2_batch(svs, ctl, tgt, edge_err)
+                        svs = self._crosstalk_batch(svs, ctl, tgt)
+                else:
+                    mat = self._single_qubit_matrix(op, name)
+                    svs = self._apply1_batch(svs, ctl, mat)
+                    if apply_noise:
+                        svs = self._depol1_batch(svs, ctl, self._one_error(ctl))
+                if apply_noise:
+                    svs = self._thermal_noise_batch(svs, ctl, gtime)
+                    if is_2q:
+                        svs = self._thermal_noise_batch(svs, tgt, gtime)
+                t_last_end[ctl] = t + gtime
+                if is_2q:
+                    t_last_end[tgt] = t + gtime
+            # 同波内多对不相交双比特门（间隔一个耦合边）的 1-hop 动态 ZZ 串扰
+            if apply_noise:
+                for (x, y) in self._wave_dynamic_crosstalk_pairs(gates):
+                    svs = self._crosstalk_batch(svs, x, y)
+            t += dw
+        # 收尾：对整段电路末尾（最后一次门之后）仍空闲的比特施加剩余退相干
+        if apply_noise:
+            for q in range(self.n_qubits):
+                idle = total_time - t_last_end[q]
+                if idle > 1e-12:
+                    svs = self._thermal_noise_batch(svs, q, idle)
+        return svs
+
+    def run_trajectories_scheduled(self, circuit: QuantumCircuit, waves,
+                                   num_trajectories: Optional[int] = None,
+                                   skip_transpile: bool = False) -> "TrajectoryResult":
+        """采样 num_trajectories 条调度感知噪声轨迹。"""
+        if num_trajectories is None:
+            num_trajectories = self.num_trajectories
+        svs = np.array([self._initial_state() for _ in range(num_trajectories)])
+        svs = self.evolve_scheduled_batch(svs, circuit, waves, apply_noise=True)
+        return TrajectoryResult(svs)
+
+    def fidelity_scheduled(self, circuit: QuantumCircuit, waves,
+                           ideal_sv: Optional[np.ndarray] = None,
+                           num_trajectories: Optional[int] = None,
+                           skip_transpile: bool = False) -> float:
+        """调度感知平均态保真度 F = mean_t |<psi_ideal|psi_t>|^2。
+
+        ideal 与调度无关（酉演化与编排无关），故用无噪声串行演化作参考。
+        """
+        if ideal_sv is None:
+            ideal_sv = self._evolve(circuit, apply_noise=False)
+        res = self.run_trajectories_scheduled(circuit, waves, num_trajectories,
+                                              skip_transpile=True)
+        return res.fidelity(ideal_sv)
 
     def _two_error(self, q1: int, q2: int) -> float:
         e = self.config.two_q_gate_error
@@ -700,10 +931,106 @@ class TrajectorySimulator:
         return res.fidelity(ideal_sv)
 
 
+def _reduce_phys_circuit_for_fidelity(phys_circuit: QuantumCircuit,
+                                      config: NoiseConfig):
+    """将路由后的物理电路 + 噪声配置裁剪到「实际被作用」的量子比特子集。
+
+    返回 (reduced_circuit, reduced_config)，使状态向量模拟仅在 2^{k}（k<=n）
+    上进行而非 2^{n}。
+
+    精确性依据：在振幅/相位阻尼 + 退极化 + 相干 ZZ 串扰模型下，从未被作用的比
+    特恒为 |0>（|0> 是振幅与相位阻尼的不动点；退极化与串扰只触及被作用比特）。
+    因此只模拟被用到的比特并对索引重标号，得到状态相对理想约化态的保真度，等于
+    全比特保真度（未用 |0> 比特贡献因子恒为 1）。即本裁剪对保真度**精确等价**，
+    不引入近似。
+    """
+    cfg = config
+    n = len(cfg.t1_times)
+    used = set()
+    for inst in phys_circuit.data:
+        oname = inst.operation.name.lower()
+        if oname in ("measure", "barrier"):
+            continue
+        for q in inst.qubits:
+            used.add(q._index)
+    if len(used) == n:
+        return phys_circuit, cfg
+
+    used_list = sorted(used)
+    remap = {old: new for new, old in enumerate(used_list)}
+    k = len(used_list)
+    rc = QuantumCircuit(k)
+    rc.global_phase = phys_circuit.global_phase
+    for inst in phys_circuit.data:
+        oname = inst.operation.name.lower()
+        if oname in ("measure", "barrier"):
+            continue
+        new_qs = [rc.qubits[remap[q._index]] for q in inst.qubits]
+        rc.append(inst.operation, new_qs)
+
+    # 子集化逐比特 / 逐边噪声参数（按物理比特索引继承）
+    t1 = [cfg.t1_times[i] for i in used_list]
+    t2 = [cfg.t2_times[i] for i in used_list]
+    freq = [cfg.freq_ghz[i] for i in used_list] if cfg.freq_ghz else None
+    sqe = ([cfg.single_q_gate_error[i] for i in used_list]
+           if isinstance(cfg.single_q_gate_error, (list, tuple))
+           else cfg.single_q_gate_error)
+    ro = ([cfg.readout_error[i] for i in used_list]
+          if cfg.readout_error is not None else None)
+
+    used_set = set(used_list)
+    cm = [(remap[a], remap[b]) for (a, b) in cfg.coupling_map
+          if a in used_set and b in used_set]
+    # 安全检查：确保 reduced coupling map 覆盖所有 used qubits
+    cm_qubits = set()
+    for a, b in cm:
+        cm_qubits.add(a)
+        cm_qubits.add(b)
+    if not cm_qubits.issuperset(set(range(k))):
+        return phys_circuit, cfg
+
+    tqe = cfg.two_q_gate_error
+    if isinstance(tqe, dict):
+        new_tqe: dict = {}
+        for (a, b), e in tqe.items():
+            if a in used_set and b in used_set:
+                new_tqe[(remap[a], remap[b])] = e
+                new_tqe[(remap[b], remap[a])] = e
+    else:
+        new_tqe = tqe
+
+    cts = cfg.crosstalk_strength
+    if cts is not None:
+        new_cts: dict = {}
+        for (a, b), e in cts.items():
+            if a in used_set and b in used_set:
+                new_cts[(remap[a], remap[b])] = e
+                new_cts[(remap[b], remap[a])] = e
+    else:
+        new_cts = None
+
+    reduced = NoiseConfig(
+        t1_times=t1,
+        t2_times=t2,
+        freq_ghz=freq,
+        single_q_gate_error=sqe,
+        two_q_gate_error=new_tqe,
+        coupling_map=cm,
+        readout_error=ro,
+        crosstalk_strength=new_cts,
+        single_gate_time=cfg.single_gate_time,
+        two_gate_time=cfg.two_gate_time,
+        idle_time=cfg.idle_time,
+        shots=cfg.shots,
+    )
+    return rc, reduced
+
+
 def trajectory_circuit_fidelity(phys_circuit: QuantumCircuit,
                                 config: NoiseConfig,
                                 num_trajectories: int = 16,
-                                seed: Optional[int] = None) -> float:
+                                seed: Optional[int] = None,
+                                scheduled: bool = False) -> float:
     """对一条物理电路计算轨迹平均态保真度 F = mean_t |<psi_ideal|psi_t>|^2。
 
     Parameters
@@ -716,34 +1043,89 @@ def trajectory_circuit_fidelity(phys_circuit: QuantumCircuit,
         采样轨迹条数。
     seed : Optional[int]
         随机种子。
+    scheduled : bool
+        若为 True，对电路做贪心波次编排（同波内比特不冲突），按调度感知
+        演化估算保真度（空闲退相干更少 + 同波相邻双比特门动态串扰）。
     """
-    sim = TrajectorySimulator(config, num_trajectories=num_trajectories, seed=seed)
-    meas = phys_circuit.copy()
+    rc, rconfig = _reduce_phys_circuit_for_fidelity(phys_circuit, config)
+    sim = TrajectorySimulator(rconfig, num_trajectories=num_trajectories, seed=seed)
+    meas = rc.copy()
     meas.measure_all()
-    meas_t = sim._transpile(meas)
-    meas_t_no_meas = meas_t.copy()
-    meas_t_no_meas.remove_final_measurements()
-    ideal_sv = sim.ideal_statevector(meas_t_no_meas)
-    return sim.fidelity(meas_t, ideal_sv=ideal_sv, skip_transpile=True)
+    ideal_sv = sim._evolve(meas, apply_noise=False)
+    if scheduled:
+        waves = schedule_phys_circuit(meas, rconfig.single_gate_time,
+                                      rconfig.two_gate_time)
+        return sim.fidelity_scheduled(meas, waves, ideal_sv=ideal_sv,
+                                      skip_transpile=True)
+    meas_no_meas = meas.copy()
+    meas_no_meas.remove_final_measurements()
+    ideal_sv = sim.ideal_statevector(meas_no_meas)
+    return sim.fidelity(meas, ideal_sv=ideal_sv, skip_transpile=True)
+
+
+def schedule_phys_circuit(phys_circuit: QuantumCircuit, single_time: float, two_time: float):
+    """对一条已映射的物理电路做贪心波次编排（同波内比特不冲突）。
+
+    返回 waves 列表，元素 = (dw, [(phys_idx, qubits, is_2q), ...])，与
+    evolve_scheduled 的输入兼容（phys_idx 为 phys_circuit.data 的索引，跳过
+    measure/barrier）。用于基线（SABRE 等）在公平条件下的调度感知保真度评估。
+    """
+    waves = []
+    used_qubits = set()
+    cur = []
+    dw = 0.0
+    for idx, instr in enumerate(phys_circuit.data):
+        op = instr.operation
+        name = op.name.lower()
+        if name in ("measure", "barrier"):
+            continue
+        qs = [phys_circuit.find_bit(q).index for q in instr.qubits]
+        dur = two_time if len(qs) == 2 else single_time
+        if qs[0] in used_qubits or (len(qs) == 2 and qs[1] in used_qubits):
+            waves.append((dw, cur))
+            used_qubits = set()
+            cur = []
+            dw = 0.0
+        cur.append((idx, tuple(qs), len(qs) == 2))
+        used_qubits.update(qs)
+        dw = max(dw, dur)
+    if cur:
+        waves.append((dw, cur))
+    return waves
 
 
 def make_trajectory_fidelity_fn(config: NoiseConfig,
                                 num_trajectories: int = 16,
-                                seed: Optional[int] = None):
+                                seed: Optional[int] = None,
+                                scheduled: bool = False):
     """构造 RoutingEnv 的 fidelity_fn hook（闭包捕获当前噪声配置与模拟器）。
 
     返回 fn(env) -> float：取 env._phys_circuit 计算轨迹平均态保真度。
     训练侧每个 episode 的噪声配置会被扰动，需按 episode 重新构造此函数。
-    """
-    sim = TrajectorySimulator(config, num_trajectories=num_trajectories, seed=seed)
 
+    scheduled=True 时使用调度感知演化（env 须开启 use_scheduler）；若 env
+    未提供调度波形（非调度模式），自动回退到串行演化。
+    """
     def trajectory_fidelity(env) -> float:
-        meas = env._phys_circuit.copy()
+        rc, rconfig = _reduce_phys_circuit_for_fidelity(env._phys_circuit, config)
+        sim = TrajectorySimulator(rconfig, num_trajectories=num_trajectories,
+                                  seed=seed)
+        meas = rc.copy()
         meas.measure_all()
-        meas_t = sim._transpile(meas)
-        meas_t_no_meas = meas_t.copy()
-        meas_t_no_meas.remove_final_measurements()
-        ideal_sv = sim.ideal_statevector(meas_t_no_meas)
-        return sim.fidelity(meas_t, ideal_sv=ideal_sv, skip_transpile=True)
+        if scheduled:
+            # 转译到基础门后贪心波次编排：与基线 schedule_phys_circuit 一致，
+            # 且能正确处理 cz/ecr 等非 cx 双比特门（evolve_scheduled 仅支持 cx/swap）。
+            meas_t = sim._transpile(meas)
+            meas_t_no_meas = meas_t.copy()
+            meas_t_no_meas.remove_final_measurements()
+            ideal_sv = sim.ideal_statevector(meas_t_no_meas)
+            waves = schedule_phys_circuit(meas_t, rconfig.single_gate_time,
+                                         rconfig.two_gate_time)
+            return sim.fidelity_scheduled(meas_t, waves, ideal_sv=ideal_sv,
+                                          skip_transpile=True)
+        meas_no_meas = meas.copy()
+        meas_no_meas.remove_final_measurements()
+        ideal_sv = sim.ideal_statevector(meas_no_meas)
+        return sim.fidelity(meas, ideal_sv=ideal_sv, skip_transpile=True)
 
     return trajectory_fidelity

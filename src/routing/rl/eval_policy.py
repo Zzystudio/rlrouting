@@ -19,6 +19,7 @@ from routing.rl.env import RoutingEnv
 from routing.rl.agent import PPOAgent
 from routing.gnn.encoder import SubGNN
 from routing.routing import greedy_route, sabre_route
+from routing.timing import GATE_DURATION_TABLE, FALLBACK_DURATION, schedule_routed_circuit, GreedyScheduler
 
 
 # ---------------------------------------------------------------------------
@@ -38,6 +39,47 @@ class CircuitMetrics:
     truncated_remaining: int = 0
     fidelity: Optional[float] = None
     mapping_swaps: int = 0
+    circuit_time_us: Optional[float] = None
+    crosstalk_events: Optional[float] = None
+    schedule: Optional[list] = None        # 带并行时序的门调度序列（启用调度器时）
+    phys_qasm: Optional[str] = None        # 含 SWAP 插入的物理电路 QASM
+    sched_stats: Optional[dict] = None     # D3: makespan/密度/并行峰值等调度统计
+    sabre_initial_layout: Optional[list] = None  # SABRE 初始布局（warm-start 用）
+
+
+def _sched_stats_from_timing(timing, dag=None) -> Optional[dict]:
+    """D3：从事件级时序内核汇总调度统计。"""
+    if timing is None:
+        return None
+    total_time = timing.total_time
+    serial = timing.serial_dur
+    density = (serial / total_time) if total_time > 1e-9 else 0.0
+    pc = {}
+    for e in timing.schedule_log:
+        # 与 SABRE（schedule_routed_circuit 把 SWAP 当 2Q 门计入波次）同口径：
+        # PPO 的 SWAP 调度事件一并计入峰值并行度，避免指标不对称压低 PPO。
+        w = e.get("wave", -1)
+        pc[w] = pc.get(w, 0) + 1
+    peak = max(pc.values()) if pc else 0
+    crit_lb = 0.0
+    if dag is not None:
+        dur = {g.index: GATE_DURATION_TABLE.get(g.name, FALLBACK_DURATION)
+               for g in dag.gates}
+        best = [0.0] * dag.num_gates
+        for g in dag.gates:
+            b = dur[g.index]
+            for p in g.predecessors:
+                b = max(b, dur[g.index] + best[p])
+            best[g.index] = b
+        crit_lb = max(best) if best else 0.0
+    return {
+        "makespan_us": total_time,
+        "serial_dur_us": serial,
+        "density": density,
+        "peak_parallel": peak,
+        "critical_path_lb_us": crit_lb,
+        "crosstalk_events": timing.crosstalk_events,
+    }
 
 
 @dataclass
@@ -55,6 +97,9 @@ class SummaryStats:
     xz_mean: Optional[float] = None
     fidelity_mean: Optional[float] = None
     mapping_mean: Optional[float] = None
+    sched_time_mean: Optional[float] = None     # D3: 平均 makespan (µs)
+    sched_density_mean: Optional[float] = None  # D3: 平均并行密度
+    sched_crosstalk_mean: Optional[float] = None  # D3: 平均串扰累计
 
 
 # ---------------------------------------------------------------------------
@@ -148,20 +193,34 @@ def compute_fidelity(qc, config, mapping, executed) -> Optional[float]:
 
 
 def build_fidelity_fn(fidelity_sim: str, config, num_trajectories: int = 64, seed: Optional[int] = None):
-    """构造 RoutingEnv 的 fidelity_fn（--fidelity-sim trajectory 时启用）。"""
+    """构造 RoutingEnv 的 fidelity_fn（--fidelity-sim trajectory/trajectory_sched 时启用）。"""
     if fidelity_sim == "trajectory":
         from sim.trajectory_sim import make_trajectory_fidelity_fn
         return make_trajectory_fidelity_fn(config, num_trajectories=num_trajectories, seed=seed)
+    if fidelity_sim == "trajectory_sched":
+        from sim.trajectory_sim import make_trajectory_fidelity_fn
+        return make_trajectory_fidelity_fn(config, num_trajectories=num_trajectories,
+                                           seed=seed, scheduled=True)
     return None
 
 
 def phys_fidelity(phys, config, fidelity_sim: str, num_trajectories: int = 64, seed: Optional[int] = None) -> Optional[float]:
-    """对路由结果电路计算保真度（基线用）：aer=counts overlap，trajectory=态保真度。"""
+    """对路由结果电路计算保真度（基线用）：aer=Hellinger 保真度，trajectory=态保真度，
+    trajectory_sched=调度感知态保真度（对已有电路做贪心波次编排）。"""
     if fidelity_sim == "trajectory":
         from sim.trajectory_sim import trajectory_circuit_fidelity
         return trajectory_circuit_fidelity(phys, config, num_trajectories=num_trajectories, seed=seed)
+    if fidelity_sim == "trajectory_sched":
+        from sim.trajectory_sim import trajectory_circuit_fidelity
+        return trajectory_circuit_fidelity(phys, config, num_trajectories=num_trajectories,
+                                           seed=seed, scheduled=True)
     from sim.sim import NoiseSimulator
     from qiskit_aer import AerSimulator
+    try:
+        from sim.trajectory_sim import _reduce_phys_circuit_for_fidelity
+        phys, config = _reduce_phys_circuit_for_fidelity(phys, config)
+    except Exception:
+        pass
     meas = phys.copy()
     meas.measure_all()
     noise_sim = NoiseSimulator(config)
@@ -171,9 +230,8 @@ def phys_fidelity(phys, config, fidelity_sim: str, num_trajectories: int = 64, s
     ideal_job = ideal_sim.run(meas_t, shots=shots)
     ideal_counts = ideal_job.result().get_counts()
     noisy_counts = noise_sim.run(meas_t, shots=shots, skip_transpile=True)
-    all_outcomes = set(ideal_counts.keys()) | set(noisy_counts.keys())
-    overlap = sum(min(ideal_counts.get(k, 0), noisy_counts.get(k, 0)) for k in all_outcomes)
-    return overlap / shots
+    from utils.metrics import counts_fidelity
+    return counts_fidelity(ideal_counts, noisy_counts)
 
 
 # ---------------------------------------------------------------------------
@@ -194,7 +252,21 @@ def evaluate_circuit(
     max_num_qubits: Optional[int] = None,
     max_num_edges: Optional[int] = None,
     random_init: bool = False,
+    mapping_phase: Optional[bool] = None,
+    init_mapping: Optional[list] = None,
+    use_scheduler: bool = False,
+    eta_time: float = 0.01,
+    eta_xtalk_par: float = 1.0,
+    eta_idle: float = 0.005,
+    eta_parallel: float = 0.05,
+    xtalk_alpha: float = 0.03,
+    swap_duration: float = 0.9,
+    dump_schedule: bool = False,
     fidelity_fn=None,
+    config=None,
+    fidelity_sim: str = 'aer',
+    num_trajectories: int = 16,
+    traj_seed: int = 0,
 ) -> CircuitMetrics:
     import torch
     env = RoutingEnv(
@@ -206,10 +278,21 @@ def evaluate_circuit(
         max_num_qubits=max_num_qubits,
         max_num_edges=max_num_edges,
         mapping_phase=agent.with_commit,
+        init_mapping=init_mapping,
         fidelity_fn=fidelity_fn,
+        use_scheduler=use_scheduler,
+        eta_time=eta_time, eta_xtalk_par=eta_xtalk_par, eta_idle=eta_idle,
+        eta_parallel=eta_parallel, xtalk_alpha=xtalk_alpha, swap_duration_us=swap_duration,
     )
 
     obs, _ = env.reset()
+    # 支持「训练带映射阶段、但评估仅路由」：保留 enable_mapping_phase（phase 特征不丢），
+    # 仅覆盖运行期 mapping_phase。A1 配置（SABRE 布局 + 关映射）走此分支。
+    if mapping_phase is not None and mapping_phase != env.mapping_phase:
+        env.mapping_phase = mapping_phase
+        if env.mapping_phase:
+            env.mapping_swaps = 0
+        obs = env._obs()
     t0 = time.perf_counter()
 
     done, truncated = False, False
@@ -238,6 +321,35 @@ def evaluate_circuit(
 
     wall_time_ms = (time.perf_counter() - t0) * 1000
 
+    sched = None
+    pqasm = None
+    if dump_schedule and getattr(env, 'timing', None) is not None:
+        sched = env.timing.schedule_log
+        try:
+            from qiskit import qasm2
+            pqasm = qasm2.dumps(env._phys_circuit)
+        except Exception:
+            try:
+                from qiskit import qasm3
+                pqasm = qasm3.dumps(env._phys_circuit)
+            except Exception:
+                pqasm = None
+
+    # 报告用保真度：即便 reward_mode='routing'（PPO 环境内不记录保真度），也对最终路由
+    # 电路用与 SABRE 基线同口径的模拟器计算一次，便于同口径对比。不影响 PPO 动作
+    # （动作来自确定性策略 argmax，与环境 reward/噪声配置无关）。
+    # aer 模式下也用 post-hoc Hellinger 保真度（phys_fidelity）覆盖 env 内的 min-count，
+    # 确保 PPO 与 SABRE 基线使用同一口径。
+    post_fid = None
+    if config is not None and fidelity_sim in ('aer', 'trajectory', 'trajectory_sched'):
+        try:
+            post_fid = phys_fidelity(
+                env._phys_circuit, config, fidelity_sim,
+                num_trajectories=num_trajectories, seed=traj_seed,
+            )
+        except Exception:
+            post_fid = None
+
     return CircuitMetrics(
         circuit_path='',
         completed=done,
@@ -248,8 +360,13 @@ def evaluate_circuit(
         wall_time_ms=wall_time_ms,
         terminal_xz=info.get('terminal_XZ', None),
         truncated_remaining=info.get('truncated_remaining', 0),
-        fidelity=info.get('fidelity', None),
+        fidelity=post_fid if post_fid is not None else info.get('fidelity', None),
         mapping_swaps=env._mapping_swaps,
+        circuit_time_us=env.timing.total_time if env.timing is not None else None,
+        crosstalk_events=env.timing.crosstalk_events if env.timing is not None else None,
+        schedule=sched,
+        phys_qasm=pqasm,
+        sched_stats=_sched_stats_from_timing(env.timing, dag),
     )
 
 
@@ -270,7 +387,21 @@ def evaluate_circuit_beam(
     max_num_qubits: Optional[int] = None,
     max_num_edges: Optional[int] = None,
     random_init: bool = False,
+    mapping_phase: Optional[bool] = None,
+    init_mapping: Optional[list] = None,
+    use_scheduler: bool = False,
+    eta_time: float = 0.01,
+    eta_xtalk_par: float = 1.0,
+    eta_idle: float = 0.005,
+    eta_parallel: float = 0.05,
+    xtalk_alpha: float = 0.03,
+    swap_duration: float = 0.9,
+    dump_schedule: bool = False,
     fidelity_fn=None,
+    config=None,
+    fidelity_sim: str = 'aer',
+    num_trajectories: int = 16,
+    traj_seed: int = 0,
 ) -> CircuitMetrics:
     import torch
     env = RoutingEnv(
@@ -282,10 +413,21 @@ def evaluate_circuit_beam(
         max_num_qubits=max_num_qubits,
         max_num_edges=max_num_edges,
         mapping_phase=agent.with_commit,
+        init_mapping=init_mapping,
         fidelity_fn=fidelity_fn,
+        use_scheduler=use_scheduler,
+        eta_time=eta_time, eta_xtalk_par=eta_xtalk_par, eta_idle=eta_idle,
+        eta_parallel=eta_parallel, xtalk_alpha=xtalk_alpha, swap_duration_us=swap_duration,
     )
 
     obs, _ = env.reset()
+    # 支持「训练带映射阶段、但评估仅路由」：保留 enable_mapping_phase（phase 特征不丢），
+    # 仅覆盖运行期 mapping_phase。A1 配置（SABRE 布局 + 关映射）走此分支。
+    if mapping_phase is not None and mapping_phase != env.mapping_phase:
+        env.mapping_phase = mapping_phase
+        if env.mapping_phase:
+            env.mapping_swaps = 0
+        obs = env._obs()
     t0 = time.perf_counter()
 
     done, truncated = False, False
@@ -357,6 +499,35 @@ def evaluate_circuit_beam(
 
     wall_time_ms = (time.perf_counter() - t0) * 1000
 
+    sched = None
+    pqasm = None
+    if dump_schedule and getattr(env, 'timing', None) is not None:
+        sched = env.timing.schedule_log
+        try:
+            from qiskit import qasm2
+            pqasm = qasm2.dumps(env._phys_circuit)
+        except Exception:
+            try:
+                from qiskit import qasm3
+                pqasm = qasm3.dumps(env._phys_circuit)
+            except Exception:
+                pqasm = None
+
+    # 报告用保真度：即便 reward_mode='routing'（PPO 环境内不记录保真度），也对最终路由
+    # 电路用与 SABRE 基线同口径的模拟器计算一次，便于同口径对比。不影响 PPO 动作
+    # （动作来自确定性策略 argmax，与环境 reward/噪声配置无关）。
+    # aer 模式下也用 post-hoc Hellinger 保真度（phys_fidelity）覆盖 env 内的 min-count，
+    # 确保 PPO 与 SABRE 基线使用同一口径。
+    post_fid = None
+    if config is not None and fidelity_sim in ('aer', 'trajectory', 'trajectory_sched'):
+        try:
+            post_fid = phys_fidelity(
+                env._phys_circuit, config, fidelity_sim,
+                num_trajectories=num_trajectories, seed=traj_seed,
+            )
+        except Exception:
+            post_fid = None
+
     return CircuitMetrics(
         circuit_path='',
         completed=done,
@@ -367,8 +538,13 @@ def evaluate_circuit_beam(
         wall_time_ms=wall_time_ms,
         terminal_xz=info.get('terminal_XZ', None),
         truncated_remaining=info.get('truncated_remaining', 0),
-        fidelity=info.get('fidelity', None),
+        fidelity=post_fid if post_fid is not None else info.get('fidelity', None),
         mapping_swaps=env._mapping_swaps,
+        circuit_time_us=env.timing.total_time if env.timing is not None else None,
+        crosstalk_events=env.timing.crosstalk_events if env.timing is not None else None,
+        schedule=sched,
+        phys_qasm=pqasm,
+        sched_stats=_sched_stats_from_timing(env.timing, dag),
     )
 
 
@@ -397,6 +573,13 @@ def evaluate_random(
     )
 
     obs, _ = env.reset()
+    # 支持「训练带映射阶段、但评估仅路由」：保留 enable_mapping_phase（phase 特征不丢），
+    # 仅覆盖运行期 mapping_phase。A1 配置（SABRE 布局 + 关映射）走此分支。
+    if mapping_phase is not None and mapping_phase != env.mapping_phase:
+        env.mapping_phase = mapping_phase
+        if env.mapping_phase:
+            env.mapping_swaps = 0
+        obs = env._obs()
     t0 = time.perf_counter()
 
     done, truncated = False, False
@@ -439,7 +622,10 @@ def evaluate_greedy(
     phys, info = greedy_route(qc, config)
     wall_time_ms = (time.perf_counter() - t0) * 1000
 
-    fid = phys_fidelity(phys, config, fidelity_sim, num_trajectories, seed) if reward_mode != 'routing' else None
+    # 即便 reward_mode='routing'，只要指定了态级保真度模拟器（trajectory/
+    # trajectory_sched），也对基线计算保真度，便于与 PPO 的 fidelity_fn 结果同口径对比。
+    fid = phys_fidelity(phys, config, fidelity_sim, num_trajectories, seed) \
+        if (reward_mode != 'routing' or fidelity_sim in ('trajectory', 'trajectory_sched')) else None
 
     return CircuitMetrics(
         circuit_path='',
@@ -467,13 +653,29 @@ def evaluate_sabre(
     seed: int = 0,
     fidelity_sim: str = 'aer',
     num_trajectories: int = 64,
+    hw=None,
+    use_scheduler: bool = False,
+    xtalk_alpha: float = 0.0,
 ) -> CircuitMetrics:
     dag = CircuitDAG.from_circuit(qc)
     t0 = time.perf_counter()
     phys, info = sabre_route(qc, config, heuristic=heuristic, swap_trials=swap_trials, seed=seed)
     wall_time_ms = (time.perf_counter() - t0) * 1000
 
-    fid = phys_fidelity(phys, config, fidelity_sim, num_trajectories, seed) if reward_mode != 'routing' else None
+    # 即便 reward_mode='routing'，只要指定了态级保真度模拟器（trajectory/
+    # trajectory_sched），也对基线计算保真度，便于与 PPO 的 fidelity_fn 结果同口径对比。
+    fid = phys_fidelity(phys, config, fidelity_sim, num_trajectories, seed) \
+        if (reward_mode != 'routing' or fidelity_sim in ('trajectory', 'trajectory_sched')) else None
+
+    sched_stats = None
+    if use_scheduler and hw is not None:
+        # D2：用同一事件级调度器给 SABRE 输出电路排程，得到公平可比的 makespan/并行度。
+        # 与 PPO 环境使用相同的 GreedyScheduler（criticality+LPT+串扰优先级），
+        # 使对比只反映「路由/布局质量」而非调度策略差异。
+        phys_dag = CircuitDAG.from_circuit(phys)
+        _, _, sched_stats = schedule_routed_circuit(
+            phys_dag, hw, mapping=list(range(hw.num_qubits)),
+            scheduler=GreedyScheduler(), xtalk_alpha=xtalk_alpha)
 
     return CircuitMetrics(
         circuit_path='',
@@ -485,6 +687,8 @@ def evaluate_sabre(
         wall_time_ms=wall_time_ms,
         terminal_xz=None,
         fidelity=fid,
+        sched_stats=sched_stats,
+        sabre_initial_layout=info.get('initial_layout'),
     )
 
 
@@ -505,6 +709,10 @@ def aggregate(metrics: List[CircuitMetrics]) -> SummaryStats:
     fid_vals = [m.fidelity for m in completed if m.fidelity is not None]
     map_vals = [m.mapping_swaps for m in completed]
 
+    sched_times = [m.sched_stats['makespan_us'] for m in completed if m.sched_stats]
+    sched_dens = [m.sched_stats['density'] for m in completed if m.sched_stats]
+    sched_xt = [m.sched_stats['crosstalk_events'] for m in completed if m.sched_stats]
+
     return SummaryStats(
         n=n,
         comp_rate=comp_rate,
@@ -519,6 +727,9 @@ def aggregate(metrics: List[CircuitMetrics]) -> SummaryStats:
         xz_mean=float(np.mean(xz_vals)) if xz_vals else None,
         fidelity_mean=float(np.mean(fid_vals)) if fid_vals else None,
         mapping_mean=float(np.mean(map_vals)) if map_vals else None,
+        sched_time_mean=float(np.mean(sched_times)) if sched_times else None,
+        sched_density_mean=float(np.mean(sched_dens)) if sched_dens else None,
+        sched_crosstalk_mean=float(np.mean(sched_xt)) if sched_xt else None,
     )
 
 
@@ -566,6 +777,11 @@ def print_report(
         else:
             parts.append('      --   ')
     print('  '.join(parts))
+    if stats.sched_time_mean is not None:
+        extra = (f"    [sched] makespan={stats.sched_time_mean:.2f}µs  "
+                 f"par_density={stats.sched_density_mean:.3f}  "
+                 f"xtalk={stats.sched_crosstalk_mean:.3f}")
+        print(extra)
 
 
 # ---------------------------------------------------------------------------
@@ -605,6 +821,8 @@ def main():
     parser.add_argument('--random-init', action=argparse.BooleanOptionalAction,
                         default=False,
                         help='start each episode from a random initial layout')
+    parser.add_argument('--warm-start-sabre', action='store_true', default=False,
+                        help='warm-start: 用每电路 SABRE 初始布局作为 PPO init_mapping')
     parser.add_argument('--deterministic', action=argparse.BooleanOptionalAction,
                         default=True,
                         help='use argmax for action selection')
@@ -622,13 +840,27 @@ def main():
     parser.add_argument('--max-circuits', type=int, default=None,
                         help='limit number of circuits to evaluate')
     parser.add_argument('--beam-width', type=int, default=0,
-                        help='beam width for 1-step lookahead (0 = argmax)')
+                        help='beam search 宽度（1-step lookahead）；0 表示 argmax')
+    parser.add_argument('--use-scheduler', action='store_true', default=False,
+                        help='启用门调度器（timing_aware），导出并行调度序列')
+    parser.add_argument('--eta-time', type=float, default=0.01)
+    parser.add_argument('--eta-xtalk-par', type=float, default=0.05)
+    parser.add_argument('--eta-idle', type=float, default=0.005)
+    parser.add_argument('--eta-parallel', type=float, default=0.05,
+                        help='并行密度奖励系数（仅训练用，评估仅透传）')
+    parser.add_argument('--swap-duration', type=float, default=0.9,
+                        help='SWAP 分解时长（µs，默认 0.9 = 3×CX）')
+    parser.add_argument('--xtalk-alpha', type=float, default=0.03,
+                        help='串扰软约束阈值（仅调度器内部用；SABRE+调度基线同用）')
+    parser.add_argument('--dump-schedule', action='store_true', default=False,
+                        help='在 --out JSON 中导出带并时序的门调度序列与物理电路 QASM')
     parser.add_argument('--verbose', action='store_true', default=False,
                         help='print per-circuit results')
     parser.add_argument('--fidelity-sim', type=str, default='aer',
-                        choices=['aer', 'trajectory'],
+                        choices=['aer', 'trajectory', 'trajectory_sched'],
                         help='保真度模拟器: aer=density_matrix/counts (n<=12), '
-                             'trajectory=轨迹状态向量 (O(2^n) 内存，20q+ 必选)')
+                             'trajectory=轨迹状态向量(串行, O(2^n) 内存), '
+                             'trajectory_sched=轨迹状态向量+调度感知(空闲退相干/动态串扰)')
     parser.add_argument('--traj-trajectories', type=int, default=16,
                         help='轨迹模拟器采样条数')
     parser.add_argument('--traj-seed', type=int, default=None,
@@ -711,6 +943,14 @@ def main():
             _progress(i, len(rel_paths), label)
             qc = load_qc(args.data_dir, rel_path)
             dag = CircuitDAG.from_circuit(qc)
+            init_mapping = None
+            if args.warm_start_sabre:
+                _, info = sabre_route(
+                    qc, config, heuristic=args.sabre_heuristic,
+                    swap_trials=args.sabre_trials, seed=args.seed,
+                )
+                init_mapping = info.get('initial_layout')
+            random_init = args.random_init and not args.warm_start_sabre
             if args.beam_width > 0:
                 m = evaluate_circuit_beam(
                     dag, hw, coupling_map, agent,
@@ -721,8 +961,21 @@ def main():
                     beam_width=args.beam_width,
                     max_num_qubits=args.max_num_qubits,
                     max_num_edges=args.max_num_edges,
-                    random_init=args.random_init,
+                    random_init=random_init,
+                    init_mapping=init_mapping,
+                    use_scheduler=(args.use_scheduler or args.fidelity_sim == "trajectory_sched"),
+                    eta_time=args.eta_time,
+                    eta_xtalk_par=args.eta_xtalk_par,
+                    eta_idle=args.eta_idle,
+                    eta_parallel=args.eta_parallel,
+                    xtalk_alpha=args.xtalk_alpha,
+                    swap_duration=args.swap_duration,
+                    dump_schedule=args.dump_schedule,
                     fidelity_fn=fid_fn,
+                    config=config,
+                    fidelity_sim=args.fidelity_sim,
+                    num_trajectories=args.traj_trajectories,
+                    traj_seed=traj_seed,
                 )
             else:
                 m = evaluate_circuit(
@@ -734,8 +987,21 @@ def main():
                     noise_config=config if args.reward_mode != 'routing' else None,
                     max_num_qubits=args.max_num_qubits,
                     max_num_edges=args.max_num_edges,
-                    random_init=args.random_init,
+                    random_init=random_init,
+                    init_mapping=init_mapping,
+                    use_scheduler=(args.use_scheduler or args.fidelity_sim == "trajectory_sched"),
+                    eta_time=args.eta_time,
+                    eta_xtalk_par=args.eta_xtalk_par,
+                    eta_idle=args.eta_idle,
+                    eta_parallel=args.eta_parallel,
+                    xtalk_alpha=args.xtalk_alpha,
+                    swap_duration=args.swap_duration,
+                    dump_schedule=args.dump_schedule,
                     fidelity_fn=fid_fn,
+                    config=config,
+                    fidelity_sim=args.fidelity_sim,
+                    num_trajectories=args.traj_trajectories,
+                    traj_seed=traj_seed,
                 )
             m.circuit_path = rel_path
             if args.verbose:
@@ -747,7 +1013,10 @@ def main():
     agent_metrics = evaluate_agent_on_circuits()
     agent_stats = aggregate(agent_metrics)
 
-    show_fid = args.reward_mode != 'routing'
+    # 即便 reward_mode='routing'，只要指定了态级保真度模拟器（trajectory/
+    # trajectory_sched），也展示保真度列（PPO 的来自环境 fidelity_fn，SABRE 的来自
+    # baseline 的 phys_fidelity），以便做同口径对比。
+    show_fid = (args.reward_mode != 'routing') or (args.fidelity_sim in ('trajectory', 'trajectory_sched'))
     print_header(show_fidelity=show_fid)
     print_report(label, agent_stats, show_fidelity=show_fid)
 
@@ -806,6 +1075,9 @@ def main():
                 seed=args.seed + i + 2000,
                 fidelity_sim=args.fidelity_sim,
                 num_trajectories=args.traj_trajectories,
+                hw=hw,
+                use_scheduler=args.use_scheduler,
+                xtalk_alpha=args.xtalk_alpha,
             )
             m.circuit_path = rel_path
             if args.verbose:
@@ -831,6 +1103,10 @@ def main():
                 'terminal_xz': m.terminal_xz,
                 'truncated_remaining': m.truncated_remaining,
                 'fidelity': m.fidelity,
+                'circuit_time_us': m.circuit_time_us,
+                'crosstalk_events': m.crosstalk_events,
+                'schedule': m.schedule,
+                'phys_qasm': m.phys_qasm,
             }
 
         out = {

@@ -1,11 +1,120 @@
 import numpy as np
 import pytest
+from itertools import combinations
 
 from qiskit import QuantumCircuit, transpile
 
 from sim.sim import NoiseConfig
-from sim.trajectory_sim import TrajectorySimulator, TrajectoryResult
+from sim.trajectory_sim import (
+    TrajectorySimulator,
+    TrajectoryResult,
+    trajectory_circuit_fidelity,
+    _reduce_phys_circuit_for_fidelity,
+)
 from utils.metrics import state_fidelity
+
+
+def _full_config(n, cm):
+    t1 = [30.0 + i for i in range(n)]
+    t2 = [60.0 + i for i in range(n)]  # t2 <= 2*t1
+    freq = [5.0] * n
+    sqe = [0.001 + 0.0001 * i for i in range(n)]
+    ro = [0.01 + 0.001 * i for i in range(n)]
+    tqe = {(a, b): 0.01 + 0.001 * (a + b) for a, b in cm}
+    tqe.update({(b, a): v for (a, b), v in list(tqe.items())})
+    cts = {(a, b): 0.001 + 0.0001 * (a + b) for a, b in cm}
+    cts.update({(b, a): v for (a, b), v in list(cts.items())})
+    return NoiseConfig(
+        t1_times=t1, t2_times=t2, freq_ghz=freq,
+        single_q_gate_error=sqe, two_q_gate_error=tqe, coupling_map=cm,
+        readout_error=ro, crosstalk_strength=cts,
+        single_gate_time=0.1, two_gate_time=0.3, idle_time=0.1, shots=1024,
+    )
+
+
+def _subset_circuit(n, used, gate_seq):
+    """在 n 比特电路上、只用到 used 中的比特，按 gate_seq 施加门。
+
+    gate_seq 元素 = (name, (qubit_idx_in_used,...), param=None)
+    """
+    qc = QuantumCircuit(n)
+    for name, qs, *rest in gate_seq:
+        param = rest[0] if rest else None
+        if param is None:
+            getattr(qc, name)(*[used[i] for i in qs])
+        else:
+            getattr(qc, name)(param, *[used[i] for i in qs])
+    return qc
+
+
+def _reduced_circuit(k, gate_seq):
+    qc = QuantumCircuit(k)
+    for name, qs, *rest in gate_seq:
+        param = rest[0] if rest else None
+        if param is None:
+            getattr(qc, name)(*qs)
+        else:
+            getattr(qc, name)(param, *qs)
+    return qc
+
+
+# ----------------------------------------------------------------------- #
+# 物理比特子集截断：对保真度精确等价（同种子）
+# ----------------------------------------------------------------------- #
+def test_truncation_equals_full_simulation():
+    """被用到的物理比特子集截断后，保真度必须与「等价约化问题」完全一致。
+
+    数学依据：|0> 是热噪声（振幅/相位阻尼）的不动点，未用比特恒为 |0>，
+    保真度贡献因子恒为 1；退极化与相干 ZZ 串扰只触及被作用比特。故只对子集
+    模拟并索引重标号，结果与全比特模拟逐位相等。
+    """
+    n = 8
+    full_cm = [(a, b) for a, b in combinations(range(n), 2)]  # 全连接避免转译插 SWAP
+    used = [0, 2, 5]
+    k = len(used)
+    red_cm = [(a, b) for a, b in combinations(range(k), 2)]
+
+    full_cfg = _full_config(n, full_cm)
+    # 手搓「仅含 used 比特」的约化配置（参数取自 used 对应索引）
+    red_cfg = NoiseConfig(
+        t1_times=[full_cfg.t1_times[i] for i in used],
+        t2_times=[full_cfg.t2_times[i] for i in used],
+        freq_ghz=[full_cfg.freq_ghz[i] for i in used],
+        single_q_gate_error=[full_cfg.single_q_gate_error[i] for i in used],
+        two_q_gate_error={(a, b): full_cfg.two_q_gate_error[(used[a], used[b])]
+                          for a, b in red_cm},
+        coupling_map=red_cm,
+        readout_error=[full_cfg.readout_error[i] for i in used],
+        crosstalk_strength={(a, b): full_cfg.crosstalk_strength[(used[a], used[b])]
+                             for a, b in red_cm},
+        single_gate_time=0.1, two_gate_time=0.3, idle_time=0.1, shots=1024,
+    )
+
+    gate_seq = [("h", (0,)), ("cx", (0, 1)), ("cx", (1, 2)),
+                ("rz", (2,), 0.5), ("cx", (0, 2))]
+    phys8 = _subset_circuit(n, used, gate_seq)
+    rc3 = _reduced_circuit(k, gate_seq)
+
+    for scheduled in (False, True):
+        f_red = trajectory_circuit_fidelity(rc3, red_cfg, num_trajectories=64,
+                                            seed=123, scheduled=scheduled)
+        f_trunc = trajectory_circuit_fidelity(phys8, full_cfg, num_trajectories=64,
+                                              seed=123, scheduled=scheduled)
+        assert f_trunc == pytest.approx(f_red, abs=1e-12), \
+            f"scheduled={scheduled}: 截断 {f_trunc} != 约化 {f_red}"
+
+
+def test_truncation_noop_when_all_used():
+    """所有比特均被使用时，截断应为无操作（结果不变）。"""
+    n = 5
+    cm = [(a, b) for a, b in combinations(range(n), 2)]
+    cfg = _full_config(n, cm)
+    qc = QuantumCircuit(n)
+    qc.h(0); qc.cx(0, 1); qc.cx(2, 3); qc.cx(3, 4); qc.rz(0.3, 4)
+    rc, rcfg = _reduce_phys_circuit_for_fidelity(qc, cfg)
+    assert rc.num_qubits == n
+    assert rcfg is cfg
+
 
 
 def _config(n=3, sqe=0.001, tqe=0.01, ro=0.02, t1=50.0, t2=70.0,

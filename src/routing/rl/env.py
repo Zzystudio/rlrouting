@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Callable, Dict, List, Optional, Tuple
 
 import gymnasium as gym
@@ -11,6 +12,7 @@ from qiskit import QuantumCircuit
 from ..graph.circuit_dag import CircuitDAG, build_routing_graph
 from ..gnn.encoder import SubGNN
 from ..graph.features import HardwareFeatures
+from ..timing import GreedyScheduler, CircuitTiming, schedule_events, FALLBACK_DURATION, GATE_DURATION_TABLE
 
 _GATE_BASE_REWARD_DEFAULT: Dict[str, float] = {
     "cx": 2.0, "h": 0.5, "sx": 0.3, "x": 0.3,
@@ -41,7 +43,7 @@ class RoutingEnv(gym.Env):
 
         # --- 步级奖励参数 (Stage 1 & 2) ---
         gate_base_reward: Optional[Dict[str, float]] = None,
-        swap_cost: float = 0.3,
+        swap_cost: float = 0.0,
         invalid_penalty: float = 1.0,
         eta_err: float = 0.5,
         eta_xtalk: float = 0.02,
@@ -49,14 +51,20 @@ class RoutingEnv(gym.Env):
         cnot_cost: float = 0.1,
 
         # --- 终端奖励参数 (Stage 2 & 3) ---
-        lambda_kl: float = 1.0,
-        lambda_ce: float = 1.0,
-        lambda_tvd: float = 1.0,
         lambda_fid: float = 5.0,
         fidelity_fn: Optional[Callable] = None,
 
         # --- 距离塑形奖励 (Phase 1) ---
         eta_dist: float = 1.0,
+
+        # --- 门调度 / 时序感知 (timing_aware, 框架 v2 Phase 1) ---
+        use_scheduler: bool = False,
+        eta_time: float = 0.01,
+        eta_xtalk_par: float = 1.0,
+        eta_idle: float = 0.005,
+        eta_parallel: float = 0.05,
+        xtalk_alpha: float = 0.03,
+        swap_duration_us: float = 0.9,
 
         # --- Episode 截断 ---
         max_episode_steps: int = 200,
@@ -67,10 +75,13 @@ class RoutingEnv(gym.Env):
         mapping_budget: Optional[int] = None,
         mapping_phase: bool = True,
         random_init: bool = True,
+        init_mapping: Optional[Sequence[int]] = None,
+        lambda_layout: float = 0.0,
         use_gnn: bool = True,
         gnn: Optional[SubGNN] = None,
         seed: int = 0,
         noise_config=None,
+        sabre_fid_map: Optional[Dict[int, float]] = None,
     ):
         super().__init__()
         self.dag = dag
@@ -91,13 +102,23 @@ class RoutingEnv(gym.Env):
         self.eta_dist = eta_dist
         self.cnot_cost = cnot_cost
 
-        self.lambda_kl = lambda_kl
-        self.lambda_ce = lambda_ce
-        self.lambda_tvd = lambda_tvd
+        self.use_scheduler = use_scheduler
+        self.eta_time = eta_time
+        self.eta_xtalk_par = eta_xtalk_par
+        self.eta_idle = eta_idle
+        self.eta_parallel = eta_parallel
+        self.xtalk_alpha = xtalk_alpha
+        self.swap_duration = swap_duration_us
+        self.scheduler = GreedyScheduler() if use_scheduler else None
+        self.timing = None
+
         self.lambda_fid = lambda_fid
         self.fidelity_fn = fidelity_fn
+        self.sabre_fid_map = sabre_fid_map
+        self.lambda_layout = lambda_layout
 
         self.random_init = random_init
+        self.init_mapping = list(init_mapping) if init_mapping is not None else None
         self.max_episode_steps = max_episode_steps
         self.unfinished_penalty = unfinished_penalty
         self.max_num_edges = max_num_edges or self.num_edges
@@ -136,7 +157,9 @@ class RoutingEnv(gym.Env):
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
         n = self.num_qubits
-        if self.random_init:
+        if self.init_mapping is not None:
+            self.mapping = list(self.init_mapping[:n])
+        elif self.random_init:
             perm = list(range(n))
             self._rng.shuffle(perm)
             self.mapping = perm
@@ -151,6 +174,9 @@ class RoutingEnv(gym.Env):
         self._last_progress_swap: int = 0
         self._xz_errors = np.zeros((n, 2), dtype=float)
         self._phys_circuit = QuantumCircuit(self.hw.num_qubits)
+        self._pending_measures = []
+        self._pending_swaps = []
+        self.timing = CircuitTiming.create(self.hw.num_qubits) if self.use_scheduler else None
         self._update()
         if not self.enable_mapping_phase:
             self._auto_execute_batch()
@@ -173,6 +199,13 @@ class RoutingEnv(gym.Env):
         else:
             self.mapping[lp], self.mapping[lq] = self.mapping[lq], self.mapping[lp]
         self._phys_circuit.swap(p, q)
+        # SWAP 本身也耗时（默认 0.9µs = 3×CX），并占用两端 qubit。
+        # 关键修复：不再在 step 内串行推进全局时钟，而是登记为「待调度事件」，
+        # 交给 _auto_execute_batch_scheduled 与同批就绪门一起做 ASAP 事件级调度，
+        # 从而让与本 SWAP 无关比特上的门可以在 SWAP 期间并行执行（与 SABRE 同口径）。
+        # 其它不相关比特的空闲仍由各门 start-last_free 记录，不重复计入。
+        if self.use_scheduler and self.timing is not None:
+            self._pending_swaps.append((p, q, self.swap_duration))
 
     def _apply_virtual_swap(self, p: int, q: int):
         """映射阶段虚拟 SWAP：仅重排初始映射，不写入物理线路、不计入 SWAP 数。"""
@@ -189,19 +222,23 @@ class RoutingEnv(gym.Env):
             self.mapping[lp], self.mapping[lq] = self.mapping[lq], self.mapping[lp]
 
     def _update(self):
-        changed = True
-        while changed:
-            changed = False
-            for g in self.dag.gates:
-                if g.index in self.executed:
-                    continue
-                if all(p in self.executed for p in g.predecessors):
-                    if not g.is_two_qubit:
-                        self.executed.add(g.index)
-                        if not g.is_measure:
-                            pq = [self.mapping[q] for q in g.qubits]
-                            self._phys_circuit.append(g.operation, pq)
-                        changed = True
+        # 调度模式下，1Q 门不在此处急迫执行（否则绕过事件级调度内核，导致
+        # 时长/并行度统计失真）；所有门统一在 _auto_execute_batch_scheduled 中调度。
+        # 仅在非调度模式保留「1Q 门自动执行」的遗留行为。
+        if not self.use_scheduler:
+            changed = True
+            while changed:
+                changed = False
+                for g in self.dag.gates:
+                    if g.index in self.executed:
+                        continue
+                    if all(p in self.executed for p in g.predecessors):
+                        if not g.is_two_qubit:
+                            self.executed.add(g.index)
+                            if not g.is_measure:
+                                pq = [self.mapping[q] for q in g.qubits]
+                                self._phys_circuit.append(g.operation, pq)
+                            changed = True
         self.executable_2q = []
         for g in self.dag.gates:
             if g.index in self.executed or g.is_two_qubit is False:
@@ -422,12 +459,23 @@ class RoutingEnv(gym.Env):
         new.eta_xz_step = self.eta_xz_step
         new.eta_dist = self.eta_dist
         new.cnot_cost = self.cnot_cost
-        new.lambda_kl = self.lambda_kl
-        new.lambda_ce = self.lambda_ce
-        new.lambda_tvd = self.lambda_tvd
+        new.use_scheduler = self.use_scheduler
+        new.eta_time = self.eta_time
+        new.eta_xtalk_par = self.eta_xtalk_par
+        new.eta_idle = self.eta_idle
+        new.eta_parallel = self.eta_parallel
+        new.xtalk_alpha = self.xtalk_alpha
+        new.swap_duration = self.swap_duration
+        new.scheduler = self.scheduler
+        new.timing = self.timing.clone() if self.timing is not None else None
+        new._pending_measures = list(self._pending_measures)
+        new._pending_swaps = list(self._pending_swaps)
         new.lambda_fid = self.lambda_fid
+        new.lambda_layout = self.lambda_layout
         new.fidelity_fn = self.fidelity_fn
+        new.sabre_fid_map = self.sabre_fid_map
         new.random_init = self.random_init
+        new.init_mapping = self.init_mapping
         new.max_episode_steps = self.max_episode_steps
         new.unfinished_penalty = self.unfinished_penalty
         new.max_num_edges = self.max_num_edges
@@ -511,6 +559,8 @@ class RoutingEnv(gym.Env):
         return -self.eta_xz_step * delta
 
     def _auto_execute_batch(self) -> Tuple[float, float]:
+        if self.use_scheduler and self.timing is not None:
+            return self._auto_execute_batch_scheduled()
         self._update()
         r_exec = 0.0
         r_prop = 0.0
@@ -527,6 +577,133 @@ class RoutingEnv(gym.Env):
             self._update()
         return r_exec, r_prop
 
+    def _update_timing(self) -> Tuple[List[int], List[int]]:
+        """返回当前可执行的一量子门 / 双量子门索引列表，不执行任何门。
+
+        供调度器（scheduled 模式）使用：门在 _auto_execute_batch_scheduled 中
+        经离散事件时序内核统一执行，以便累积 timing 奖励。
+        """
+        ready_1q: List[int] = []
+        ready_2q: List[int] = []
+        ready_meas: List[int] = []
+        for g in self.dag.gates:
+            if g.index in self.executed:
+                continue
+            if not all(p in self.executed for p in g.predecessors):
+                continue
+            if g.is_measure:
+                ready_meas.append(g.index)
+            elif g.is_two_qubit:
+                qa, qb = g.qubits
+                pa, pb = self.mapping[qa], self.mapping[qb]
+                if self.hw.adj[pa, pb] > 0:
+                    ready_2q.append(g.index)
+            else:
+                ready_1q.append(g.index)
+        self.executable_2q = ready_2q
+        self._pending_measures = ready_meas
+        return ready_1q, ready_2q
+
+    def _auto_execute_batch_scheduled(self) -> Tuple[float, float]:
+        """调度版批执行：事件级 ASAP 调度，结算 timing 奖励。
+
+        - 每轮把当前就绪门交给 schedule_events 做事件级调度（A1/A2/A3）
+        - 并行密度奖励 r_parallel = eta_parallel·max(0, serial_dur/clock_advance-1)
+          而 r_time = -eta_time·clock_advance（B1/B2：优化 clock = 优化时间）
+        - 末尾把已就绪的 measure 集中在最终波执行（A5），不入 _phys_circuit
+        - 空闲以「相邻门 gap」累计（A6），不重复计入 SWAP 占用
+        """
+        r_gate_exec = 0.0
+        r_prop = 0.0
+        r_time = 0.0
+        r_xtalk = 0.0
+        r_idle = 0.0
+        r_parallel = 0.0
+        total_clock = 0.0
+        total_serial = 0.0
+        total_xtalk = 0.0
+        while True:
+            ready_1q, ready_2q = self._update_timing()
+            pending = list(self._pending_swaps)
+            if not ready_1q and not ready_2q and not pending:
+                break
+            idle_before = float(self.timing.qubit_idle_time.sum())
+            placed, clock_advance, xtalk = schedule_events(
+                ready_1q, ready_2q, self.dag, self.mapping,
+                self.timing, self.hw, self.scheduler, self.xtalk_alpha,
+                pending_swaps=pending)
+            self._pending_swaps = []
+            idle_after = float(self.timing.qubit_idle_time.sum())
+            if not placed:
+                # 安全兜底：保证每轮至少执行一个门，避免死循环
+                fb = ready_1q + ready_2q
+                gate_idx = min(fb)
+                g = self.dag.gates[gate_idx]
+                pqs = [self.mapping[q] for q in g.qubits]
+                dur = GATE_DURATION_TABLE.get(g.name, FALLBACK_DURATION)
+                start = self.timing.total_time
+                self.timing._phys_qubits_idle(None, pqs, start, dur)
+                self.timing.total_time += dur
+                self.timing.schedule_log.append({
+                    "kind": "2q" if g.is_two_qubit else "1q",
+                    "gate_idx": gate_idx, "op": g.name,
+                    "qubits": pqs, "start": start, "end": self.timing.total_time,
+                    "wave": self.timing.waves,
+                })
+                self.timing.waves += 1
+                placed = [(gate_idx, start, self.timing.total_time,
+                           "2q" if g.is_two_qubit else "1q")]
+                xtalk = 0.0
+                clock_advance = dur
+            for (gate_idx, start, end, kind) in placed:
+                if gate_idx >= 0:
+                    g = self.dag.gates[gate_idx]
+                    self.executed.add(gate_idx)
+                    self._last_progress_swap = len(self._swap_history)
+                    if not g.is_measure:
+                        pq = [self.mapping[q] for q in g.qubits]
+                        self._phys_circuit.append(g.operation, pq)
+                    r_gate_exec += self._step_reward_execute(True, gate_idx)
+                    r_prop += self._step_reward_propagate(gate_idx)
+                    total_serial += (end - start)
+                else:
+                    # SWAP 调度事件（gate_idx==-1）：仅累积时长，不写物理线路/DAG
+                    total_serial += (end - start)
+            total_clock += clock_advance
+            total_xtalk += xtalk
+            r_time += -self.eta_time * clock_advance
+            r_xtalk += -self.eta_xtalk_par * xtalk
+            r_idle += -self.eta_idle * (idle_after - idle_before)
+        # 末尾 measure 波（A5）：集中在最终时刻并行执行，不写物理线路
+        if getattr(self, "_pending_measures", []):
+            meas = self._pending_measures
+            self._pending_measures = []
+            idle_before = float(self.timing.qubit_idle_time.sum())
+            start = self.timing.total_time
+            m_dur = GATE_DURATION_TABLE.get("measure", 2.0)
+            for gate_idx in meas:
+                g = self.dag.gates[gate_idx]
+                q = self.mapping[g.qubits[0]]
+                self.timing._phys_qubits_idle(None, [q], start, m_dur)
+                self.timing.schedule_log.append({
+                    "kind": "measure", "gate_idx": gate_idx, "op": "measure",
+                    "qubits": [q], "start": start, "end": start + m_dur,
+                    "wave": self.timing.waves,
+                })
+                self.executed.add(gate_idx)
+                self._last_progress_swap = len(self._swap_history)
+                r_gate_exec += self._step_reward_execute(True, gate_idx)
+                r_prop += self._step_reward_propagate(gate_idx)
+                total_serial += m_dur
+            self.timing.total_time += m_dur
+            self.timing.waves += 1
+            total_clock += m_dur
+            idle_after = float(self.timing.qubit_idle_time.sum())
+            r_idle += -self.eta_idle * (idle_after - idle_before)
+        r_parallel = self.eta_parallel * max(0.0, (total_serial / total_clock - 1.0)) \
+            if total_clock > 1e-9 else 0.0
+        return (r_gate_exec + r_time + r_parallel + r_xtalk + r_idle, r_prop)
+
     # ------------------------------------------------------------------
     #  终端保真度 / 分布差异
     # ------------------------------------------------------------------
@@ -537,16 +714,58 @@ class RoutingEnv(gym.Env):
             return self._compute_aer_fidelity()
         return 0.0
 
+    def get_schedule_waves(self):
+        """返回调度波形列表，供调度感知保真度模拟器使用。
+
+        每个波形 = (dw, [(phys_idx, qubits, is_2q), ...])，其中 phys_idx
+        对应 self._phys_circuit.data[phys_idx]（跳过末尾 measure 波）。
+        dw = 该波内 max(end) - min(start)。无 timing（非调度模式）或空日志返回 None。
+        """
+        if self.timing is None:
+            return None
+        log = getattr(self.timing, "schedule_log", None)
+        if not log:
+            return None
+        by_wave = {}
+        phys_counter = 0
+        for entry in log:
+            if entry.get("kind") == "measure":
+                continue
+            w = entry["wave"]
+            by_wave.setdefault(w, []).append((phys_counter, entry))
+            phys_counter += 1
+        if not by_wave:
+            return None
+        waves = []
+        for w in sorted(by_wave):
+            entries = by_wave[w]
+            dw = max(e["end"] for _, e in entries) - min(e["start"] for _, e in entries)
+            gates = []
+            for phys_idx, e in entries:
+                qs = tuple(e["qubits"])
+                is_2q = (e["kind"] == "2q")
+                gates.append((phys_idx, qs, is_2q))
+            waves.append((dw, gates))
+        return waves
+
     def _compute_aer_fidelity(self) -> float:
         from qiskit_aer import AerSimulator
         from sim.sim import NoiseSimulator
 
         shots = self.noise_config.shots
 
-        meas = self._phys_circuit.copy()
+        # 截断到实际使用的量子比特子集，避免 density_matrix OOM
+        try:
+            from sim.trajectory_sim import _reduce_phys_circuit_for_fidelity
+            red_circ, red_cfg = _reduce_phys_circuit_for_fidelity(
+                self._phys_circuit, self.noise_config)
+        except Exception:
+            red_circ, red_cfg = self._phys_circuit, self.noise_config
+
+        meas = red_circ.copy()
         meas.measure_all()
 
-        noise_sim = NoiseSimulator(self.noise_config)
+        noise_sim = NoiseSimulator(red_cfg)
         meas_t = noise_sim._transpile(meas)
 
         noisy_counts = noise_sim.run(meas_t, shots=shots, skip_transpile=True)
@@ -562,12 +781,26 @@ class RoutingEnv(gym.Env):
     def _terminal_reward(self, info: dict) -> float:
         info["num_swaps"] = self._swap_counter
         info["mapping_swaps"] = self._mapping_swaps
+        info["terminal_reward"] = 0.0
         if self.reward_mode == "routing":
             info["terminal_XZ"] = float(np.sum(self._xz_errors))
             return 0.0
         if self.reward_mode in ("noise_aware", "fidelity_shaping"):
+            # warmup：lambda_fid==0 时跳过昂贵的终端保真度模拟（奖励恒为 0）
+            if self.lambda_fid == 0:
+                info["fidelity"] = None
+                return 0.0
             fid = self._get_terminal_reward_value()
             info["fidelity"] = fid
+            if self.sabre_fid_map is not None:
+                sref = self.sabre_fid_map.get(self.num_qubits)
+                if sref and sref > 0:
+                    fid_c = max(fid, sref * 1e-4)
+                    r = self.lambda_fid * (math.log(fid_c) - math.log(sref))
+                    r = float(np.clip(r, -50.0, 50.0))
+                    info["terminal_reward"] = r
+                    return r
+            info["terminal_reward"] = self.lambda_fid * fid
             return self.lambda_fid * fid
         return 0.0
 
@@ -594,12 +827,16 @@ class RoutingEnv(gym.Env):
             self.mapping_phase = False
             r_exec, r_prop = self._auto_execute_batch()
             reward += r_exec + r_prop
+            if self.lambda_layout != 0.0:
+                nready = max(1, len(self._ready_2q_gates()))
+                reward += -self.lambda_layout * (self._front_layer_dist() / nready)
         else:
             p, q = self.coupling_map[action]
             dist_before = self._front_layer_dist() if self.eta_dist != 0 else 0.0
             self._apply_virtual_swap(p, q)
             self._mapping_swaps += 1
             self._swap_history.append(action)
+            reward += self._step_reward_swap()
             if self.eta_dist != 0:
                 dist_after = self._front_layer_dist()
                 reward += -self.eta_dist * (dist_after - dist_before) / max(dist_before, 1e-8)
@@ -607,6 +844,9 @@ class RoutingEnv(gym.Env):
                 self.mapping_phase = False
                 r_exec, r_prop = self._auto_execute_batch()
                 reward += r_exec + r_prop
+                if self.lambda_layout != 0.0:
+                    nready = max(1, len(self._ready_2q_gates()))
+                    reward += -self.lambda_layout * (self._front_layer_dist() / nready)
         return self._end_step(reward, info, compute_obs=compute_obs)
 
     # ------------------------------------------------------------------
@@ -636,5 +876,7 @@ class RoutingEnv(gym.Env):
             dist_after = self._front_layer_dist()
             r_dist = -self.eta_dist * (dist_after - dist_before) / max(dist_before, 1e-8)
             reward += r_dist
+
+        reward += self._step_reward_swap()
 
         return self._end_step(reward, {}, compute_obs=compute_obs)

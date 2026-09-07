@@ -1,0 +1,27 @@
+{
+ "circuit": "tof_3.qasm",
+ "model": "l05_beam5",
+ "num_logical_qubits": 5,
+ "num_physical_qubits": 20,
+ "topology": "tianyan176_20q",
+ "initial_layout": {
+  "0": "Q14",
+  "1": "Q20",
+  "2": "Q19",
+  "3": "Q7",
+  "4": "Q13"
+ },
+ "routed_qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[20];\nh q[0];\nh q[1];\ncx q[4],q[1];\nrz(-pi/4) q[1];\ncx q[19],q[1];\nrz(pi/4) q[1];\ncx q[4],q[1];\nrz(-pi/4) q[1];\ncx q[19],q[1];\nrz(pi/4) q[1];\nh q[1];\ncx q[1],q[18];\nrz(-pi/4) q[18];\nswap q[1],q[18];\ncx q[3],q[1];\nrz(pi/4) q[1];\ncx q[18],q[1];\nrz(-pi/4) q[1];\ncx q[3],q[1];\nrz(pi/4) q[1];\nh q[1];\nswap q[1],q[18];\ncx q[3],q[1];\nrz(-pi/4) q[1];\ncx q[3],q[1];\nrz(pi/4) q[3];\nrz(pi/4) q[1];\nh q[1];\nswap q[4],q[1];\ncx q[19],q[1];\nrz(-pi/4) q[1];\ncx q[19],q[1];\nrz(pi/4) q[19];\nrz(pi/4) q[1];\ncx q[1],q[4];\nrz(pi/4) q[4];\nswap q[4],q[1];\ncx q[19],q[1];\nrz(-pi/4) q[1];\ncx q[4],q[1];\nrz(pi/4) q[1];\ncx q[19],q[1];\nrz(-pi/4) q[1];\nh q[1];\nswap q[2],q[19];\ncx q[2],q[4];\nrz(pi/4) q[4];\ncx q[2],q[4];\nrz(-pi/4) q[2];\nrz(-pi/4) q[4];",
+ "num_swaps": 5,
+ "mapping_swaps": 2,
+ "completed": true,
+ "fidelity": 0.4747192004302836,
+ "final_layout": {
+  "0": "Q14",
+  "1": "Q20",
+  "2": "Q19",
+  "3": "Q7",
+  "4": "Q13"
+ },
+ "wall_time_ms": 135.6
+}

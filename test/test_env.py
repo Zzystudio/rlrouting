@@ -91,15 +91,20 @@ def test_fidelity_shaping_step_zero():
 
 
 def test_swap_penalty():
-    env = _env(reward_mode="routing", swap_cost=0.3)
-    obs, _ = env.reset()
-    env.step(env.commit_action)  # 结束映射阶段
-    pre_executed = len(env.executed)
-    obs, reward, done, truncated, info = env.step(0)
-    if len(env.executed) == pre_executed:
-        assert reward == 0.0, f"expected 0 for pure SWAP, got {reward}"
-    else:
-        assert reward > 0.0, f"expected positive for gate-executing SWAP, got {reward}"
+    # wiring: a routing SWAP step must be penalized by exactly -swap_cost
+    # relative to the swap_cost=0 baseline (all other terms identical).
+    env0 = _env(reward_mode="routing", swap_cost=0.0)
+    obs, _ = env0.reset()
+    env0.step(env0.commit_action)  # 结束映射阶段
+    r0 = env0.step(0)[1]
+
+    env3 = _env(reward_mode="routing", swap_cost=0.3)
+    obs, _ = env3.reset()
+    env3.step(env3.commit_action)
+    r3 = env3.step(0)[1]
+
+    assert abs((r3 - r0) - (-0.3)) < 1e-6, \
+        f"swap penalty should be -0.3, got {r3 - r0}"
 
 
 def test_swap_counter():

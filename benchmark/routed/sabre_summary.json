@@ -1,0 +1,116 @@
+[
+ {
+  "circuit": "barenco_tof_10.qasm",
+  "num_qubits": 19,
+  "swaps": 103,
+  "fidelity": 0.07145924413781675
+ },
+ {
+  "circuit": "barenco_tof_3.qasm",
+  "num_qubits": 5,
+  "swaps": 9,
+  "fidelity": 0.7466949143141477
+ },
+ {
+  "circuit": "barenco_tof_4.qasm",
+  "num_qubits": 7,
+  "swaps": 30,
+  "fidelity": 0.44542558655396125
+ },
+ {
+  "circuit": "barenco_tof_5.qasm",
+  "num_qubits": 9,
+  "swaps": 26,
+  "fidelity": 0.16834435002077214
+ },
+ {
+  "circuit": "csla_mux_3.qasm",
+  "num_qubits": 15,
+  "swaps": 39,
+  "fidelity": 0.03408509786711572
+ },
+ {
+  "circuit": "gf2^4_mult.qasm",
+  "num_qubits": 12,
+  "swaps": 50,
+  "fidelity": 0.23483995909947097
+ },
+ {
+  "circuit": "gf2^5_mult.qasm",
+  "num_qubits": 15,
+  "swaps": 72,
+  "fidelity": 0.0793403293836398
+ },
+ {
+  "circuit": "gf2^6_mult.qasm",
+  "num_qubits": 18,
+  "swaps": 109,
+  "fidelity": 0.03143190620881076
+ },
+ {
+  "circuit": "grover_5.qasm",
+  "num_qubits": 9,
+  "swaps": 119,
+  "fidelity": 0.0005738380458848115
+ },
+ {
+  "circuit": "hwb6.qasm",
+  "num_qubits": 7,
+  "swaps": 50,
+  "fidelity": 2.8359897232140464e-07
+ },
+ {
+  "circuit": "mod5_4.qasm",
+  "num_qubits": 5,
+  "swaps": 12,
+  "fidelity": 0.512236712941706
+ },
+ {
+  "circuit": "mod_mult_55.qasm",
+  "num_qubits": 9,
+  "swaps": 22,
+  "fidelity": 0.1553530390999591
+ },
+ {
+  "circuit": "mod_red_21.qasm",
+  "num_qubits": 11,
+  "swaps": 48,
+  "fidelity": 0.0644897993039363
+ },
+ {
+  "circuit": "rc_adder_6.qasm",
+  "num_qubits": 14,
+  "swaps": 38,
+  "fidelity": 0.16618694831179026
+ },
+ {
+  "circuit": "tof_10.qasm",
+  "num_qubits": 19,
+  "swaps": 57,
+  "fidelity": 0.4263800118429171
+ },
+ {
+  "circuit": "tof_3.qasm",
+  "num_qubits": 5,
+  "swaps": 11,
+  "fidelity": 0.7779114580241799
+ },
+ {
+  "circuit": "tof_4.qasm",
+  "num_qubits": 7,
+  "swaps": 17,
+  "fidelity": 0.6570139828238839
+ },
+ {
+  "circuit": "tof_5.qasm",
+  "num_qubits": 9,
+  "swaps": 17,
+  "fidelity": 0.4698757456319113
+ },
+ {
+  "circuit": "vbe_adder_3.qasm",
+  "num_qubits": 10,
+  "swaps": 28,
+  "fidelity": 0.1779229166374216
+ }
+]

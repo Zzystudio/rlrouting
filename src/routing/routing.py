@@ -119,10 +119,24 @@ def sabre_route(
 
     num_swaps = sum(1 for inst, qargs, cargs in phys.data if inst.name == "swap")
 
+    # 由最终布局 + 逆推路由 SWAP 还原「初始布局」(logical->physical 列表)。
+    # SabreSwap 只在 property_set 中保留 final_layout，无 initial 键，故需重建。
+    final_layout = pm.property_set.get("final_layout")
+    initial_layout = None
+    if final_layout is not None:
+        vb = final_layout.get_virtual_bits()
+        layout = {q._index if hasattr(q, "_index") else q: p for q, p in vb.items()}
+        for inst, qargs, cargs in reversed(list(phys.data)):
+            if inst.name == "swap":
+                i, j = qargs[0]._index, qargs[1]._index
+                layout[i], layout[j] = layout[j], layout[i]
+        initial_layout = [layout[i] for i in range(phys.num_qubits)]
+
     info = {
         "num_swaps": num_swaps,
         "num_physical_gates": phys.num_nonlocal_gates
         if hasattr(phys, "num_nonlocal_gates") else None,
+        "initial_layout": initial_layout,
         "wall_time_ms": wall_time_ms,
     }
     return phys, info

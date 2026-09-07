@@ -149,6 +149,7 @@ class PPOAgent:
         self.num_edges = num_edges
         self.coupling_map = coupling_map
         self.rew_norm = RewardNormalizer()
+        self.term_norm = RewardNormalizer()
 
         params = []
         if gnn is not None:
@@ -163,6 +164,22 @@ class PPOAgent:
             self.ac = ActorCritic(obs_dim, action_dim).to(device)
         params += list(self.ac.parameters())
         self.optimizer = torch.optim.Adam(params, lr=lr)
+        self.ema = None
+
+    def init_ema(self, decay=0.999):
+        self.ema = EMAModel(self.ac, decay=decay)
+
+    def update_ema(self):
+        if self.ema is not None:
+            self.ema.update(self.ac)
+
+    def apply_ema(self):
+        if self.ema is not None:
+            self.ema.apply_shadow(self.ac)
+
+    def restore_from_ema(self):
+        if self.ema is not None:
+            self.ema.restore(self.ac)
 
     # ---- 交互 ----
     @torch.no_grad()
@@ -255,7 +272,8 @@ class PPOAgent:
                 ef = torch.cat([ef, pad], dim=0)
             mv_raw = torch.tensor(mv, dtype=torch.float32, device=self.device)
             mv_t = torch.zeros(1, self.num_qubits, dtype=torch.float32, device=self.device)
-            mv_t[0, :mv_raw.shape[0]] = mv_raw
+            n_copy = min(mv_raw.shape[0], self.num_qubits)
+            mv_t[0, :n_copy] = mv_raw[:n_copy]
             pg_t = torch.tensor(pg, dtype=torch.float32, device=self.device).unsqueeze(0)
             if phase_list is not None:
                 ph_t = torch.tensor([[float(phase_list[i])]], dtype=torch.float32, device=self.device)
@@ -440,3 +458,34 @@ class PPOAgent:
         if clip_return is not None:
             returns = np.clip(returns, -clip_return, clip_return)
         return advantages, returns
+
+
+class EMAModel:
+    """Exponential Moving Average of model parameters for stable evaluation."""
+
+    def __init__(self, model, decay=0.999):
+        self.decay = decay
+        self.shadow = {}
+        self.backup = {}
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                self.shadow[name] = param.data.clone()
+
+    def update(self, model):
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                self.shadow[name] = (
+                    self.decay * self.shadow[name] + (1 - self.decay) * param.data
+                )
+
+    def apply_shadow(self, model):
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                self.backup[name] = param.data.clone()
+                param.data = self.shadow[name]
+
+    def restore(self, model):
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                param.data = self.backup[name]
+        self.backup = {}

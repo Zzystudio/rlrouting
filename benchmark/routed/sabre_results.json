@@ -1,0 +1,135 @@
+[
+ {
+  "circuit": "barenco_tof_10.qasm",
+  "num_qubits": 19,
+  "num_gates": 450,
+  "swaps": 103,
+  "time_ms": 19.304945977637544
+ },
+ {
+  "circuit": "barenco_tof_3.qasm",
+  "num_qubits": 5,
+  "num_gates": 58,
+  "swaps": 9,
+  "time_ms": 3.175974008627236
+ },
+ {
+  "circuit": "barenco_tof_4.qasm",
+  "num_qubits": 7,
+  "num_gates": 114,
+  "swaps": 30,
+  "time_ms": 4.894946003332734
+ },
+ {
+  "circuit": "barenco_tof_5.qasm",
+  "num_qubits": 9,
+  "num_gates": 170,
+  "swaps": 26,
+  "time_ms": 7.763564994093031
+ },
+ {
+  "circuit": "csla_mux_3.qasm",
+  "num_qubits": 15,
+  "num_gates": 170,
+  "swaps": 39,
+  "time_ms": 7.975632004672661
+ },
+ {
+  "circuit": "gf2^4_mult.qasm",
+  "num_qubits": 12,
+  "num_gates": 225,
+  "swaps": 50,
+  "time_ms": 9.413441992364824
+ },
+ {
+  "circuit": "gf2^5_mult.qasm",
+  "num_qubits": 15,
+  "num_gates": 347,
+  "swaps": 72,
+  "time_ms": 13.836903002811596
+ },
+ {
+  "circuit": "gf2^6_mult.qasm",
+  "num_qubits": 18,
+  "num_gates": 495,
+  "swaps": 109,
+  "time_ms": 20.96645999699831
+ },
+ {
+  "circuit": "grover_5.qasm",
+  "num_qubits": 9,
+  "num_gates": 831,
+  "swaps": 119,
+  "time_ms": 28.767302981577814
+ },
+ {
+  "circuit": "hwb6.qasm",
+  "num_qubits": 7,
+  "num_gates": 259,
+  "swaps": 50,
+  "time_ms": 9.880962985334918
+ },
+ {
+  "circuit": "mod5_4.qasm",
+  "num_qubits": 5,
+  "num_gates": 63,
+  "swaps": 12,
+  "time_ms": 4.578355001285672
+ },
+ {
+  "circuit": "mod_mult_55.qasm",
+  "num_qubits": 9,
+  "num_gates": 119,
+  "swaps": 22,
+  "time_ms": 5.57909399503842
+ },
+ {
+  "circuit": "mod_red_21.qasm",
+  "num_qubits": 11,
+  "num_gates": 278,
+  "swaps": 48,
+  "time_ms": 9.192501020152122
+ },
+ {
+  "circuit": "rc_adder_6.qasm",
+  "num_qubits": 14,
+  "num_gates": 200,
+  "swaps": 38,
+  "time_ms": 7.087922014761716
+ },
+ {
+  "circuit": "tof_10.qasm",
+  "num_qubits": 19,
+  "num_gates": 255,
+  "swaps": 57,
+  "time_ms": 9.468694013776258
+ },
+ {
+  "circuit": "tof_3.qasm",
+  "num_qubits": 5,
+  "num_gates": 45,
+  "swaps": 11,
+  "time_ms": 3.176055004587397
+ },
+ {
+  "circuit": "tof_4.qasm",
+  "num_qubits": 7,
+  "num_gates": 75,
+  "swaps": 17,
+  "time_ms": 4.43658500444144
+ },
+ {
+  "circuit": "tof_5.qasm",
+  "num_qubits": 9,
+  "num_gates": 105,
+  "swaps": 17,
+  "time_ms": 4.7434169973712415
+ },
+ {
+  "circuit": "vbe_adder_3.qasm",
+  "num_qubits": 10,
+  "num_gates": 150,
+  "swaps": 28,
+  "time_ms": 5.915722984354943
+ }
+]

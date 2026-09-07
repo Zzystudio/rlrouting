@@ -202,6 +202,7 @@ def compute_fidelity(qc, config, result):
     from qiskit_aer import AerSimulator
     from sim.sim import NoiseSimulator
     from routing.routing import greedy_route, sabre_route
+    from utils.metrics import counts_fidelity
 
     if result.method == "Greedy":
         phys, _ = greedy_route(qc, config)
@@ -220,9 +221,7 @@ def compute_fidelity(qc, config, result):
     ideal_job = ideal_sim.run(meas_t, shots=shots)
     ideal_counts = ideal_job.result().get_counts()
 
-    all_out = set(ideal_counts.keys()) | set(noisy_counts.keys())
-    overlap = sum(min(ideal_counts.get(k, 0), noisy_counts.get(k, 0)) for k in all_out)
-    result.fidelity = overlap / shots
+    result.fidelity = counts_fidelity(ideal_counts, noisy_counts)
     return result
 
 

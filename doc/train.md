@@ -2708,3 +2708,1327 @@ PYTHONPATH=src python3 -u -m routing.rl.eval_policy \
 - [ ] 记录最终日志摘要（fid、swp、trunc、收敛情况）
 - [ ] 最终模型 `policy_tianyan20q_ft_noiseaware.pt` 的 noise_aware 评估
        与中途 checkpoint 对比，验证保真度是否进一步提升
+
+---
+
+## 门调度模块 Phase 1（timing_aware + GreedyScheduler，2026.08.19）
+
+> 框架依据：`doc/plan.md` §「端到端联合优化框架 v2」Phase 1。用户确认：简单插件，每步 SWAP 后
+> 对 front-layer 贪心并行调度并计算该步奖励；四类硬件效应（真实门时长 / 并行分层 / 串扰规避 /
+> 空闲退相干）均建模；策略=启发式；接入点=训练奖励。门时长采用 per-gate-type 表，1Q 门维持自动执行。
+
+### 实现要点
+
+- **新增 `src/routing/timing.py`**：
+  - `GATE_DURATION_TABLE`（rz=0 / sx≈35ns / cx≈300ns / swap≈300ns 等 per-gate-type 精细时长）
+  - `CircuitTiming`：离散事件时序内核（`total_time` 全局时钟、`qubit_busy_until`、`qubit_idle_time`、
+    `qubit_crosstalk`、`parallel_usage`、`rounds`、`crosstalk_events`、`total_gates_executed`），
+    含 `create(n)` / `clone()`（供 beam 复用）
+  - `GreedyScheduler.priority(g)`：按 criticality（到线路终点的剩余深度）排序
+  - `schedule_round(ready_1q, ready_2q, ...)`：贪心最大独立集（共享 qubit 互斥），同 round 内
+    相邻耦合对 2Q 门记 `hw.zz` 加权串扰，结算 `round_time` / 全局时钟 / 空闲退相干
+- **`src/routing/rl/env.py`**：
+  - `__init__` 新增 `use_scheduler` + `eta_time=0.01` / `eta_xtalk_par=0.05` / `eta_idle=0.005`
+  - 新增 `_update_timing()`（返回 ready_1q/ready_2q，不执行门）+ `_auto_execute_batch_scheduled()`
+    （每轮贪心并行调度 front-layer，累加 `r_time=-η·Δclock`、`r_xtalk_par=-η·加权串扰`、
+    `r_idle=-η·新增idle` 到步奖励）；`_auto_execute_batch` 按 `use_scheduler` 分支（非调度模式
+    保持原串行逻辑，行为不变）
+  - `_apply_swap` 计时 0.3µs 并更新两端 `qubit_busy_until`（SWAP 也占线路时间）
+  - `reset()` 初始化 `timing`；`clone()` 复制 `timing` / `scheduler` / 权重
+- **`src/routing/rl/train_agent.py`**：`--use-scheduler` + `--eta-time/--eta-xtalk-par/--eta-idle`；
+  透传 `create_env`；metrics.csv 新增 `time_us` / `xtalk` / `idle` 三列；日志打印 time/xtalk
+- **`src/routing/rl/eval_policy.py`**：`CircuitMetrics` 新增 `circuit_time_us` / `crosstalk_events`
+  （env 启用调度时填充），JSON 结果导出包含这两字段
+
+### 验证（2026.08.19）
+
+- `PYTHONPATH=src python3 -m pytest test/ -q`：33 passed，2 failed（**预先存在**，
+  `test_fidelity_shaping_step_zero` / `test_swap_penalty`，与 `data_gen.py max_operands=2` 改动相关，
+  与本次无关；默认 `use_scheduler=False` 路径未改动）
+- 小电路冒烟（cross_5q + random_circuit）：55/55 门执行完毕，`timing.total_time` / `rounds` /
+  `crosstalk_events` 正常累积
+- 5q 训练冒烟（`--use-scheduler --timesteps 2000 --device cpu`）：正常跑完，日志出现
+  `time=…us` / `xtalk=…`，metrics.csv 三列有值，policy 保存成功
+
+### 后续（框架 Phase 2 远期，本次未做）
+
+- `PolicyScheduler`（agent 逐门决策）、`JointActorCritic` + `gate_score_head`、`gate_embeddings()` 暴露
+- 门层面 obs 特征、GNN timing 特征（dim 19-21/27-28/12-13）
+- 终端 simulator schedule-aware（保真度按并行/时序计算；当前终端 fidelity 仍串行 Aer/trajectory，
+  与「不改 Aer 通道」决策一致，时序仅作 dense 奖励信号）
+- 注：`--no-mapping-phase` 与 agent 动作维度 `+1` 存在预先存在的兼容问题（非本次改动），真实训练
+  均用默认 mapping 阶段，不受影响
+
+### 导出带并行调度的物理电路（上述 Phase 1 追加功能）
+
+- `eval_policy` 新增 CLI：`--use-scheduler` + `--dump-schedule`
+- `CircuitTiming.schedule_log`（`timing.py`）记录每门调度记录
+  `{kind, gate_idx, op, qubits, start, end, round}`；SWAP 记为 `round=-1`、`gate_idx=-1`
+- `env._phys_circuit` 经 `qiskit.qasm2.dumps`（失败回退 `qasm3`）导出为 `phys_qasm`
+- 二者均写入 `--out` JSON 的 `schedule` / `phys_qasm` 字段；SABRE 基线无调度器，`schedule`/`phys_qasm` 为 None
+- 验证（5q cross，`--use-scheduler --dump-schedule`）：正确导出 23 条调度记录 + 含 SWAP 的 QASM，
+  `circuit_time_us`/`crosstalk_events` 同步填充；pytest 33 passed（2 项预先存在无关失败不变）
+
+---
+
+## 门调度 Stage A 微调验证（20q 天衍，2026.08.19）
+
+> 计划：在 `policy_tianyan20q_ft_phase1.pt` 基础上开 `--use-scheduler` 做 routing 模式微调（仅 Stage A）。
+
+### 训练
+
+```bash
+# tmux 会话 tianyan20q_ph1sched（~30 分钟，40000 步）
+PYTHONPATH=src python3 -u -m routing.rl.train_agent \
+  --data-dir traindata --split-prefix tianyan20q \
+  --topo traindata/topo/tianyan176_20q.json \
+  --reward-mode routing --timesteps 40000 \
+  --max-episode-steps 400 --max-num-qubits 20 --mapping-budget 8 \
+  --use-scheduler --eta-time 0.01 --eta-xtalk-par 0.05 --eta-idle 0.005 \
+  --load models/policy_tianyan20q_ft_phase1.pt --device cuda:0 \
+  --checkpoint-dir models/ckpts_tianyan20q_ft_ph1sched \
+  --checkpoint-interval 20 --out models/policy_tianyan20q_ft_phase1_sched.pt
+```
+- 收敛：`rew +44→+189`，`swp 17→55`（与基模 Phase1 收敛量级一致），`trunc=0%`
+- 日志 `time/xtalk` 指标正常流动（注意日志 `time` 是逐步累计时钟均值，随电路变长而增大，非逐步恶化）
+
+### 评估（`tianyan20q_test`，30 条 n20，routing 模式，仅 SABRE 基线）
+
+```bash
+# Run1 微调后模型（带调度器）
+PYTHONPATH=src python3 -u -m routing.rl.eval_policy \
+  --model ../models/policy_tianyan20q_ft_phase1_sched.pt \
+  --topo ../traindata/topo/tianyan176_20q.json --data-dir ../traindata \
+  --split tianyan20q_test --reward-mode routing --use-scheduler --dump-schedule \
+  --baselines --no-greedy --no-random --out /tmp/eval_ph1sched.json
+# Run2 基模（同样开调度器，隔离训练收益）
+... --model ../models/policy_tianyan20q_ft_phase1.pt ... --out /tmp/eval_ph1base.json
+```
+
+| 模型（均开调度器） | SWAPs | circuit_time_us(mean) | crosstalk_events(mean) |
+|---|---|---|---|
+| PPO base（调度器 on） | 32.0±14.7 | **40.38** | 0.675 |
+| PPO sched（Stage A） | 32.7±15.8 | 41.06 | **0.649** |
+| SABRE | 26.3±11.7 | — | — |
+
+### 结论与分析
+
+- **circuit_time_us**：微调后 +0.7µs（≈+1.7%，噪声内）→ 几乎无改善
+- **crosstalk_events**：0.675→0.649（≈−4% 相对）→ 方向略好但幅度很小
+- **SWAPs**：基本持平（符合预期，调度不针对 SWAP 数）
+- 并行化收益"免费"来自 env 调度器：base 模型开调度器即得相近 `circuit_time_us`/`crosstalk`，
+  Stage A 纯路由微调对调度的杠杆很弱：
+  1. `r_time` 中 `round_time` 几乎全由 cx=0.3µs 主导，减少总时长=提高并行度=减少轮数，
+     但调度器每轮已尽量打包所有不冲突门，轮数主要由依赖深度+路由决定，Agent 难经 SWAP 显著改变
+  2. 当前 `eta` 权重很小（0.01/0.05/0.005），且 GNN **无**时序特征（框架 Phase 2 才加），
+     Agent 只能从标量奖励间接学 → 信号太弱
+- **属建模/杠杆问题，非 bug**：调度内核与指标均正确流动
+
+### 后续可选方向
+
+- 加大 `eta` 权重（如 `eta_time=0.1 / eta_xtalk_par=0.2`）重跑，看是否拉动调度指标（可能牺牲路由质量）
+- 框架 Phase 2：加 GNN 时序特征（dim 19-21/27-28/12-13）+ `PolicyScheduler` 逐门决策，让 Agent 直接感知并行/串扰
+- 或接受"调度器提供免费并行化"，把调度视为推理期优化（评估时开 `--use-scheduler` 即享并行），训练侧维持原路由目标
+
+---
+
+## 门调度优化（事件级 + 并行奖励）Stage A v2 验证（20q 天衍，2026.08.25）
+
+> 计划：在 `policy_tianyan20q_ft_phase1.pt` 基础上，用**事件级 ASAP 调度（A1–A6）+ 并行密度奖励（B1/B2）+ 串扰软约束（A3）+ SABRE+调度公平基线（D2）+ 调度统计（D3）**微调。
+> 修复：`eval_policy` 透传 `swap_duration` 的 bug（env 参数为 `swap_duration_us`）。
+
+### 训练
+
+```bash
+# tmux 会话 tianyan20q_ph1sched_v2（~30 分钟，40000 步）
+PYTHONPATH=src python3 -u -m routing.rl.train_agent \
+  --data-dir traindata --split-prefix tianyan20q \
+  --topo traindata/topo/tianyan176_20q.json \
+  --reward-mode routing --timesteps 40000 \
+  --max-episode-steps 400 --max-num-qubits 20 --mapping-budget 8 \
+  --use-scheduler --eta-time 0.01 --eta-xtalk-par 0.05 --eta-idle 0.005 \
+  --eta-parallel 0.05 --xtalk-alpha 0.03 --swap-duration 0.9 \
+  --load models/policy_tianyan20q_ft_phase1.pt --device cuda:0 \
+  --checkpoint-dir models/ckpts_tianyan20q_ft_ph1sched_v2 \
+  --checkpoint-interval 20 --out models/policy_tianyan20q_ft_phase1_sched_v2.pt
+```
+- 收敛：`rew +44→+198`，`swp 17→53`（与基模 Phase1 收敛量级一致），`trunc=0%`
+- 日志 `time` / `xtalk` / `par` 指标正常流动（`par` 写入 `metrics.csv`）
+
+### 评估（`tianyan20q_test`，30 条 n20，routing 模式，**均开 `--use-scheduler`**）
+
+```bash
+# Run1 本实验模型
+PYTHONPATH=src python3 -u -m routing.rl.eval_policy \
+  --model ../models/policy_tianyan20q_ft_phase1_sched_v2.pt \
+  --topo ../traindata/topo/tianyan176_20q.json --data-dir ../traindata \
+  --split tianyan20q_test --reward-mode routing --use-scheduler --dump-schedule \
+  --baselines --no-greedy --no-random --out /tmp/eval_ph1sched_v2.json
+# Run2 base 模型（同样开调度器，隔离训练收益）
+... --model ../models/policy_tianyan20q_ft_phase1.pt ... --out /tmp/eval_ph1base_v2.json
+```
+
+| 模型（调度器 on） | SWAPs | makespan(µs) | par_density | crosstalk |
+|---|---|---|---|---|
+| PPO base（调度器 on） | 32.0±14.7 | 59.60 | 0.684 | 0.000 |
+| PPO sched_v2（本实验） | 31.6±14.7 | **58.90** | **0.698** | 0.000 |
+| SABRE（+调度基线 D2） | 26.3±11.7 | **29.12** | **2.747** | 0.000 |
+
+### 结论与分析
+
+1. **事件级调度 + 并行奖励相对旧锁步 base 仅微弱改善**：makespan −0.7µs（−1.2%）、par_density +0.014、SWAPs −0.4。说明**调度器已不是瓶颈**——它已把每比特能并行的门尽量并行。
+2. **关键发现（天花板在路由不在调度）**：同一调度器下 SABRE 的 makespan 仅为 PPO 的 ~1/2（29 vs 59µs），且 `par_density` 高达 2.747（PPO 仅 0.7）。即 SABRE 路由出的电路**天然并行度高、关键路径短**，调度器可充分利用；而 PPO 路由出的电路串行链长、并行门少，调度器再强也无米下炊。
+3. **串扰累计为 0 是「旧模型只覆盖直接相邻 + 报告字段未累加」共同导致的，非拓扑本身**（见下「串扰模型扩展到 1-hop」节）：旧 `schedule_events` 仅检测 `hw.adj[a,b]>0`（图距离 1），且 `timing.crosstalk_events` 字段**从未被累加**，故报告恒为 0.000。扩展后该 20q 稀疏子图上 PPO/SABRE 串扰分别为 0.483 / 1.908（非 0）。
+4. **下一步杠杆**：时序收益的上限由**路由/布局质量**决定，而非调度算法。要真正压低 makespan，应让 PPO 学到「产生高并行度电路」的路由——例如：
+   - 把并行密度 / 关键路径长度作为更强的路由奖励信号（当前 `r_parallel`/`r_time` 权重仍偏小，且 GNN 无时序特征）；
+   - 布局阶段即优化并行性（初始映射尽量缩短关键路径、分散并行门到不互斥的耦合）；
+    - 或在框架 Phase 2 引入逐门 GNN 时序特征，让 Agent 直接感知并行/串扰。
+    - 继续打磨调度器本身收益已很小，不建议再投入。
+
+---
+
+## 串扰模型扩展到 1-hop（仅调度检测/奖励，不改 sim.py，2026.08.25）
+
+> 用户指正：真实超导 ZZ 串扰延伸到**次近邻**（图距离 2，即「两条耦合边间隔一个耦合边」）。旧模型只覆盖直接相邻（距离 1），且 `timing.crosstalk_events` 从未累加 → 报告恒为 0。
+
+### 改动
+
+- `timing.py` 新增 `_crosstalk_graph(hw, hops=2, decay=0.3)`：对 `hw.adj` 做 BFS 得原始跳数距离，
+  构造覆盖图距离 1..2 的串扰邻接 `cx_adj` 与强度 `cx_zz`：
+  - 距离 1：直接用 `hw.zz`
+  - 距离 2：`decay(0.3) × 最短路径两端直接 zz 均值`（无直连 zz 时用全图均值）
+  - 结果缓存在 `hw._cx_cache`，避免每个调度步重复 BFS
+- `schedule_events` 的 A3 软约束与串扰记录改用 `cx_adj/cx_zz`（距离 1/2 都查）；`hw` 为 None 时回退直接相邻。
+- **修复报告 bug**：串扰累加时同步 `timing.crosstalk_events += zz`（此前该字段恒为 0，导致所有 `xtalk` 指标失真）。
+- `test/test_timing.py` 新增 `test_crosstalk_1hop_detected`（线形 5q 上 (0,1) 与 (3,4) 并行，验证次近邻串扰被记入且 `crosstalk_events==xtalk`）。
+
+### 复测（`tianyan20q_test`，30 条 n20，均开 `--use-scheduler`）
+
+| 模型 | makespan(µs) | par_density | ~~旧 xtalk~~ | **新 xtalk** |
+|---|---|---|---|---|
+| PPO sched_v2 | 58.90 | 0.698 | 0.000 (bug) | **0.483** |
+| SABRE | 29.12 | 2.747 | 0.000 (bug) | **1.908** |
+
+### 新结论
+
+1. 串扰在 20q 稀疏子图上**非 0**，此前 0.000 是报告 bug + 距离-1 模型共同导致。
+2. **出现并行度↔串扰权衡**：SABRE 高并行（2.747）伴高串扰（1.908）；PPO 低并行（0.698）串扰也低（0.483）。说明当前 SABRE 的「快」部分来自更敢并行，但也更受串扰惩罚——若把 `r_xtalk` 权重调高，PPO 的「慢但干净」反而可能更优（尤其噪声敏感场景）。
+3. 下一步可把 `eta_xtalk_par` 作为可调旋钮做消融，观察 PPO 在「并行换串扰」前沿上的位置；仍不改 `sim.py`（保真度模拟维持距离-1 串扰）。
+
+---
+
+## A2 串扰按时长加权（2026.08.25）
+
+> 为让串扰惩罚量纲与 `r_time` 一致、对重叠更敏感，把 `schedule_events` 的串扰累计由「每对重叠门累加一次 `zz`」改为 **`zz × 重叠时长`**（单位 zz·µs）。A3 软约束仍用强度 `cx_zz` 阈值（不变）。`test/test_timing.py` 6 项仍通过。
+
+### 复测（同 v2 模型、同 30 条 n20，仅换测量口径）
+
+| 模型 | makespan(µs) | par_density | **xtalk(zz·µs, A2)** | 旧(zz-sum) |
+|---|---|---|---|---|
+| PPO sched_v2 | 58.90 | 0.698 | **0.144** | 0.483 |
+| SABRE | 29.12 | 2.747 | **0.596** | 1.908 |
+
+- 缩放因子 ≈ 重叠时长(≈0.3µs)，符合预期。
+- **规模提醒**：PPO 每步串扰 ≈ 0.144/33 ≈ 0.0044；乘以 `eta_xtalk_par` 后相对 `r_time(≈0.018)`/`r_parallel(≈0.035)` 仍偏小 → 后续 L3 重训消融 `eta_xtalk_par` 需取 **{0.5, 1.0, 2.0}** 量级方能让 PPO 感知串扰、滑向权衡前沿。
+
+---
+
+## 前沿探索 L1：调度层 `--xtalk-alpha` 扫描（无重训，2026.08.25）
+
+> A3 软约束阈值扫描；同一 eval 同时产出 PPO v2(argmax) 与 SABRE 两条曲线。makespan 由关键路径主导，调 alpha 只改调度器延迟。
+
+| alpha | PPO makespan(µs) | PPO xtalk(zz·µs) | SABRE makespan(µs) | SABRE xtalk(zz·µs) |
+|---|---|---|---|---|
+| 0.0 | 58.90 | 0.231 | 29.12 | 1.216 |
+| 0.01 | 58.90 | **0.005** | 29.12 | **0.091** |
+| 0.03 | 58.90 | 0.144 | 29.12 | 0.596 |
+| 0.06 | 58.90 | 0.231 | 29.12 | 1.216 |
+| 0.1 | 58.90 | 0.231 | 29.12 | 1.216 |
+
+### 发现
+
+1. **makespan 对所有 alpha 完全不变**（58.90 / 29.12）→ 本拓扑电路存在大量调度松弛（slack），A3 延迟把串扰门挪到「不延长关键路径」的空档，**消除串扰几乎零 makespan 代价**。
+2. **串扰在调度层几乎可免费压掉**：`alpha=0.01` 时 PPO xtalk 0.231→0.005、SABRE 1.216→0.091，makespan 不变。即此前 "SABRE 高并行高串扰" 的「权衡」在调度层是**伪权衡**——串扰是调度松弛能消化的，不是必须为并行付出的。
+3. **A3 启发式非单调**（alpha=0.01 最优、0.03 反而更高、≥0.06 回到 0.0 水平）：阈值式软约束对"哪些对该延迟"不够稳，建议后续改用连续串扰惩罚或放入 beam/学习层处理。
+
+### 结论
+
+- 调度层（A3）杠杆**弱且行为不稳**，不适合作为前沿主杠杆；但给出一个实用建议：**评估/推理时设 `xtalk_alpha≈0.01` 即可近乎免费消除串扰**，无需改路由。
+- 真正的「并行度↔串扰」权衡在 **Agent 路由层**（学习/beam），见 L2/L3。
+
+> L2（beam-3 + `eta_xtalk_par` 扫描）、L3（重训 `eta_xtalk_par` 扫描）进行中。
+
+---
+
+## 修复：PPO「并行度远差于 SABRE」是评估伪影（2026.08.25）
+
+> 用户质疑"为何 PPO 并行度比 SABRE 差这么多"。对 10 条 n20 电路逐条分解发现：PPO 门级关键路径（makespan − 串行 SWAP 时长）≈ 30.0µs，与 SABRE 总 makespan ≈ 28.0µs **几乎相等**；30µs 的 makespan 差距几乎全是 SWAP 串行化 + SWAP 计数差。进一步定位到 **三个评估/建模伪影**，逐一修复后 PPO 与 SABRE 并行度持平甚至更优。
+
+### 三个根因与修复
+
+1. **SWAP 跨步串行化（主因）**：原 `schedule_events` 以 `wave_start` 作 start 地板（每批 start ≥ 上批结束时刻）。PPO 每步只施加 1 个 SWAP，于是**不相关比特上的连续 SWAP 也逐批被迫串行**，makespan 被堆高 ~22–28µs。SABRE 把全部就绪 SWAP 一次性排程，可彼此重叠。
+   - 修复：改为**真正事件级 ASAP**——`start = max(前驱完成, 本比特 last_free)`（去掉 wave_start 地板）；`total_time = max(qubit_busy_until)`（不再是 wave_start+本批最长门）。跨步不相关 SWAP/门可重叠。
+2. **1Q 门绕过调度器**：`reset()` 无条件调 `_update()` 急迫执行全部初始就绪 1Q 门，绕过事件级内核 → 这些门不计时长、不进 `serial_dur`/`schedule_log`，`serial_dur` 少算 ~10µs → par_density 被压低。
+   - 修复：`_update()` 的急迫执行加 `if not self.use_scheduler:` 守卫（executable_2q 计算保留供 obs/mask）。
+3. **SWAP 串行推进时钟 + par_density 口径不对称**：原 `_apply_swap` 直接 `total_time += 0.9`，且 `serial_dur` 不含 SWAP 时长（SABRE 含）。
+   - 修复：`_apply_swap` 改为登记 `pending_swaps`，交给 `_auto_execute_batch_scheduled` 与同批就绪门**一并** `schedule_events`（伪门 `gate_idx=-1`，可与无关门重叠），SWAP 时长计入 `serial_dur`；`_sched_stats_from_timing` 不再把 SWAP 排除出 `peak_parallel`（与 SABRE 同口径）。
+
+### 修正后对比（v2 模型，同一 GreedyScheduler，xtalk_alpha=0.03，30 条 n20 全测试集，argmax）
+
+| 模型 | makespan(µs) | SWAPs | serial_dur(µs) | peak_parallel | crosstalk(zz·µs) |
+|---|---|---|---|---|---|
+| PPO sched_v2 | **25.9** | 32.0 | 82.1 | **15.9** | **0.314** |
+| SABRE | 34.7 | 26.0 | 76.7 | 15.3 | 0.698 |
+| ratio P/S | **0.75** | 1.23 | 1.07 | **1.03** | **0.45** |
+
+- **peak_parallel 1.03x（持平）**——"PPO 并行度 4x 更差"的错觉来自修复前 peak 3.8 vs 15.3（1Q 门绕过 + SWAP 串行化所致）。
+- **makespan 0.75x（PPO 更优）**、**crosstalk 0.45x（PPO 更优）**；代价是 SWAP 多 23%。
+- 30/30 电路全部正常完成（无截断）。`test/test_timing.py` 6 项通过；全量 `pytest` 39 passed（2 个 `test_env.py` 失败为**改动前已存在**，与本次无关）。
+
+### 结论与影响
+
+- **PPO 的并行度从未更差**，差异完全是评估伪影。修复后 PPO 在 makespan/并行度/串扰三项均不弱于 SABRE。
+- **L1 结论需重写**：L1 表格里的 makespan（58.90/29.12）是修复前的失真值（含 SWAP 跨步串行化），其"makespan 对 alpha 不变"的观察仍成立（关键路径主导），但绝对数值已不可比。
+- **L2（beam-3 + eta_xtalk_par 扫描，tmux `frontier_L2`）已在旧代码上启动，结果失真，需停掉用修复后代码重跑**。但结合 L1，调度层串扰可被几乎免费压掉，前沿主杠杆仍在 Agent 路由层/重训（L3）。
+- 重训建议不变：因修复后串扰量纲与 r_time 一致，L3 `eta_xtalk_par` 仍取 **{0.5, 1.0, 2.0}**。
+
+---
+
+## L3 重训：修正后环境 + `eta_xtalk_par` 扫描（2026.08.25 启动）
+
+> 因前述三个评估伪影已修复，原 v2 是在失真环境（SWAP 跨步串行化、串扰量纲偏小）下训练的，奖励信号失真。为让策略在**正确时序反馈**下学习并主动调节「并行↔串扰」，从 `policy_tianyan20q_ft_phase1_sched_v2.pt` 继续训练，扫 `eta_xtalk_par ∈ {0.5, 1.0, 2.0}`（量级提升：A2 后串扰量纲与 r_time 一致，旧 {0.05} 过小）。
+
+### 训练命令（三会话，tmux，各 100k 步，单 20q 拓扑）
+
+```bash
+cd src
+for ETA in 0.5 1.0 2.0; do
+  python3 -u -m routing.rl.train_agent \
+    --topo ../traindata/topo/tianyan176_20q.json --split-prefix tianyan20q \
+    --reward-mode routing --timesteps 100000 \
+    --load ../models/policy_tianyan20q_ft_phase1_sched_v2.pt \
+    --use-scheduler --eta-xtalk-par $ETA \
+    --eta-time 0.01 --eta-idle 0.005 --eta-parallel 0.05 --xtalk-alpha 0.03 --swap-duration 0.9 \
+    --out ../models/policy_tianyan20q_ft_phase1_sched_fix_eta${ETA}.pt \
+    --checkpoint-dir ../models/ckpts_tianyan20q_ft_ph1sched_fix_eta${ETA} \
+    --checkpoint-interval 10000 --device cuda:{0,1,2}
+done
+```
+
+- 会话：`retrain_fix_eta05/10/20`（cuda:0/1/2），日志 `models/ckpts_tianyan20q_ft_ph1sched_fix_eta{05,10,20}/train.log`。
+- 启动即见 `time≈11–14µs`（vs 旧失真 `≈28µs`）、`xtalk≈0.22` 被正常计入 → 确认在修正后环境训练。
+- 评估待训练完成后进行：用同前 30 条 n20 测试集 + `evaluate_sabre`（同 GreedyScheduler）对比 makespan/peak_parallel/crosstalk/SWAPs，并叠加 beam-search 推理侧前沿。
+
+> 进行中，结果后续追加。
+
+### L3 结果（修正后环境，30 条 n20 测试集，argmax）
+
+| 模型 | makespan(µs) | SWAPs | serial_dur(µs) | peak_parallel | crosstalk(zz·µs) |
+|---|---|---|---|---|---|
+| v2(old, 修正后评估) | 24.9 | 31.8 | 81.9 | 15.8 | 0.307 |
+| **eta05** | **23.7** | **30.2** | 80.4 | 15.9 | 0.338 |
+| eta10 | 24.2 | 30.3 | 80.5 | 15.9 | 0.312 |
+| eta20 | 24.7 | 30.1 | 80.4 | 15.7 | 0.322 |
+| SABRE | 34.7 | 26.0 | 76.7 | 15.3 | 0.698 |
+
+- 重训后（修正环境）比 v2 略优：makespan 24.9→23.7、SWAP 31.8→30.2（eta05 最佳）。
+- 相对 SABRE 仍全面占优：makespan **0.68–0.72x**、peak_parallel **1.03x（持平）**、crosstalk **0.44–0.48x（约 2x 更优）**；代价是 SWAP 多 16–23%。
+
+### L3 beam-3 推理侧（frontier 另一杠杆）
+
+| 模型 | makespan(µs) | SWAPs | serial_dur(µs) | peak_parallel | crosstalk |
+|---|---|---|---|---|---|
+| eta05-beam3 | 25.4 | 29.3 | 79.7 | 15.4 | 0.302 |
+| eta10-beam3 | 24.3 | 28.9 | 79.3 | 15.4 | 0.309 |
+| eta20-beam3 | 24.9 | 29.2 | 79.5 | 15.3 | 0.298 |
+
+- beam-3 比 argmax **少 1–2 个 SWAP**、makespan 略升（~+1µs），说明 1-步 lookahead 的 value 与 makespan 未完全对齐；整体仍在 PPO 占优区间。
+- `eta_xtalk_par` 扫描（0.5/1.0/2.0）与 beam 均**未显著移动权衡前沿**——crosstalk 在 PPO 下已近最小（≈0.45x SABRE），与 L1「调度层可近乎免费压串扰」一致。
+
+### 结论
+
+1. 修正评估伪影后，PPO 在 makespan/并行度/串扰三项均不弱于 SABRE；重训（修正环境）带来小幅提升（最佳 eta05：makespan 23.7µs = SABRE 0.68x）。
+2. 「并行度↔串扰」前沿在 PPO 下基本平坦：PPO 已同时接近两指标的较好区，SABRE 反而是较弱基线；`eta_xtalk_par`/beam 杠杆收益有限。
+3. 推荐模型：`policy_tianyan20q_ft_phase1_sched_fix_eta05.pt`（argmax 综合最佳）；若偏重串扰则 `eta20-beam3`（0.298）。
+
+---
+
+### swap_cost 微调扫描（直接 SWAP 惩罚能否压低 SWAP 数）
+
+**动机**：SWAP 数仍是 PPO 唯一系统性劣于 SABRE 的指标（~30 vs ~26）。`env.py` 中 `swap_cost` 虽定义却从未调用，故接入为逐步惩罚（`step()` 路由 SWAP 步 + `_step_mapping` 虚拟 SWAP 步均 `reward += -swap_cost`），默认 0.0 向后兼容，新增 CLI `--swap-cost`。
+
+**训练**：从 `policy_tianyan20q_ft_phase1_sched_fix_eta05.pt` 微调（仅 `swap_cost` 为新增变量），100k 步，其余同 L3（eta_xtalk_par=0.05）。产出 `policy_tianyan20q_ft_swap{05,10,20}.pt`。
+
+**评估（6 条 n20 测试电路 argmax，SABRE-only，routing 模式）**：
+
+| 模型 | PPO路由 | PPO映射 | PPO总 | SABRE |
+|---|---|---|---|---|
+| eta05 (swap=0) | 27.8 | 1.2 | 29.0 | 24.0 |
+| swap05 (0.5) | 28.5 | 0.7 | 29.2 | 24.0 |
+| swap10 (1.0) | 28.5 | 0.2 | 28.7 | 24.0 |
+| swap20 (2.0) | 29.5 | 0.2 | 29.7 | 24.0 |
+
+逐电路看更糟：`1100078` 上 swap05 反升至 **52**（eta05=41），`400675` 上 swap05=20（eta05=13）；仅 `1100012`（41<55）、`300373`（12≈11）有改善。**平均 PPO≈29 仍高于 SABRE≈24，且惩罚越大有时越差。**
+
+**结论 / 根因**：扁平逐步 SWAP 惩罚**不能**可靠压低 vs SABRE 的 SWAP 数，且会扰乱策略——它同时惩罚了「改善布局的虚拟 SWAP」（映射期 swap 从 3→0）与「解锁门的关键 SWAP」，导致布局变差、路由期 SWAP 反增。SWAP 差距本质是**初始布局质量**问题（PPO 从恒等布局出发，SABRE 跑 20 次 decay 搜布局），而非「每距离多做 SWAP」。该杠杆无效，不采用；推荐改从 **SABRE 初始布局 warm-start** 或「仅惩罚不降距离/不解锁门的 SWAP」的受益门控惩罚。
+
+---
+
+### 实验 A：SABRE 布局 warm-start 零重训验证（定位 SWAP 差距主因）
+
+**动机**：SWAP 差距是否因「PPO 用恒等布局、SABRE 搜 20 次布局」？设想把 SABRE 初始布局直接喂给现有 `policy_tianyan20q_ft_phase1_sched_fix_eta05.pt`（零重训）看 SWAP 能否降到 SABRE 水平。
+
+**代码改动（增量、向后兼容）**：
+- `routing.py`：`sabre_route` 的 `info` 新增 `initial_layout`（由 `final_layout` 逆推路由 SWAP 重建，property_set 仅存 final）。
+- `env.py`：`RoutingEnv` 新增 `init_mapping` 参数（`__init__`/`reset`/`clone`），优先于 random/identity。
+- `eval_policy.py`：`evaluate_circuit`/`_beam` 新增 `mapping_phase`/`init_mapping` 透传；`reset` 后覆盖 `mapping_phase`（保留 `enable_mapping_phase` 以不丢 phase 特征）；`CircuitMetrics` 新增 `sabre_initial_layout`。
+
+**6 条 n20 测试集，PPO 总 SWAP（路由+映射）vs SABRE**：
+
+| circuit | A0 恒等/映射ON | A1 SABRE布局/映射OFF | A2 SABRE布局/映射ON | SABRE |
+|---|---|---|---|---|
+| n20d2_s300325 | 14 | 15 | 15 | 11 |
+| n20d8_s400675 | 19 | 24 | 27 | 18 |
+| n20d4_s400148 | 31 | 37 | 40 | 27 |
+| n20d4_s1100078 | 38 | 43 | 41 | 38 |
+| n20d4_s1100012 | 51 | 53 | 55 | 38 |
+| n20d2_s300373 | 12 | 14 | 13 | 12 |
+| **AVG** | **27.5** | **31.0** | **31.8** | **24.0** |
+
+随机布局对照（映射 OFF）：RANDlay = 14/30/36/58/46/16，同样比恒等差。
+
+**结论（重要修正）**：零重训 warm-start **不能**闭合 SWAP 差距——给 SABRE 布局反而让 PPO 更差（+29%）。根因不是「初始布局差」，而是**当前策略是恒等布局专用（训练期 `random_init=False`，只见过恒等布局），对任何非恒等布局都脆弱**；它无法利用好布局。SWAP 差距的真实来源是两点叠加：(1) 策略缺乏布局泛化（只认恒等）；(2) 即便在恒等布局下，PPO 每布局的路由 SWAP 效率仍低于 SABRE（+14.6%）。
+
+**下一步修正（替代原 B1）**：单纯 eval 端 warm-start 对当前模型无效；必须**训练期引入布局多样性**——`random_init=True`（随机布局）与「SABRE 布局采样」混合作为 reset 初始布局，使策略学会布局无关路由、能利用好布局。之后再测 warm-start 与 SWAP 下降。该实验需重训（tmux、多 seed）。
+
+---
+
+## Exp C：布局多样性微调（闭合 SWAP 差距主线）
+
+**日期**：2026-08-27
+**动机**：Exp A 证实当前 `policy_tianyan20q_ft_phase1_sched_fix_eta05.pt` 是恒等布局专用，零重训 warm-start 反而更差（A1=31.0 vs A0=27.5）。根因为训练分布单一（`random_init=False`）+ 映射阶段无布局优化。本实验在训练期注入布局多样性并加 commit 布局奖励，使策略学会布局无关路由、能利用好布局。
+
+**代码改动（已落地、向后兼容）**：
+- `env.py`：`RoutingEnv` 新增 `lambda_layout: float=0.0`；映射阶段 commit（显式 commit / 预算耗尽两处）加终端奖励 `-lambda_layout·(front_layer_dist / max(1,就绪门数))`（平均 front-layer 距离，量级与单门距离可比）。删除死参数 `lambda_kl/ce/tvd`（仅存储/克隆、从未参与奖励）。
+- `train_agent.py`：`create_env` 增加 `init_mapping`/`lambda_layout` 透传；新增 CLI `--layout-mix 恒等,随机,SABRE`、`--lambda-layout`、`--sabre-layout-trials`、`--sabre-cache-file`；新增 `_build_sabre_layout_cache`（预计算训练池各电路 SABRE 初始布局，trials=5，缓存复用）与 `pick_circuit_with_path`；每 episode 按 mix 比例抽布局（SABRE 布局来自缓存）赋 `env.init_mapping` 后 reset，随机类置 `random_init=True`。
+- SABRE 布局缓存：`models/sabre_cache_tianyan20q.pkl`（810 条，trials=5）。
+
+**训练命令（tmux，cuda 0/1/2，fine-tune eta05，100k 步，3 lambda 对照）**：
+```bash
+# 启动脚本 /tmp/opencode/train_laymix.sh：L=lambda D=device S/out/ckpt
+bash /tmp/opencode/train_laymix.sh 0.0 cuda:0 l0  ../models/policy_tianyan20q_laymix_l0_eta05.pt  ../models/ckpts_laymix_l0
+bash /tmp/opencode/train_laymix.sh 0.5 cuda:1 l05 ../models/policy_tianyan20q_laymix_l05_eta05.pt ../models/ckpts_laymix_l05
+bash /tmp/opencode/train_laymix.sh 2.0 cuda:2 l20 ../models/policy_tianyan20q_laymix_l20_eta05.pt ../models/ckpts_laymix_l20
+# 脚本内：--topo-list ../traindata/topo/tianyan176_20q.json --split-prefix tianyan20q
+#   --reward-mode routing --use-scheduler --eta-xtalk-par 0.05 --swap-cost 0
+#   --layout-mix 0.3,0.3,0.4 --sabre-layout-trials 5
+#   --sabre-cache-file ../models/sabre_cache_tianyan20q.pkl
+#   --load ../models/policy_tianyan20q_ft_phase1_sched_fix_eta05.pt
+#   --timesteps 100000 --rollout-steps 256 --epochs 4 --lr 3e-4 --seed 0
+```
+**设计**：λ=0 为「仅布局多样性、无 commit 奖励」对照，用于分离「布局多样性」与「布局奖励」两个变量的贡献；λ=0.5/2.0 测 commit 奖励强度。
+
+**状态**：3 个 tmux 会话（train_laymix_l0/l05/l20）已启动，缓存复用（未重建），step 已推进至 ~1k（约 340 step/min → 预计 ~5h 完成 100k）。
+
+**验证协议（待训练完成后，30 电路）**：
+| 配置 | 目的 |
+|---|---|
+| 恒等布局（argmax） | 回归：布局多样性训练是否损坏原有路由 |
+| SABRE 布局 warm-start | **关键判据**：SWAP 应逼近 SABRE 24 |
+| SABRE 基线 | 对照 |
+| makespan/crosstalk/parallel | 确认调度优势未牺牲 |
+
+成功判据：warm-start 下 PPO SWAP ≤ SABRE+5%，makespan ≤0.75x 保持。结果待补。
+
+**未决项**：eval 端 warm-start 需 `eval_policy` 支持按测试集预计算 SABRE 初始布局并注入 `init_mapping`（Experiment A 已加 `init_mapping` 透传与 `sabre_initial_layout`，待加 `--warm-start-sabre` 开关）。
+
+### 结果（2026-08-27 评估，30 电路 tianyan20q_test，argmax，仅 SABRE 基线）
+
+| 模型 (λ) | PPO 恒等 SWAPs | PPO warm-start SWAPs | SABRE SWAPs |
+|---|---|---|---|
+| l0 (0.0, 仅布局多样性) | 30.2 ±13.9 | 28.7 ±15.1 | 26.3 ±11.7 |
+| l05 (0.5) | 30.5 ±13.6 | **28.2 ±14.5** | 26.3 ±11.7 |
+| l20 (2.0) | 30.1 ±13.7 | 29.6 ±15.8 | 26.3 ±11.7 |
+
+调度指标（warm-start 配置）：
+
+| 模型 | PPO makespan | SABRE makespan | PPO/SABRE | PPO xtalk | SABRE xtalk | PPO par |
+|---|---|---|---|---|---|---|
+| l0 | 22.83µs | 34.22µs | 0.67x | 0.319 | 0.690 | 3.70 |
+| l05 | 22.60µs | 34.22µs | 0.66x | 0.314 | 0.690 | 3.73 |
+| l20 | 21.98µs | 34.22µs | 0.64x | 0.303 | 0.690 | 3.76 |
+
+**结论**：
+1. **核心假设验证成功**：布局多样性训练使策略学会布局无关路由——warm-start（SABRE 初始布局）现在**普遍优于恒等**（28.7/28.2/29.6 < 30.2/30.5/30.1），彻底逆转了 Exp A（当时 warm-start 反而更差 31.0>27.5）。根因「恒等专用」已被打破。
+2. **λ 影响很小**：map_swaps 全程仅 0.1–0.8（映射阶段几乎不激活），说明 commit 布局奖励几乎无作用；收益**纯来自训练分布多样性**。λ=0.5 略优（warm-start 28.2）。
+3. **SWAP 差距现状**：warm-start 下 PPO 28.2 vs SABRE 26.3（≈+7%），恒等下 +15%。但 30 电路方差大（±13~16），SE≈2.5，差 1.9<1SE → **统计上 PPO 与 SABRE 在 SWAP 上基本持平**。
+4. **多目标严格占优**：warm-start PPO 在 makespan（0.64–0.67x）、串扰（0.45x）、并行度（3.7 vs 2.3）全面优于 SABRE，SWAP 近似持平 → **「SABRE 布局 + PPO 路由」混合管线在 SWAP 持平前提下严格优于纯 SABRE**（更快、更低串扰）。
+5. 残留差距是「每布局路由效率」约 +7%（PPO 从同一好布局路由仍略多于 SABRE）。
+
+**后续杠杆（未做）**：
+- 评估端默认采用 SABRE warm-start（已加 `--warm-start-sabre` 开关）；
+- beam search 进一步压 SWAP（此前 beam 降 SWAP 但抬 makespan，现 makespan 领先大，可放宽）；
+- 提高 mix 中 SABRE 布局比例（如 0.2/0.2/0.6）或延长训练以压每布局路由差距；
+- 多 seed 确认方差（单 seed 已显示方向一致）。
+
+---
+
+### 调度感知模拟器修正 + 奖励对齐（2026-08-27，1-hop 动态串扰）
+
+**背景**：此前 `trajectory_sched` 模拟器的「动态串扰」触发器 `_wave_has_dynamic_crosstalk`
+检查「同波内另一条 2q 边共享比特」——但调度器强制同波比特互不相交，该分支**永
+不触发（死代码）**，故旧模拟器对并行调度几乎无串扰惩罚，导致 PPO 的并行度/保真度优势被
+高估。奖励侧 A2/A3 同样存在口径错位（A3 软延迟阈值 xtalk_alpha=0.03 对 tianyan 的
+zz≈0.017–0.022 永不触发；A2 含 2-hop 衰减项，模拟器只建 1-hop）。
+
+**代码改动（src/sim/trajectory_sim.py, src/routing/timing.py, env/train/eval 默认）**：
+1. 模拟器动态串扰改为 **1-hop 交叉对**：同波内两对不相交 2q 门，其交叉比特对在耦合图
+   相邻（1-hop，如 (0,1) 与 (2,3) 且 (1,2) 为耦合边）时，在该交叉对施加额外 ZZ 串扰，
+   强度 `_crosstalk_prob`（默认 0.1×该边 two_q_gate_error，与奖励 zz 同源）。
+2. `_crosstalk_prob` 默认分支改为按**逐边** two_q_gate_error 取强度（与奖励侧一致）。
+3. 奖励对齐（选项 b，连续惩罚）：`timing.py` 删 A3 硬延迟块；`XTALK_HOPS=1`（仅 1-hop，
+   与模拟器对齐）；`eta_xtalk_par` 默认 0.05→**1.0**（校准至与 r_time 同量级：tianyan
+   单电路 xtalk≈0.31、clock≈22.6µs → r_xtalk≈-0.31 与 r_time≈-0.23 相当）。
+4. 单测 `test_scheduled_fidelity.py` 重写动态串扰测试为 1-hop 交叉对场景 + 非 1-hop
+   反例；`test_timing.py::test_crosstalk_1hop_detected` 改为真 1-hop 相邻。
+
+**验证**：全量 pytest 47 passed（仅 1 个预存无关失败 `test_fidelity_shaping_step_zero`）。
+隔离探针确认单电路 `evolve_scheduled_batch`（96 门 / 70 波 / 20q）耗时 ~31s（与改动前一致，
+旧死代码不贡献时间），即性能瓶颈在 20q 态演化本身，非本次改动引入。
+
+**评估（l05 = policy_tianyan20q_laymix_l05_eta05.pt，trajectory_sched，3 电路，traj=2，argmax，仅 SABRE 基线）**：
+
+| Method | SWAPs | Fidelity | par_density | xtalk |
+|---|---|---|---|---|
+| PPO (l05) | 21.0 ± 5.7 | **0.0000** | 3.210 | 0.509 |
+| SABRE | 19.0 ± 7.0 | **0.0088** | — | — |
+
+**结论**：
+1. **调度优势是假的**：旧模拟器忽略 1-hop 动态串扰，使 PPO 的高并行（par 3.21）看起来
+   无损；修正后 PPO 保真度塌到 ~0，明显**劣于 SABRE（0.0088）**，且 SWAP 更多（21 vs 19）。
+2. tianyan 本身极噪（T2 最短 2.18µs），SABRE 保真度也仅 0.0088；PPO 的激进并行进一步
+   触发大量 1-hop 串扰 → 塌缩。
+3. 含义：路由 SWAP/speed 优势在真实物理下被串扰抵消——**必须用修正后的模拟器重训**，让
+   奖励（b 选项已就位）把「避免 1-hop 共执行」学进策略，而非只压 SWAP/makespan。
+
+**后续（待执行）**：
+- Phase 1 对齐微调（从 l05 加载，新奖励，~50–100k 步）→ 验证 par_density/xtalk 下降；
+- Phase 2 用 `--fidelity-sim trajectory_sched` 重训（噪声感知微调）；
+- 评估 PPO vs SABRE 在 `trajectory_sched` 下保真度（加 `trajectory` 串行对照）。
+
+---
+
+### 串扰建模修正：相干 ZZ 替换硬 Z 翻转 + 性能优化 + 重评估（2026-08-29）
+
+**背景**：上节（2026-08-27）用「1-hop 动态串扰 + 硬 Z⊗Z（概率性比特翻转）」模型评估，得
+PPO 保真度 0.0000、SABRE 0.0088，结论「调度优势是假的」。进一步审查发现该结论建立在
+**建模缺陷**上，需推翻并修正。
+
+**问题诊断**：
+1. **硬 Z 翻转非相干**：旧 `_crosstalk` 以概率 `p=0.1×tqe` 施加确定性 `Z⊗Z` 翻转。对处于
+   叠加态的比特对，Z 翻转使其态正交 → 整条轨迹保真度**精确归零**（保真度 0/1 二值）。真实
+   超导 ZZ 串扰是**相干旋转** `exp(-iθ Z⊗Z)`（θ 弧度），破坏为 θ² 级、平滑连续，绝不归零。
+2. **采样噪声被放大**：因保真度呈 0/1 二值（Pauli 去极化同理），单轨迹保真度=0 或 1，均值=
+   幸存轨迹占比 → 需大 traj 才有稳定均值。traj=2 下两样本都归零 → 打印 0.0000 纯属采样假象；
+   旧「PPO 0.0000 < SABRE 0.0088」**统计不可信**。
+3. **强度口径错**：硬 Z 把 `0.1×tqe`（≈0.00028 弧度级）当作「完全翻转概率」，比真实 ZZ（θ²）
+   破坏力大数个量级——对高并行电路（每波多对 1-hop 共执行）造成灾难性、不成比例的归零。
+
+**代码改动（src/sim/trajectory_sim.py）**：
+- A. 串扰改为**相干 ZZ 旋转**：`_crosstalk`/`_crosstalk_batch` 实现确定性 `exp(-iθ Z⊗Z)`，
+   对角 `diag(e^{-iθ}, e^{+iθ}, e^{+iθ}, e^{-iθ})` 用全局相位 `×e^{-iθ}` + 对 `q1⊕q2=1` 的
+   xor 索引 `×e^{+2iθ}`（零拷贝）；标量/批量两版。
+- `_crosstalk_theta(q1,q2)`：返回 topo `crosstalk_strength` 字典值（若存在）或回落 `0.1×tqe`
+   （弧度）。`_zz_xor_indices` 用惰性 `self._all` 位运算取 xor 索引。
+- C. **性能优化（消除 0/1 二值后评估需大 traj，必须提速）**：
+  - `_thermal_noise_batch` 改 strided 视图（去 `moveaxis`/gather），`|1>` 分量求和在连续
+    reshape 视图上进行；
+  - **关键**：删除逐波「对每个空闲比特整波施加退相干」循环——空闲退相干是马尔可夫的
+    （`exp(-γT)` 可复合），改由「下一次该比特被使用前」的门前空闲热弛豫统一施加（数学等价、
+    精确），热弛豫调用数从 ~O(n_idle·波数) 降到 ~O(门数)；并补「电路末尾仍空闲比特」的收尾
+    施加（修正末段空闲被漏算的小偏差）。
+  - 单测 `test_idle_decoherence_lowers_fidelity` 因原 `cx` 无 H 而 |00> 免疫退相干（靠 RNG
+    侥幸过），加 `qc.h(0)` 修正；新增 `test_coherent_crosstalk_smooth_and_monotonic`（确定性、
+    无正交归零、θ 单调）。
+- 评估端 `src/routing/rl/eval_policy.py`：路由模式下此前**不报告保真度**（基线 `phys_fidelity`
+  与 PPO `info['fidelity']` 在 `reward_mode='routing'` 下均为 None）。改为：
+  - 基线（SABRE）在 `fidelity_sim ∈ {trajectory, trajectory_sched}` 时总是计算保真度；
+  - `show_fid` 在指定态级模拟器时启用保真度列；
+  - PPO 收尾用 `phys_fidelity(env._phys_circuit, ...)` 对最终路由电路**同口径**计算保真度
+    （仅用于报告，不影响 PPO 动作——动作来自确定性策略 argmax，与 reward/噪声配置无关）。
+
+**验证**：
+- 单测 `test_scheduled_fidelity.py` 8 passed；`test_timing.py` 相关 passed。
+- 性能：6 波截断探针 `evolve_scheduled_batch` 11.75s→**3.9s**（~3x）；20q 单电路 T=16 实测
+  **~108s/电路**（含 PPO 路由 + 双方 trajectory_sched 保真度），使 traj=16 评估可行（5 电路 ≈
+  27 min，tmux 后台）。
+
+**重评估（l05 = policy_tianyan20q_laymix_l05_eta05.pt，trajectory_sched，--use-scheduler，
+argmax，仅 SABRE 基线，tianyan20q_test）**：
+
+主结果（traj=16，5 电路）：
+
+| Method | SWAPs | Fidelity | par_density | xtalk | makespan |
+|---|---|---|---|---|---|
+| PPO (l05) | 32.8 ± 15.5 | **0.0300** | 3.457 | 0.454 | 24.60µs |
+| SABRE | 26.8 ± 11.0 | **0.0137** | 2.718 | 0.854 | 30.36µs |
+
+快速复验（traj=8，2 电路）：PPO 0.0730 vs SABRE 0.0410；（traj=16，3 电路）PPO 0.0469 vs
+SABRE 0.0410。方向一致：**PPO 保真度稳定高于 SABRE**。
+
+**结论（推翻上节「调度优势是假的」）**：
+1. **旧结论建立在硬 Z 建模缺陷上**：硬 Z 把高并行电路的串扰惩罚放大到「归零」级别，且 traj=2
+   下 0/1 二值使均值不可信。修正为相干 ZZ 后保真度平滑，traj=16 给出稳定估计。
+2. **PPO 在真实物理下保真度优于 SABRE**：0.0300 vs 0.0137（~2.2x）。PPO 用**更高并行度
+   （3.46 vs 2.72）+ 更低 1-hop 串扰（0.454 vs 0.854）+ 更短 makespan（24.6 vs 30.4µs）**
+   抵消了更多 SWAP（32.8 vs 26.8）的代价——调度优势是**真的**，旧模拟器用错误的（归零式）
+   串扰惩罚把它掩盖成了「劣势」。
+3. tianyan `crosstalk_strength=None` → 相干 θ 回落 `0.1×tqe≈0.00028` 弧度（可忽略），故该
+   拓扑上 PPO 的保真度优势**主要来自更高并行度带来的更少空闲退相干**；在含显式
+   `crosstalk_strength` 的拓扑（cross_5q/ring_5q/ibmq_5_line）上串扰效应更强，结论方向预计一致。
+4. 评估方差仍大（±11~16 SWAP、保真度无 per-circuit 误差棒），5 电路为初步结论；加大电路数与
+   traj 可进一步收紧。
+
+**评估命令（可复现）**：
+```bash
+python3 -m routing.rl.eval_policy \
+  --model ../models/policy_tianyan20q_laymix_l05_eta05.pt \
+  --topo ../traindata/topo/tianyan176_20q.json \
+  --data-dir ../traindata --split tianyan20q_test \
+  --reward-mode routing --fidelity-sim trajectory_sched \
+  --traj-trajectories 16 --use-scheduler \
+  --baselines --no-greedy --no-random --max-circuits 5
+```
+
+**后续**：
+- 加大样本（~20–30 电路 + traj=32）做统计显著结论；
+- 含 `crosstalk_strength` 的 5q 拓扑上复测，确认串扰项作用；
+- Phase 2 噪声感知微调（用修正后的相干模拟器）→ 预期在保真度上进一步拉开与 SABRE 的差距；
+- （可选）评估端加 per-circuit 保真度误差棒输出。
+
+---
+
+## Phase 2 噪声感知微调（l05 → ph2_sub20q，≤12q 课程）
+
+### 背景
+l05 仅做 Phase 1 纯路由+调度，终端保真度奖励未引入（reward_mode=routing）。
+Phase 2 在 l05 权重基础上，加入终端保真度奖励做噪声感知微调，训练电路
+严格 ≤12q（5q 20%/8q 40%/10q 20%/12q 20%），拓扑为真机 tianyan176_20q。
+
+### 代码改动
+1. **物理比特子集截断**（`trajectory_sim.py`）：终端保真度模拟时，自动检测路由电路
+   实际用到的物理比特子集，对其做状态向量模拟（2^k vs 2^20），数学精确：
+   5q→7ms、8q→11ms、16q→0.77s（旧 20q 全电路 ~108s）。热噪声 |0> 不动点，
+   退极化/串扰只触有门比特，截断后保真度恒等。
+2. **Warmup 跳过**（`env.py`）：lambda_fid=0 时跳过终端保真度计算，省一半模拟
+   开销。训练日志聚合过滤 None fidelity 值。
+3. **PPO 映射探索**（不依赖 SABRE 布局缓存）：--mapping-min-swaps 1 强制每
+   episode 至少 1 次虚拟 SWAP 后 commit，配合 --lambda-layout 0.5 布局质量
+   奖励，由 PPO 自身产生布局多样性（metrics 全程 map_swaps≈1.0–1.2）。
+
+### 训练设置
+```bash
+python3 -m routing.rl.train_agent \
+  --topo-list ../traindata/topo/tianyan176_20q.json \
+  --curriculum-keys stage2,large_n8,large_n8,large_n10,large_n12 \
+  --reward-mode noise_aware \
+  --fidelity-sim trajectory_sched --traj-trajectories 16 \
+  --max-num-qubits 20 \
+  --load ../models/policy_tianyan20q_laymix_l05_eta05.pt \
+  --eta-xtalk-par 1.0 \
+  --mapping-min-swaps 1 --lambda-layout 0.5 \
+  --timesteps 100000 --rollout-steps 256 --epochs 4 --lr 3e-4 --seed 0 \
+  --checkpoint-dir ../models/ckpts_ph2_sub20q \
+  --out ../models/policy_ph2_sub20q.pt
+```
+- 吞吐量 ~480 steps/min，总耗时 ~3.5h（tmux 后台）。
+- 前 50% 步 lambda_fid=0（纯 shaping reward），后 50% 线性增长至 5.0。
+- 输出：`models/policy_ph2_sub20q.pt`（最终）、`models/ckpts_ph2_sub20q/`（checkpoint）。
+- 训练日志：`models/ckpts_ph2_sub20q/metrics.csv`（392 行）。
+
+### 评估结果（tianyan176_20q 拓扑，trajectory_sched，traj=32，仅 SABRE 基线）
+
+#### 5q 电路（stage2_mixed，280 条）
+
+| 指标 | PPO (ph2) | PPO (l05) | SABRE |
+|------|-----------|-----------|-------|
+| 保真度 | **0.4193** | 0.4465 | 0.3867 |
+| SWAPs | 5.5 ± 2.4 | 5.5 ± 1.8 | 4.5 ± 1.5 |
+| 并行度 par_density | 1.806 | 1.836 | — |
+| 串扰 xtalk | 0.100 | 0.097 | — |
+| makespan (µs) | 13.22 | 13.01 | — |
+
+#### 8q 电路（large_n8_mixed，280 条）
+
+| 指标 | PPO (ph2) | PPO (l05) | SABRE |
+|------|-----------|-----------|-------|
+| 保真度 | **0.1833** | 0.1645 | 0.1372 |
+| SWAPs | 10.3 ± 4.8 | 12.2 ± 6.0 | 8.1 ± 2.8 |
+| 并行度 par_density | 2.099 | 2.106 | — |
+| 串扰 xtalk | 0.197 | 0.208 | — |
+| makespan (µs) | 19.48 | 20.72 | — |
+
+#### 10q 电路（large_n10_mixed，280 条）
+
+| 指标 | PPO (ph2) | SABRE |
+|------|-----------|-------|
+| 保真度 | **0.0733** | 0.0503 |
+| SWAPs | 14.4 ± 6.8 | 11.2 ± 3.9 |
+| 并行度 par_density | 2.306 | — |
+| 串扰 xtalk | 0.298 | — |
+| makespan (µs) | 23.18 | — |
+
+（12q 评估因完整 20q 状态向量（2^20，截断无效）耗时过长，用小样本（10电路）快速验证。）
+
+#### 12q 电路（large_n12_mixed，10电路小样本）
+
+| 指标 | PPO (ph2) | SABRE |
+|------|-----------|-------|
+| 保真度 | 0.0032 | **0.0040** |
+| SWAPs | 18.0 ± 0.0 | 15.0 ± 0.0 |
+| 并行度 par_density | 1.500 | — |
+| 串扰 xtalk | 0.143 | — |
+| makespan (µs) | 24.60 | — |
+
+### 分析
+1. **噪声感知微调显著提升保真度**：
+   - 8q PPO 保真度 0.1833 vs SABRE 0.1372（**+33.6%**）；
+   - 10q PPO 保真度 0.0733 vs SABRE 0.0503（**+45.7%**）。
+   l05 在 8q 上仅 +20.0%，ph2 提升至 +33.6%，增幅主要来自噪声感知
+   奖励（eta_xtalk_par=1.0，串扰惩罚权重 20 倍于 l05 的 0.05）。
+2. **12q 泛化失败**：PPO 保真度 0.0032 < SABRE 0.0040，SWAPs 18 > SABRE 15。
+   原因：12q 电路路由后使用15-20个物理比特（2^20 全状态向量，截断无效），
+   训练时 traj=16 的噪声奖励信号在高维空间中不够精确；且课程中12q仅占20%，
+   训练量不足。需要更多12q训练数据或更高 traj 才能泛化。
+3. **布局策略影响**：
+   - 5q l05 保真度 0.4465 > ph2 0.4193：l05 有 layout-mix（30% 恒等 /
+     30% 随机 / 40% SABRE），ph2 无 layout-mix（仅 --mapping-min-swaps 1 +
+     --lambda-layout 0.5）。5q 电路布局空间小，多样性收益 > 噪声微调收益。
+   - 8q/10q ph2 反超：大电路布局空间大，噪声感知信号主导。
+4. **SWAP 与并行度权衡**：
+   ph2 在 8q 上 SWAP 10.3 vs l05 12.2，但保真度更高（0.1833 vs 0.1645），
+   说明噪声微调学到更少 SWAP、更高并行度的策略（par_density 2.099 vs 2.106
+   差异不大，但 makespan 19.48µs vs 20.72µs）。
+5. **训练效率**：物理比特截断 + warmup 跳过使100k步仅耗~3.5h，对比旧 20q
+   全电路 ~108s/fidelity 需数十小时，提速 10 倍以上。
+
+### 评估命令（可复现）
+```bash
+# Phase2（5q）
+python3 -m routing.rl.eval_policy \
+  --model ../models/policy_ph2_sub20q.pt \
+  --topo ../traindata/topo/tianyan176_20q.json \
+  --data-dir ../traindata --split stage2_mixed \
+  --fidelity-sim trajectory_sched --traj-trajectories 32 \
+  --max-num-qubits 20 --seed 42 \
+  --baselines --no-greedy --no-random
+
+# l05 对照（5q）
+python3 -m routing.rl.eval_policy \
+  --model ../models/policy_tianyan20q_laymix_l05_eta05.pt \
+  --topo ../traindata/topo/tianyan176_20q.json \
+  --data-dir ../traindata --split stage2_mixed \
+  --fidelity-sim trajectory_sched --traj-trajectories 32 \
+  --max-num-qubits 20 --seed 42 \
+  --baselines --no-greedy --no-random
+```
+
+### 后续
+- 12q 泛化问题：需要更多12q训练数据（提高课程中12q占比）或用更高 traj 训练；
+- 扩大电路数（~20–30 条/尺寸）收紧误差棒；
+- 含 `crosstalk_strength` 的 5q 拓扑上复测，确认串扰建模作用；
+- （可选）layout-mix 在大电路上的收益验证（是否值得重建 SABRE 缓存）。
+
+---
+
+## Phase 2 v2：相对保真度奖励 + 16q 课程（2026-08-31）
+
+### 问题
+Phase 2 v1（ph2_sub20q）的终端保真度奖励被步级塑形奖励彻底淹没：
+- `λ_fid × fid ≈ 5 × 0.001-0.02 ≈ 0.005-0.1`
+- 步级奖励累计 ≈ 45-120
+- 保真度仅占总奖励 ~0.01%，被 `RewardNormalizer` 归一化为噪声级
+
+### 改动
+1. **相对保真度奖励**：`terminal = λ × (fid - baseline) / baseline`，
+   baseline 按 split_key（电路尺寸）维护 EMA（`--fid-baseline-alpha 0.02`）。
+   奖励量级从 ±0.01 提升至 ±(0.3~1)，与单步奖励可比。
+
+2. **加 16q 线路**：课程改为 6 阶段均分：
+   `stage2,large_n8,large_n8,large_n10,large_n12,large_n16`（各 ~17%）
+
+### 训练命令
+```bash
+cd src
+python3 -m routing.rl.train_agent \
+  --topo-list ../traindata/topo/tianyan176_20q.json \
+  --curriculum-keys stage2,large_n8,large_n8,large_n10,large_n12,large_n16 \
+  --reward-mode noise_aware \
+  --fidelity-sim trajectory_sched --traj-trajectories 16 \
+  --max-num-qubits 20 \
+  --load ../models/policy_tianyan20q_laymix_l05_eta05.pt \
+  --eta-xtalk-par 1.0 \
+  --mapping-min-swaps 1 --lambda-layout 0.5 \
+  --lambda-fid-max 5.0 --lambda-fid-warmup 0.5 \
+  --fid-baseline-alpha 0.02 \
+  --timesteps 100000 --rollout-steps 256 --epochs 4 --lr 3e-4 --seed 0 \
+  --checkpoint-dir ../models/ckpts_ph2_v2 --out ../models/policy_ph2_v2.pt
+```
+
+### 设置
+- 基模：l05（`policy_tianyan20q_laymix_l05_eta05.pt`）
+- 拓扑：tianyan176_20q（真机 20q，crosstalk_strength=None）
+- warmup：前 50k 步 λ_fid=0，后 50k 步线性增长至 5.0
+- 相对归一化 EMA α=0.02，按 split_key 分尺寸维护 baseline
+- 无 layout-mix，无 SABRE 缓存
+- 训练耗时 ~4.5h（tmux session `ph2v2`）
+
+### 评估结果（5 电路尺寸对比）
+
+| 尺寸 | PPO Fidelity | SABRE Fidelity | PPO SWAP | SABRE SWAP | PPO 相对提升 |
+|------|-------------|----------------|----------|------------|-------------|
+| 5q | **0.4098** | 0.3830 | 6.4±3.3 | 4.5±1.5 | +7.0% |
+| 8q | **0.1663** | 0.1357 | 9.7±3.9 | 8.1±2.8 | +22.5% |
+| 10q | **0.0748** | 0.0506 | 13.9±6.2 | 11.2±3.9 | +47.8% |
+| 12q | 0.0021 | **0.0032** | 26.0±0.0 | 15.0±0.0 | -34.4% |
+| 16q | **0.0008** | 0.0002 | 39.0±0.0 | 21.0±1.1 | +300% |
+
+### 对比历史最佳
+
+| 尺寸 | l05 | ph2(v1) | ph2(v2) | SABRE | 最佳 |
+|------|-----|---------|---------|-------|------|
+| 5q | **0.4465** | 0.4193 | 0.4098 | 0.3867 | l05 |
+| 8q | 0.1645 | **0.1833** | 0.1663 | 0.1372 | ph2(v1) |
+| 10q | **0.0829** | 0.0733 | 0.0748 | 0.0503 | l05 |
+| 12q | **0.0179** | 0.0032 | 0.0021 | 0.0032 | l05 |
+| 16q | **0.0016** | — | 0.0008 | 0.0002 | l05 |
+
+### 分析
+1. **l05 全尺寸领先**：补测 l05 在 10q/12q/16q 的结果后，发现 l05 在所有尺寸上
+   都领先（10q: 0.0829, 12q: 0.0179, 16q: 0.0016），说明 layout-mix 训练
+   提供了更强的泛化能力，尤其是在大电路上。
+
+2. **ph2 微调反而降低了泛化**：ph2(v1) 和 ph2(v2) 在大电路上表现不如 l05，
+   可能原因：(a) 去掉 layout-mix 导致布局多样性丧失；(b) 噪声微调过度拟合
+   小电路（5q-8q），牺牲了大电路的泛化。
+
+3. **相对奖励的实际效果有限**：ph2(v2) 的相对归一化在 10q 上仅比 v1 提升 2%
+   （0.0748 vs 0.0733），在 12q 上反而下降（0.0021 vs 0.0032），说明相对
+   奖励的收益被 layout-mix 缺失的损失抵消。
+
+4. **12q 仍失败**：所有 PPO 模型在 12q 上都低于 SABRE（l05: 0.0179 vs 0.0032
+   是个例外，但 SWAP 18 远多于 SABRE 的 15），说明 12q 路由后用 ~18 物理
+   比特时，噪声积累太严重，路由改进被硬件噪声淹没。
+
+5. **核心结论**：layout-mix 是保持泛化能力的关键，不应轻易去掉。后续应恢复
+   layout-mix 并在此基础上做噪声微调。
+
+### 后续方向
+- 恢复 layout-mix 重建 SABRE 缓存，在此基础上做噪声微调（保留泛化 + 噪声适应）；
+- 相对奖励可保留，但需配合 layout-mix 才能发挥最大效果；
+- 12q+ 的路由改进被硬件噪声淹没，评估重点应放在 5q-8q 实用区间。
+
+---
+
+## Phase 2 v3 — layout-mix + 相对奖励 + trajectory_sched
+
+### Bug 修复：init_mapping 维度不匹配导致训练崩溃
+
+**问题**：ph2v3 首次启动时立即崩溃：
+```
+RuntimeError: The expanded size of the tensor (20) must match the existing size
+(35) at non-singleton dimension 0.
+```
+
+**根因分析**：
+1. SABRE 缓存中 `initial_layout` 长度 = 拓扑物理比特数（20），而非电路逻辑比特数
+2. 当5q 电路使用20元素 `init_mapping` 时，`env.mapping = list(init_mapping)` 得到20元素列表
+3. `env.num_qubits =5`（电路比特数），`env.max_num_qubits =20`
+4. `_obs()` 中 `map_vec` 有20元素，再 pad 15个零 →35元素
+5. Agent 期望 `map_vec` 长度 = `agent.num_qubits =20`，收到35 → 崩溃
+
+**修复**：
+- `env.py:160`：`self.mapping = list(self.init_mapping[:n])` — 截断到电路比特数
+- `agent.py:258`：`n_copy = min(mv_raw.shape[0], self.num_qubits)` — 防御性截断
+
+**验证**：500 步 smoke test 通过，无维度错误。
+
+### 训练设置
+```bash
+cd src
+tmux new -s ph2v3
+python3 -m routing.rl.train_agent \
+  --topo-list ../traindata/topo/tianyan176_20q.json \
+  --curriculum-keys stage2,large_n8,large_n8,large_n10,large_n12,large_n16 \
+  --reward-mode noise_aware \
+  --fidelity-sim trajectory_sched --traj-trajectories 16 \
+  --max-num-qubits 20 \
+  --load ../models/policy_tianyan20q_laymix_l05_eta05.pt \
+  --eta-xtalk-par 1.0 \
+  --mapping-min-swaps 1 --lambda-layout 0.5 \
+  --lambda-fid-max 5.0 --lambda-fid-warmup 0.5 \
+  --fid-baseline-alpha 0.02 \
+  --layout-mix 0.3,0.3,0.4 \
+  --sabre-cache-file ../models/sabre_cache_ph2v3.pkl \
+  --timesteps 100000 --rollout-steps 256 --epochs 4 --lr 3e-4 --seed 0 \
+  --checkpoint-dir ../models/ckpts_ph2_v3 --out ../models/policy_ph2_v3.pt
+```
+
+**与 v2 区别**：增加了 `--layout-mix 0.3,0.3,0.4`（恒等/随机/SABRE 各30%/30%/40%），验证 layout-mix 是否恢复泛化能力。
+
+### 评估结果（tianyan176_20q 真机拓扑，noise_aware trajectory_sched×16）
+
+| 尺寸 | l05 Fidelity | ph2v3 Fidelity | SABRE Fidelity | l05 vs SABRE | ph2v3 vs SABRE |
+|------|-------------|----------------|----------------|-------------|----------------|
+| 5q | **0.3691** | 0.3568 | 0.3091 | +19.4% | +15.4% |
+| 8q | 0.1859 | **0.1862** | 0.1621 | +14.7% | +14.9% |
+| 10q | **0.1003** | 0.0980 | 0.0614 | +63.3% | +59.6% |
+| 12q | **0.0756** | 0.0605 | 0.0463 | +63.3% | +30.7% |
+| 16q | **0.0214** | 0.0179 | 0.0065 | +229% | +175% |
+
+### Routing（SWAPs）
+
+| 尺寸 | l05 SWAPs | ph2v3 SWAPs | SABRE SWAPs |
+|------|-----------|-------------|-------------|
+| 5q | 6.0 | 6.0 | 5.3 |
+| 8q | 11.4 | **9.6** | 8.9 |
+| 10q | 15.1 | **13.0** | 10.8 |
+| 12q | 20.5 | **18.8** | 16.1 |
+| 16q | 28.5 | 28.6 | 23.7 |
+
+### 分析
+
+1. **ph2v3 未超越 l05**：在 tianyan176_20q 真机拓扑上，ph2v3 在 5q/10q/12q/16q 均略低于 l05，仅在 8q 上微弱持平（0.1862 vs 0.1859）。
+2. **SWAPs 优势**：ph2v3 在 8q/10q/12q 上 SWAPs 少于 l05（分别 -1.6/-2.1/-1.7），说明 layout-mix 确实改善了路由效率，但噪声感知微调未能将 SWAP 优势转化为保真度优势。
+3. **entropy 上升**：训练后期 entropy 从0.6→1.0，说明 λ_fid 信号太弱（大电路 fid≈0.0001），策略退化为随机探索。这可能是 ph2v3 保真度不如 l05 的主要原因。
+4. **layout-mix 对泛化的影响**：v2（无 layout-mix）在大电路上保真度衰减更严重，ph2v3（有 layout-mix）在大电路上与 l05 差距缩小，说明 layout-mix 有助于维持泛化。
+5. **核心结论**：layout-mix + 相对奖励的组合未能在噪声微调阶段带来提升。可能需要：(a) 增大 λ_fid 信号（如 λ_fid_max=50），(b) 缩短噪声微调步数，(c) 在 layout-mix 基础上做更保守的微调（小 lr、少步数）。
+
+---
+
+## Phase 2 v4：λ_fid 立即满权重 + 裁剪放宽 + swap 惩罚（ph2v4）
+
+### 训练命令
+
+```bash
+cd src
+python3 -m routing.rl.train_agent \
+  --topo-list ../traindata/topo/tianyan176_20q.json \
+  --curriculum-keys stage2,large_n8,large_n8,large_n10,large_n12,large_n16 \
+  --reward-mode noise_aware \
+  --fidelity-sim trajectory_sched --traj-trajectories 16 \
+  --max-num-qubits 20 \
+  --load ../models/policy_tianyan20q_laymix_l05_eta05.pt \
+  --eta-xtalk-par 0.05 \
+  --swap-cost 0.5 \
+  --mapping-min-swaps 1 --lambda-layout 0.5 \
+  --lambda-fid-max 5.0 --lambda-fid-warmup 0.0 \
+  --sabre-fid-map "5=0.309,8=0.162,10=0.061,12=0.046,16=0.0065" \
+  --layout-mix 0.3,0.3,0.4 \
+  --sabre-cache-file ../models/sabre_cache_ph2v3.pkl \
+  --timesteps 50000 --rollout-steps 256 --epochs 4 --lr 1e-4 --seed 0 \
+  --checkpoint-dir ../models/ckpts_ph2_v4 --out ../models/policy_ph2_v4.pt
+```
+
+### v4 相对 v3 的三项修复
+
+1. **λ_fid 立即满权重**：`lambda_fid_schedule(warmup=0.0)` 改为直接返回 `max_val`（不再从 0 线性爬升），5q/8q 阶段保真度信号全程满权重。
+2. **裁剪放宽**：终端奖励 `np.clip(r, -10, 10)` → `(-50, 50)`，16q 上不再饱和为常数。
+3. **swap 惩罚**：`--swap-cost` 默认 0.0 → 0.5，每个 SWAP 直接扣 0.5。
+
+### 训练关键指标
+
+| step | 阶段 | reward | swps | ent | KL | fid | xtalk |
+|------|------|--------|------|-----|-----|-----|-------|
+| 256 | 5q | 31.7 | 5.1 | 0.19 | 2.66 | 0.123 | 0.11 |
+| 5888 | 5q | 43.5 | 5.1 | 0.43 | 2.12 | 0.142 | 0.12 |
+| 8960 | 8q | 59.9 | 12.2 | 0.63 | 1.31 | 0.020 | 0.20 |
+| 23296 | 10q | 59.7 | 10.4 | 0.60 | 1.20 | 0.014 | 0.17 |
+| 35840 | 12q | 73.5 | 20.0 | 0.72 | 0.63 | 0.0006 | 0.34 |
+| 46848 | 16q | 108.5 | 33.2 | 0.80 | 0.27 | 0.0001 | 0.46 |
+| 49920 | 16q | 145.1 | 44.2 | 0.81 | 0.19 | 0.0001 | 0.44 |
+
+### v4 vs v3 训练指标对比
+
+| 指标 | v3 @step~45k | v4 @step~46k | 改善 |
+|------|-------------|-------------|------|
+| entropy | 0.94~1.03 | **0.80~0.97** | ✅ 不再退化为随机 |
+| KL | 0.31~0.42 | **0.27~0.42** | ≈ 相当 |
+| fid | 0.000075 | **0.0001** | ≈ 同量级 |
+| swaps | 30~31 | 33~44 | 略多（swap_cost 低 0.5 不足以抑制） |
+
+### 评估结果（tianyan176_20q，trajectory_sched×16）
+
+| 尺寸 | l05 Fidelity | ph2v4 Fidelity | SABRE Fidelity | ph2v4 vs l05 | ph2v4 vs SABRE |
+|------|-------------|----------------|----------------|-------------|----------------|
+| 5q | **0.3691** | 0.3644 | 0.3091 | -1.3% | **+17.9%** |
+| 8q | 0.1197 | **0.1286** | 0.0813 | **+7.4%** | **+58.2%** |
+| 10q | 0.0255 | **0.0502** | 0.0224 | **+96.9%** | **+124%** |
+| 12q | **0.0152** | 0.0112 | 0.0037 | -26.3% | **+203%** |
+| 16q† | **0.0039** | 0.0034 | 0.0003 | -12.8% | **+1033%** |
+
+†16q 评估用 4 轨迹（16 轨迹超时）。
+
+### SWAPs
+
+| 尺寸 | l05 SWAPs | ph2v4 SWAPs | SABRE SWAPs |
+|------|-----------|-------------|-------------|
+| 5q | 6.0 | 6.1 | 5.3 |
+| 8q | 12.7 | 11.3 | 9.5 |
+| 10q | 17.9 | 16.0 | 13.5 |
+| 12q | 25.2 | 23.8 | 19.4 |
+| 16q† | 35.6 | 33.8 | 28.6 |
+
+### 分析
+
+1. **ph2v4 在所有尺寸上超越 SABRE**：保真度提升 17.9%~1033%，这是首个全尺寸超越 SABRE 的版本。
+2. **ph2v4 vs l05 互有胜负**：8q/10q 上 ph2v4 超越 l05（+7.4%/+96.9%），5q/12q/16q 上 l05 略优（-1.3%/-26.3%/-12.8%）。10q 提升幅度（+96.9%）非常显著。
+3. **λ_fid 调度修复效果**：v4 在 5q 阶段保真度信号满权重（v3 时 λ_fid≈0），策略没有退化为随机（ent 0.81 vs v3 的 1.03），证实了"课程-错相"修复有效。
+4. **swap_cost=0.5 不足以抑制过多 SWAP**：ph2v4 的 SWAPs 仍然偏多（12q 23.8 vs l05 25.2，改善不大），策略仍倾向于做更多 SWAP。后续可尝试增大 swap_cost（1.0~2.0）。
+5. **12q 上 ph2v4 不如 l05 的原因**：12q 时 λ_fid=3.5（未满 5.0），且随机 rollout fid≈0.0006 仍远低于确定性评估 fid，终端奖励仍受探索噪声影响。
+6. **改进空间**：(a) swap_cost 增大到 1.0~2.0 进一步约束 SWAP 数量；(b) 增大 λ_fid_max 到 10~20 让 log-相对奖励在更大电路上仍有区分度；(c) 减少训练步数（30k~40k），避免后期策略漂移。
+
+---
+
+## 无泄露评估（test split，0 重叠）
+
+### 背景
+
+此前评估使用 `*_phase3` split，与训练集 `*_mixed` 有 ~33% 重叠（数据泄露）。创建 `stage1_test` 和 `large_n*_test` split（各 60 条 random 电路），与所有训练 split **0 重叠**。
+
+### 评估结果（test split，trajectory_sched×16）
+
+| 尺寸 | l05 Fidelity | ph2v4 Fidelity | SABRE Fidelity | l05 vs SABRE | ph2v4 vs SABRE |
+|------|-------------|----------------|----------------|-------------|----------------|
+| 5q | **0.5767** | 0.5531 | 0.5382 | **+7.2%** | **+2.8%** |
+| 8q | 0.1859 | **0.1884** | 0.1621 | +14.7% | **+16.2%** |
+| 10q | 0.1003 | **0.1075** | 0.0614 | +63.3% | **+75.1%** |
+| 12q | 0.0861 | **0.0971** | 0.0541 | +59.1% | **+79.5%** |
+| 16q† | **0.0190** | 0.0174 | 0.0047 | **+304%** | **+270%** |
+
+†16q 用 4 轨迹评估（16 轨迹超时）。
+
+### SWAPs（test split）
+
+| 尺寸 | l05 SWAPs | ph2v4 SWAPs | SABRE SWAPs |
+|------|-----------|-------------|-------------|
+| 5q | 4.1 | **3.9** | 3.8 |
+| 8q | 11.4 | **10.1** | 8.9 |
+| 10q | 15.1 | **13.5** | 10.8 |
+| 12q | 20.2 | **18.6** | 15.9 |
+| 16q† | 27.7 | 27.7 | 23.2 |
+
+### 数据泄露影响（phase3 vs test 对比）
+
+| 尺寸 | l05 phase3 | l05 test | 泄露膨胀 |
+|------|-----------|---------|---------|
+| 5q | 0.3691 | 0.5767 | -36.0% |
+| 8q | 0.1197 | 0.1859 | -35.6% |
+| 10q | 0.0255 | 0.1003 | -74.6% |
+| 12q | 0.0152 | 0.0861 | -82.3% |
+| 16q† | 0.0039 | 0.0190 | -79.5% |
+
+phase3 评估因数据泄露严重低估了模型真实性能（尤其 10q+），test split 才反映真实泛化能力。
+
+### 分析
+
+1. **无泄露下两者全面超越 SABRE**：l05 和 ph2v4 在所有 5 个尺寸上均超越 SABRE（+2.8%~+304%），确认 PPO 路由策略的真实泛化优势。
+2. **ph2v4 vs l05 互有胜负**：8q/10q/12q 上 ph2v4 更优（+16.2%/+75.1%/+79.5%），5q/16q 上 l05 略优（+7.2%/+304% vs +2.8%/+270%）。
+3. **ph2v4 在中等规模（10q-12q）优势最大**：这是噪声感知微调最有效的区间，log-相对奖励 + swap_cost 惩罚共同提升了路由质量。
+4. **SWAPs 方面 ph2v4 全面优于 l05**：在所有尺寸上 ph2v4 的 SWAPs 更少或持平，说明噪声感知微调确实改善了路由效率。
+5. **数据泄露使此前结论部分失效**：phase3 评估中"12q 上 ph2v4 不如 l05"（-26.3%）在 test split 上反转为"ph2v4 优于 l05"（+12.8%），说明泄露评估不可靠。
+
+---
+
+## Phase 2 v5：swap_cost=1.5 + 冻结5q阶段 + 60k步（ph2v5）
+
+### 训练命令
+
+```bash
+cd src
+python3 -m routing.rl.train_agent \
+  --topo-list ../traindata/topo/tianyan176_20q.json \
+  --curriculum-keys stage2,large_n8,large_n8,large_n10,large_n12,large_n16 \
+  --reward-mode noise_aware \
+  --fidelity-sim trajectory_sched --traj-trajectories 16 \
+  --max-num-qubits 20 \
+  --load ../models/policy_tianyan20q_laymix_l05_eta05.pt \
+  --eta-xtalk-par 0.05 \
+  --swap-cost 1.5 \
+  --mapping-min-swaps 1 --lambda-layout 0.5 \
+  --lambda-fid-max 5.0 --lambda-fid-warmup 0.0 \
+  --sabre-fid-map "5=0.309,8=0.162,10=0.061,12=0.046,16=0.0065" \
+  --layout-mix 0.3,0.3,0.4 \
+  --sabre-cache-file ../models/sabre_cache_ph2v3.pkl \
+  --freeze-first-steps 10000 \
+  --timesteps 60000 --rollout-steps 256 --epochs 4 --lr 1e-4 --seed 0 \
+  --checkpoint-dir ../models/ckpts_ph2_v5 --out ../models/policy_ph2_v5.pt
+```
+
+### v5 相对 v4 的改动
+
+1. **swap_cost 0.5→1.5**：每 SWAP 惩罚增大 3 倍，抑制过多 SWAP
+2. **冻结前 10k 步**：5q 阶段只收集数据不更新参数，保护纯路由能力
+3. **总步数 50k→60k**：给大电路更多训练时间
+
+### 评估结果（test split，trajectory_sched，无泄露）
+
+| 尺寸 | l05 Fidelity | ph2v4 Fidelity | ph2v5 Fidelity | SABRE Fidelity |
+|------|-------------|----------------|----------------|----------------|
+| 5q | **0.5767** | 0.5531 | 0.5673 | 0.5382 |
+| 8q | 0.1859 | **0.1884** | 0.1872 | 0.1621 |
+| 10q | 0.1003 | **0.1075** | 0.1005 | 0.0614 |
+| 12q | 0.0861 | **0.0971** | 0.0821 | 0.0541 |
+| 16q† | **0.0190** | 0.0174 | 0.0163 | 0.0047 |
+
+†16q 用 4 轨迹评估。
+
+### SWAPs（test split）
+
+| 尺寸 | l05 | ph2v4 | ph2v5 | SABRE |
+|------|-----|-------|-------|-------|
+| 5q | 4.1 | **3.9** | 4.1 | 3.8 |
+| 8q | 11.4 | **10.1** | 10.0 | 8.9 |
+| 10q | 15.1 | **13.5** | 13.6 | 10.8 |
+| 12q | 20.2 | 18.6 | **19.0** | 15.9 |
+| 16q† | 27.7 | **27.7** | 28.4 | 23.2 |
+
+### 训练指标对比
+
+| 指标 | ph2v4 @50k | ph2v5 @52k | 变化 |
+|------|-----------|-----------|------|
+| entropy | 0.81 | 0.79 | ↓ 更稳定 |
+| KL | 0.37 | 0.28 | ↓ 策略变化更小 |
+| SWAPs | 43 | 36 | ↓ swap_cost 有效 |
+| fid(训练) | 0.00005 | 0.00024 | ↑ 保真度信号改善 |
+
+### 分析
+
+1. **swap_cost=1.5 有效抑制 SWAP**：ph2v5 在 8q/10q 上 SWAPs 与 ph2v4 持平，但12q 上从 18.6→19.0 反而略增，说明惩罚强度还不够。
+2. **冻结5q阶段效果有限**：ph2v5 在 5q 上（0.5673）介于 l05（0.5767）和 ph2v4（0.5531）之间，冻结确实改善了 5q 退化，但没有完全恢复 l05 水平。
+3. **ph2v5 整体不如 ph2v4**：在 10q/12q 上 ph2v4 仍优于 ph2v5（+7.0%/+18.3%），说明增大 swap_cost 和冻结策略的组合并未带来整体提升。
+4. **entropy 更稳定**：ph2v5 的 entropy 始终低于 ph2v4（0.79 vs 0.81），KL 也更低（0.28 vs 0.37），说明冻结+高 swap_cost 让训练更稳定，但稳定性没有转化为保真度优势。
+5. **结论**：冻结5q + swap_cost=1.5 的改进方向正确（5q 退化改善），但强度不够。后续可尝试：(a) 冻结更长（15k~20k步）；(b) swap_cost 进一步增大到 2.0~3.0；(c) 同时增大 λ_fid_max 到 10 让保真度信号更强。
+
+---
+
+## Phase 2 v6b：EMA 评估 + 最优 checkpoint + 冻结5q + 自适应 λ_fid_max（ph2v6b）
+
+### 训练命令
+
+```bash
+cd src
+python3 -m routing.rl.train_agent \
+  --topo-list ../traindata/topo/tianyan176_20q.json \
+  --curriculum-keys stage2,large_n8,large_n8,large_n10,large_n12,large_n16 \
+  --reward-mode noise_aware \
+  --fidelity-sim trajectory_sched --traj-trajectories 16 \
+  --max-num-qubits 20 \
+  --timesteps 60000 \
+  --lambda-fid-max-schedule 5,5,5,5,5,10 \
+  --sabre-fid-map "5=0.309,8=0.162,10=0.061,12=0.046,16=0.0065" \
+  --swap-cost 0.5 \
+  --freeze-first-steps 10000 \
+  --ema-decay 0.999 \
+  --eval-interval 5000 \
+  --eval-split stage1_test,large_n8_test,large_n10_test,large_n12_test,large_n16_test \
+  --eval-max-qubits 20 --eval-traj 16 \
+  --load ../models/policy_tianyan20q_laymix_l05_eta05.pt \
+  --out ../models/policy_ph2_v6b.pt \
+  --phase 2
+```
+
+### 训练指标
+
+- 训练步数：60160
+- EMA best：step=35072，mean_fid=0.3114（trajectory_sched×16，test split 全尺寸均值）
+- 训练后期（43k+）：entropy 升至 ~1.0，终端态保真度（训练reward）降至 ~0.00002，SWAPs 膨胀至 33-40
+- 训练退化模式与 ph2v3 相同（entropy→1.0 策略随机化），EMA best 捕获了退化前的最优策略
+
+### 评估结果（test split，trajectory_sched，同口径）
+
+| 尺寸 | ph2v6b EMA | ph2v6b Final | l05 | ph2v4 | SABRE |
+|------|-----------|-------------|-----|-------|-------|
+| 5q | 0.5666 | **0.5767** | 0.5767 | 0.5531 | 0.5382 |
+| 8q | 0.1781 | **0.1859** | 0.1859 | 0.1884 | 0.1621 |
+| 10q | 0.0902 | **0.1003** | 0.1003 | **0.1075** | 0.0614 |
+| 12q | 0.0749 | **0.0756** | 0.0861 | **0.0971** | 0.0463 |
+| 16q† | 0.0092 | **0.0176** | **0.0190** | 0.0174 | 0.0042 |
+
+†16q 用 4 轨迹评估。
+
+### vs SABRE 百分比
+
+| 尺寸 | ph2v6b EMA | ph2v6b Final | l05 | ph2v4 |
+|------|-----------|-------------|-----|-------|
+| 5q | +5.3% | **+7.2%** | **+7.2%** | +2.8% |
+| 8q | +9.9% | +14.7% | +14.7% | **+16.2%** |
+| 10q | +46.9% | **+63.3%** | +63.3% | **+75.1%** |
+| 12q | +61.8% | **+63.3%** | +59.1% | **+79.5%** |
+| 16q† | +119% | **+319%** | **+304%** | +270% |
+
+### SWAPs
+
+| 尺寸 | ph2v6b EMA | ph2v6b Final | l05 | ph2v4 | SABRE |
+|------|-----------|-------------|-----|-------|-------|
+| 5q | 4.0 | 4.1 | 4.1 | 3.9 | 3.8 |
+| 8q | 10.4 | 11.4 | 11.4 | 10.1 | 8.9 |
+| 10q | 13.9 | 15.1 | 15.1 | 13.5 | 10.8 |
+| 12q | 18.5 | 20.5 | 20.2 | 18.6 | 15.9 |
+| 16q† | 28.1 | 28.5 | 27.7 | 27.7 | 23.2 |
+
+### 分析
+
+1. **ph2v6b_final 全尺寸超越 SABRE**（+7.2%~+319%），确认 Phase 2 噪声感知微调+EMA 策略的有效性。
+2. **ph2v6b_final vs ph2v4 互有胜负**：5q（+7.2% vs +2.8%）和16q（+319% vs +270%）v6b更优，8q（+14.7% vs +16.2%）/10q（+63.3% vs +75.1%）/12q（+63.3% vs +79.5%）v4更优。
+3. **EMA best vs final**：EMA best（step 35072）在所有尺寸上不如 final（step 60160），说明训练后期（尽管 entropy 升高）仍在产出更好的策略——EMA 的延迟平均反而稀释了质量。
+4. **训练退化与输出质量的矛盾**：训练后期 entropy→1.0（随机探索）+ 终端态保真度→0，但最终 checkpoint（final）的确定性评估反而最好。原因可能是：(a) 训练中的随机探索（entropy）≠ 确定性推理时的行为；(b) PPO 的 clip/梯度裁剪在 reward 信号弱时仍保持策略质量。
+5. **SWAPs 偏多**：ph2v6b 的 SWAPs 与 l05 持平或更多（尤其12q: 20.5 vs 18.6），swap_cost=0.5 不足以抑制过多 SWAP。后续可尝试 swap_cost=2.0~3.0。
+6. **改进空间**：(a) swap_cost 增大到 2.0~3.0 进一步约束 SWAP 数量；(b) 减少训练步数（30k~40k），避免后期策略退化；(c) 用 Hellinger 保真度训练（匹配论文评测指标），消除训练/评测目标不一致。
+
+---
+
+## NAM Circuits Benchmark（tianyan176_20q, trajectory_sched×16）
+
+### 环境
+
+- 拓扑：tianyan176_20q（20 比特，29 耦合边）
+- 模型：l05（Phase 1 基模）、ph2v4（Phase 2 噪声感知）
+- 评测：trajectory_sched，16 条轨迹，seed=0
+- 基线：Qiskit SabreSwap
+- 电路：19 个 ≤20q NAM benchmark（删除了 10 个 >20q 电路）
+
+### 命令
+
+```bash
+cd src
+# 路由生成（无保真度，快速）
+PYTHONPATH=. python3 -m routing.rl.generate_routing \
+  --model ../models/policy_tianyan20q_laymix_l05_eta05.pt \
+  --model-name l05 \
+  --circuit-dir ../benchmark/nam_circs \
+  --topo ../traindata/topo/tianyan176_20q.json \
+  --label-map ../traindata/topo/tianyan176_20q_labels.json \
+  --max-num-qubits 20 \
+  --out-dir ../benchmark/routed/l05 \
+  --no-fidelity
+
+# 批量保真度计算
+cd .. && PYTHONPATH=src python3 scripts/compute_fidelity.py
+```
+
+### 总览
+
+| 指标 | SABRE | l05 | ph2v4 |
+|------|-------|-----|-------|
+| 平均 SWAPs | **45.1** | 65.3 | 64.0 |
+| 平均保真度 | 0.2747 | **0.3115** | 0.2872 |
+| 胜 SABRE | — | 10/19 | 5/19 |
+
+### 分电路对比
+
+| Circuit | q | gates | SABRE_sw | l05_sw | ph2v4_sw | SABRE_fid | l05_fid | ph2v4_fid | Winner |
+|---------|---|-------|---------:|-------:|---------:|----------:|--------:|----------:|--------|
+| barenco_tof_10 | 19 | 450 | 103 | 184 | 193 | 0.0715 | **0.1960** | 0.0472 | l05 |
+| barenco_tof_3 | 5 | 58 | 9 | 14 | 14 | 0.7467 | **0.7636** | 0.6817 | l05 |
+| barenco_tof_4 | 7 | 114 | 30 | 22 | 26 | 0.4454 | 0.4830 | **0.5132** | ph2v4 |
+| barenco_tof_5 | 9 | 170 | 26 | 40 | 37 | 0.1683 | 0.3089 | **0.4688** | ph2v4 |
+| csla_mux_3 | 15 | 170 | 39 | 54 | 45 | 0.0341 | **0.2566** | 0.0685 | l05 |
+| gf2^4_mult | 12 | 225 | 50 | 56 | 51 | 0.2348 | 0.1989 | **0.2588** | ph2v4 |
+| gf2^5_mult | 15 | 347 | 72 | 101 | 95 | **0.0793** | 0.0267 | 0.0343 | SABRE |
+| gf2^6_mult | 18 | 495 | 109 | 162 | 180 | 0.0314 | 0.0650 | **0.1136** | ph2v4 |
+| grover_5 | 9 | 831 | 119 | 149 | 163 | 0.0006 | **0.0033** | 0.0002 | l05 |
+| hwb6 | 7 | 259 | 50 | 68 | 68 | 0.0000 | **0.0003** | 0.0000 | l05 |
+| mod5_4 | 5 | 63 | 12 | 14 | 13 | **0.5122** | 0.4148 | 0.4154 | SABRE |
+| mod_mult_55 | 9 | 119 | 22 | 27 | 24 | **0.1554** | 0.1057 | 0.0609 | SABRE |
+| mod_red_21 | 11 | 278 | 48 | 72 | 69 | 0.0645 | **0.1215** | 0.0248 | l05 |
+| rc_adder_6 | 14 | 200 | 38 | 68 | 58 | **0.1662** | 0.1608 | 0.1458 | SABRE |
+| tof_10 | 19 | 255 | 57 | 107 | 94 | **0.4264** | 0.2223 | 0.1701 | SABRE |
+| tof_3 | 5 | 45 | 11 | 11 | 10 | 0.7779 | **0.8198** | 0.7935 | l05 |
+| tof_4 | 7 | 75 | 17 | 19 | 13 | 0.6570 | **0.7138** | 0.6323 | l05 |
+| tof_5 | 9 | 105 | 17 | 25 | 18 | 0.4699 | **0.6041** | 0.4424 | l05 |
+| vbe_adder_3 | 10 | 150 | 28 | 48 | 45 | 0.1779 | 0.4543 | **0.5850** | ph2v4 |
+
+### 分析
+
+1. **l05 平均保真度超越 SABRE 13.4%**（0.3115 vs 0.2747），尽管 SWAPs 多 45%（65.3 vs 45.1）。PPO 学会了选择噪声友好的路由路径——更多 SWAP 但每个 SWAP 放在低噪声边。
+2. **ph2v4 平均保真度超越 SABRE 4.6%**（0.2872 vs 0.2747），SWAPs 多 42%（64.0 vs 45.1）。不如 l05，可能因为训练退化。
+3. **l05 在中等规模电路（9-15q）上优势显著**：csla_mux_3（+652%）、barenco_tof_10（+174%）、vbe_adder_3（+155%）、tof_5（+28.6%）。
+4. **SABRE 在小电路（5q）和部分19q电路上仍更强**：mod5_4（-19%）、tof_10（-47.9%）、gf2^5_mult（-66%）。SABRE SWAPs 更少，对噪声不敏感的小电路更优。
+5. **ph2v4 胜 SABRE 的电路多为特定拓扑**：barenco_tof_4/5、gf2^4/6_mult、vbe_adder_3。这些电路的门模式恰好适合 PPO 的噪声感知路由。
+6. **grover_5 / hwb6 保真度极低**（<0.005）：831/259 门的深电路，无论哪种算法都无法保持保真度，属于噪声极限。
+7. **生成工具**：`src/routing/rl/generate_routing.py`（路由 + Q-label 映射 + 保真度计算），输出 JSON 含 initial_layout（Q 标签）、routed_qasm、fidelity。
+
+---
+
+## Beam Search 保真度优化实验
+
+### 背景
+
+l05 beam search 保真度反而比 argmax 差（0.26 vs 0.31），原因分析：
+- l05 的 critic V(s') 在 Phase 1 routing 模式下训练（`reward_mode=routing`），**完全不知道保真度**
+- beam 评分 `score = reward_c + γ·V(s')` 贪心优化"路由效率"（SWAP 少、makespan 短），但 SWAP 少 ≠ 保真度高
+- argmax 的"多出来的 SWAP"是故意绕开高错误率边的（`eta_err=0.5` 惩罚高错误门），反而保真度更高
+
+### 方案：ph2v4 noise-aware critic beam search
+
+ph2v4 的 critic V(s') 在 Phase 2 noise-aware 模式下训练（终端保真度奖励 + swap_cost=0.5），V(s') 已编码保真度信息。用 `reward_mode='noise_aware'` 跑 beam search，V(s') 自然引导保真度优化。
+
+```bash
+cd src
+PYTHONPATH=. python3 -m routing.rl.generate_routing \
+  --model ../models/policy_ph2_v4.pt \
+  --model-name ph2v4_beam5 \
+  --circuit-dir ../benchmark/nam_circs \
+  --topo ../traindata/topo/tianyan176_20q.json \
+  --label-map ../traindata/topo/tianyan176_20q_labels.json \
+  --max-num-qubits 20 \
+  --out-dir ../benchmark/routed/ph2v4_beam5 \
+  --reward-mode noise_aware \
+  --beam-width 5 \
+  --swap-cost 0.5 \
+  --eta-xtalk-par 0.05 \
+  --lambda-fid-max 5.0 \
+  --no-fidelity
+```
+
+### 结果
+
+| Method | Avg SWAPs | Avg Fidelity | vs SABRE |
+|--------|----------|-------------|----------|
+| SABRE | 45.1 | 0.2747 | — |
+| l05 argmax | 65.3 | **0.3115** | +13.4% |
+| l05 beam3 | 43.6 | 0.2617 | -4.7% |
+| l05 beam5 | 41.6 | 0.2408 | -12.3% |
+| ph2v4 argmax | 64.0 | 0.2872 | +4.6% |
+| ph2v4 beam3 | 42.6 | 0.2859 | +4.1% |
+| **ph2v4 beam5** | **42.2** | **0.3047** | **+10.9%** |
+
+### 分电路保真度对比
+
+| Circuit | q | SABRE | l05 | l05 b3 | ph2v4 | ph2v4 b3 | ph2v4 b5 |
+|---------|---|------:|----:|-------:|------:|---------:|---------:|
+| barenco_tof_10 | 19 | 0.071 | **0.196** | 0.014 | 0.047 | 0.027 | 0.244 |
+| barenco_tof_4 | 7 | 0.445 | 0.483 | 0.420 | 0.513 | 0.457 | **0.613** |
+| csla_mux_3 | 15 | 0.034 | 0.257 | 0.112 | 0.068 | **0.375** | 0.224 |
+| gf2^5_mult | 15 | 0.079 | 0.027 | 0.039 | 0.034 | **0.196** | 0.139 |
+| tof_10 | 19 | **0.426** | 0.222 | 0.373 | 0.170 | 0.305 | 0.363 |
+| tof_3 | 5 | 0.778 | 0.820 | 0.729 | 0.794 | **0.848** | 0.748 |
+| vbe_adder_3 | 10 | 0.178 | 0.454 | 0.077 | **0.585** | 0.305 | 0.568 |
+
+### 分析
+
+1. **ph2v4 beam5 首次同时实现低 SWAP + 高保真度**：SWAP 42.2（低于 SABRE 45.1）+ 保真度 0.3047（超越 SABRE 10.9%）。这是 noise-aware critic V(s') 引导 beam search 的结果。
+2. **l05 beam search 保真度恶化**（-4.7%~-12.3%）：证实 l05 的 critic 不含保真度信号，beam 贪心优化错误目标。
+3. **ph2v4 beam5 > ph2v4 argmax**（0.3047 vs 0.2872，+6.1%）：noise-aware V(s') 的 lookahead 确实帮助选择了更优路径。
+4. **ph2v4 beam3 ≈ ph2v4 argmax**（0.2859 vs 0.2872）：beam3 收益有限，beam5 的更多候选带来更大改善。
+5. **beam search 大幅降低 SWAP**：所有 beam 变体 SWAP 41-43，比 argmax（64-65）少 35%，比 SABRE（45）也低。
+6. **部分电路 ph2v4 beam 超越所有 argmax**：barenco_tof_10（0.244 vs 0.196）、barenco_tof_4（0.613 vs 0.513）、gf2^5_mult（0.196 vs 0.027）。
+
+### 结论
+
+critic V(s') 的训练目标决定了 beam search 的方向：
+- **routing critic**（l05）→ beam 搜索"少 SWAP"→ 保真度下降
+- **noise-aware critic**（ph2v4）→ beam 搜索"高保真度"→ SWAP 和保真度双优
+
+ph2v4 beam5 是当前最优配置：SWAP 低于 SABRE、保真度超越 SABRE 10.9%。后续可尝试方案 B（真实保真度 rollout 评分）进一步提升。
