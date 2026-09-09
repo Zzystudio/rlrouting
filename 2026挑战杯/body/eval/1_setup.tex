@@ -1,0 +1,32 @@
+在这一章节中，\ourwork 通过实验验证所提编译框架的有效性。首先给出实验的各项配置与评价指标，随后设计多组对照实验，通过对比各组结果说明框架对量子线路运行性能的提升，最后对编译优化效果进行分析与归因。
+
+\subsection{实验设置}
+\label{sec:experiment-setup}
+
+\paragraph{测试数据集.} \cmynote{通过$'$.$'$将标题与正文分开}
+% 我们选用MQT Bench~\cite{quetschlich2023mqtbench}中的14条VQE量子线路作为测试数据。线路抽象层次为Target-independent Level，前端编译器为Qiskit；逻辑规模覆盖3至16个量子比特。该组线路具有不同的宽度和双比特交互结构，可用于评估映射与路由策略对端到端真机执行结果的影响。
+
+\paragraph{CqLib执行配置.}
+本文将CqLib作为连接量子云平台和构造提交线路的Python接口。输入线路采用OpenQASM~2.0格式，首先由Qiskit读取为\texttt{QuantumCircuit}对象；随后将编译后的门序列转换为CqLib的\texttt{Circuit}对象，并导出为QCIS格式提交至真机。换言之，OpenQASM的解析由Qiskit完成，CqLib负责承载转换后的线路及调用\texttt{TianYanPlatform}接口完成任务提交和结果查询。
+
+本文不使用CqLib提供门级线路优化，而是将其作为统一的执行与提交接口。\ourwork 选择SABRE算法~\cite{li2019tackling}作为基线算法。
+
+\paragraph{设备选择.}
+实验在天衍~176量子计算机上完成。该设备标称具有66个物理量子比特。每次提交前，程序从云端获取最新芯片配置，并在映射时自动排除当前被禁用的量子比特和耦合器，因此实际使用的硬件连接图随提交时的可用资源确定。
+
+\paragraph{执行流程与评价指标.}
+为了定量评估编译后量子线路在实际硬件上的执行保真度，本文采用海林格保真度（Hellinger Fidelity）作为核心评价指标。该指标广泛应用于 NISQ 时代的量子基准测试、编译优化与噪声验证工作中~\cite{tomesh2022supermarq,gokhale2020openpulse,brandhofer2023qubitreuse}。
+具体执行时，对于每条逻辑线路，先依据提交时的硬件连接图执行映射和路由，再将得到的 QCIS 线路提交至真机。每条线路均执行 $10000$ 次计算基（$Z$ 基）测量，且不进行读出误差缓解。设比特串 $x$ 在真机测量中出现 $N_x$ 次，则实验概率为
+\begin{equation}
+    P_{\mathrm{exp}}(x) = \frac{N_x}{10000}.
+\end{equation}
+另一方面，对移除末尾测量操作后的逻辑线路进行无噪声状态向量模拟，得到理想态 $\lvert\psi_{\mathrm{ideal}}\rangle$ 及理想计算基概率
+\begin{equation}
+    P_{\mathrm{ideal}}(x) = \left\lvert\langle x\mid\psi_{\mathrm{ideal}}\rangle\right\rvert^2.
+\end{equation}
+在将真机物理量子比特的测量结果映射回逻辑比特顺序后，计算两个概率分布之间的一致性。Bhattacharyya 系数（Bhattacharyya Coefficient, BC）是衡量两个统计离散分布重叠程度的经典度量，定义为各分量几何均值的累加和，其值严格落在 $[0, 1]$ 之间。量子计算领域通常采用该系数的平方来定义海林格保真度 $F_{\mathrm{H}}$：
+\begin{equation}
+    F_{\mathrm{H}} = \left(\sum_{x\in\mathcal{X}} \sqrt{P_{\mathrm{exp}}(x) P_{\mathrm{ideal}}(x)}\right)^2, \quad F_{\mathrm{H}} \in [0,1]
+    \label{eq:hellinger-fidelity}
+\end{equation}
+其中 $\mathcal{X}$ 为实验分布和理想分布中比特串的并集。$F_{\mathrm{H}}$ 越大（越接近 1），表示真机在计算基下的采样概率分布与理想理论结果的重合度越高。需要指出的是，$F_{\mathrm{H}}$ 衡量的是计算基测量概率分布的吻合度，不等同于全量子态保真度，其无法直接反映非对角元的相位信息或相干性。

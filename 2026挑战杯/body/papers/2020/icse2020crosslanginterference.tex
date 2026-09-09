@@ -1,0 +1,50 @@
+\subsection{[ICSE2020] Here We Go Again: Why Is It Diﬀicult for Developers to Learn Another Programming Language?}
+
+\label{sec:icse2020crosslanginterference}
+
+\cite{shrestha2020crosslanginterference} 论证了开发者们在已经掌握一门语言的前提下再学习新语言时, 往往不是那么容易. 他的研究方法是:\\
+1. 在Stack Overflow上选出涉及language transition的帖子进行分析. \\
+2. 采访16名有多年经验的资深程序员对language transition的看法. 最后得出结论: 对程序员来说, language transition往往不会很顺利, 已经学过的语法及思维方式有很大可能会对学习新语言产生干扰.
+
+\subsubsection{选取数据部分}
+
+数据的收集,样本的选取及标记
+
+\begin{itemize}
+    \item 用BigQuery从数据库中选择tag中包含两种语言的帖子
+    \item 对每一对语言(共15对), 从这些帖子中随机选取30个, 人工检查是否为符合要求的帖子, 若不符合, 舍弃, 并从剩余帖子中再随机选取一个, 直至30个帖子都符合要求.
+    \item 人工把每对语言的30个样本分类为correct或incorrect. correct表示之前的知识对学习新语言有帮助, incorrect则相反.
+    \item 这里的人工选择均由前两位作者完成, 他们进行了kappa一致性检验确保两人的判断基本一致.( 算出来的$\kappa$类似于相关系数, 越接近1, 两人的一致性越强)
+\end{itemize}
+
+\subsubsection{采访程序员部分}
+作者用了purposive sampling方法(即不是随机取样, 是有目的性地寻找样本)雇了16个在过去6个月内正在学习新语言的professional programmers, 他们都来自大型互联网公司并有5年及以上的工作经历. 并问了他们如下五个问题
+
+\begin{itemize}
+    \item participant background
+    \item first steps
+    \item obstacles
+    \item learning process
+    \item general strategies
+\end{itemize}
+
+\subsubsection{结果}
+作者们发现大部分程序员在language transition过程中都会遇到障碍, 调查的15个language transition中只有3个的sample correct比例超过50％
+在采访中作者获得了16位程序员在language transition中的学习方法及遇到的问题. 他们发现Language Interference是普遍存在的
+
+\subsubsection{局限性}
+
+\begin{itemize}
+    \item 作者提到Because the sampling approach is non-probabilistic, it does not allow for sample-to-population, or statistical generalization. 即由于他们的取样方式, 不能保证样本数增加时结论仍然成立.
+    \item 在分类上只有correct和incorrect两类, 是最简单的定性统计量, 可能采用open coding等方式效果会更好
+    \item 定性的研究具有很大一部分主观性
+\end{itemize}
+
+\subsubsection{建议}
+作者们对程序员和开发者提了几点建议, 希望language transition能更顺利
+\begin{itemize}
+    \item Design documentation that reduces interference and supports knowledge transfer.
+    \item Build automated tools to provide on-demand feedback. For example, Johnson propose “bespoke” notifcation tools that provide adaptive feedback to the programmer based on the programmer’s prior knowledge of programming languages and concepts. Python 3 adopts this idea of using prior programmer knowledge to assist programmers who come from a Python 2 background.
+    \item Be intentional about programming language syntax, semantics, and pragmatics. 
+    \item Support not only programming languages, but programming language ecosystems.
+\end{itemize}

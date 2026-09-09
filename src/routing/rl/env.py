@@ -82,6 +82,7 @@ class RoutingEnv(gym.Env):
         seed: int = 0,
         noise_config=None,
         sabre_fid_map: Optional[Dict[int, float]] = None,
+        sref_override: Optional[float] = None,
     ):
         super().__init__()
         self.dag = dag
@@ -115,6 +116,7 @@ class RoutingEnv(gym.Env):
         self.lambda_fid = lambda_fid
         self.fidelity_fn = fidelity_fn
         self.sabre_fid_map = sabre_fid_map
+        self.sref_override = sref_override
         self.lambda_layout = lambda_layout
 
         self.random_init = random_init
@@ -474,6 +476,7 @@ class RoutingEnv(gym.Env):
         new.lambda_layout = self.lambda_layout
         new.fidelity_fn = self.fidelity_fn
         new.sabre_fid_map = self.sabre_fid_map
+        new.sref_override = self.sref_override
         new.random_init = self.random_init
         new.init_mapping = self.init_mapping
         new.max_episode_steps = self.max_episode_steps
@@ -792,14 +795,16 @@ class RoutingEnv(gym.Env):
                 return 0.0
             fid = self._get_terminal_reward_value()
             info["fidelity"] = fid
-            if self.sabre_fid_map is not None:
+            # sref 优先级：per-circuit 覆盖 > sabre_fid_map 按 num_qubits 查
+            sref = self.sref_override
+            if sref is None and self.sabre_fid_map is not None:
                 sref = self.sabre_fid_map.get(self.num_qubits)
-                if sref and sref > 0:
-                    fid_c = max(fid, sref * 1e-4)
-                    r = self.lambda_fid * (math.log(fid_c) - math.log(sref))
-                    r = float(np.clip(r, -50.0, 50.0))
-                    info["terminal_reward"] = r
-                    return r
+            if sref is not None and sref > 0:
+                fid_c = max(fid, sref * 1e-4)
+                r = self.lambda_fid * (math.log(fid_c) - math.log(sref))
+                r = float(np.clip(r, -50.0, 50.0))
+                info["terminal_reward"] = r
+                return r
             info["terminal_reward"] = self.lambda_fid * fid
             return self.lambda_fid * fid
         return 0.0

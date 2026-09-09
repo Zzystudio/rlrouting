@@ -1,0 +1,310 @@
+\newpage
+\section{量子比特路由}
+
+代码仓库：\href{http://202.38.78.31:1480/quantum/rlrouting/-/tree/main?ref_type=heads}{gitlab}
+
+\subsection{问题定义}
+
+量子比特路由（Quantum Circuit Routing）是将逻辑量子电路映射到物理量子硬件的过程。由于 NISQ 设备中只有相邻的物理量子比特可以执行双量子比特门（如 CNOT），当逻辑门操作的两个量子比特在物理上不相邻时，必须插入 SWAP 门来交换量子比特的位置。每次 SWAP 操作引入额外噪声并增加电路深度，因此目标是在满足物理约束的前提下，最小化 SWAP 数量或最大化最终保真度。
+
+更形式化地，给定：
+\begin{itemize}
+  \item 逻辑电路 $C$ 包含 $n$ 个逻辑量子比特和一系列门操作
+  \item 物理拓扑 $G = (V, E)$ 包含 $m \geq n$ 个物理量子比特，$E$ 为相邻边集
+  \item 初始映射 $\pi: [n] \to [m]$ 将逻辑量子比特映射到物理位置
+\end{itemize}
+
+每一步，智能体从 $E$ 中选择一条边 $(p,q)$ 执行 SWAP 操作，这一操作交换物理量子比特 $p$ 和 $q$ 上的内容。在 SWAP 后，所有前置门已执行完的双量子比特门自动执行。重复此过程，直到电路中的所有门都执行完毕或达到最大步数限制。
+
+\subsection{总体架构}
+
+系统采用强化学习结合图神经网络的方法解决路由问题：GNN 编码器将电路结构和硬件拓扑编码为节点嵌入，PPO 智能体根据这些嵌入为每条候选 SWAP 边打分，选取得分最高的动作执行。噪声模拟器在终端评估保真度并反馈给智能体。
+
+\begin{figure}[h]
+\centering
+\begin{verbatim}
+  NoiseConfig (噪声参数)
+       │
+       ├──> NoiseSimulator ──> Aer 密度矩阵 (eval)
+       │
+       └──> TrajectorySimulator (训练/eval)
+              │
+              ├── 轨迹采样: O(T·G·2^n)
+              └── 解析代理: O(G)
+                     │
+  HardwareFeatures ──> CircuitDAG
+       │                    │
+       └──> SubGNN ─────────┘
+              │
+              ├──> RoutingEnv (Gymnasium)
+              │        │
+              │        ├── GreedyScheduler (事件级 ASAP)
+              │        ├── CircuitTiming (时序状态)
+              │        └── 死锁掩码 / 映射阶段
+              │
+              └──> PPOAgent (EdgeActorCritic)
+                       │
+                       ├──> train_agent.py (Phase 1/2)
+                       └──> eval_policy.py (argmax/beam)
+\end{verbatim}
+\caption{系统架构图}
+\label{fig:arch}
+\end{figure}
+
+\subsubsection{CircuitDAG（电路有向无环图）}
+
+\texttt{routing/graph/circuit\_dag.py} 将 QuantumCircuit 解析为 DAG 结构，每个节点对应一个门操作，边表示依赖关系。每个门记录其前驱门索引，支持拓扑排序和 front\_layer 提取（所有依赖条件已满足且未执行的双量子比特门）。特征编码输出 32 维节点特征和 16 维边特征。
+
+\subsubsection{HardwareFeatures（硬件特征）}
+
+\texttt{routing/graph/features.py} 从噪声配置构建硬件特征：包含物理距离矩阵、噪声参数（T1/T2、门错误率、串扰强度等），并提供 \texttt{RoutingGraphData} 数据结构作为 GNN 的 PyTorch Geometric Data 对象。
+
+\subsubsection{SubGNN（图神经网络编码器）}
+
+\texttt{routing/gnn/encoder.py} 实现基于 GATConv 的双向二分图编码器：
+\begin{itemize}
+  \item \textbf{输入}：32 维节点特征（逻辑/物理量子比特）、16 维边特征（门操作/物理连接）
+  \item \textbf{架构}：3 层多头 GAT (hidden=64, heads=4) + LayerNorm + ReLU
+  \item \textbf{输出}：\texttt{node\_embeddings()} 返回每个物理量子比特的 48 维嵌入
+  \item \textbf{全局池化}：mean+max 池化得到 96 维全局嵌入
+\end{itemize}
+
+\subsubsection{RoutingEnv（强化学习环境）}
+
+\texttt{routing/rl/env.py} 实现 Gymnasium 接口的环境。环境维护当前映射状态、已执行门集合、物理线路、调度时序和 X/Z 错误追踪，核心设计如下。
+
+\textbf{观测空间}：每条耦合边独立构建局部特征向量，直接建模 $Q(s,a)$ 而非全局状态，解决了全局池化下的 state-action 歧义问题：
+
+\[
+\text{edge\_feat}_i = [h_p, h_q, h_p-h_q, \text{sabre\_feats}] \in \mathbb{R}^{149}
+\]
+
+其中 $h_p, h_q \in \mathbb{R}^{48}$ 为 GNN 节点嵌入，$\text{sabre\_feats} \in \mathbb{R}^5$ 为 SABRE 启发式特征，包含：
+\begin{itemize}
+  \item \texttt{front\_dist\_before}：执行 SWAP 前 front layer 门到目标边的归一化距离
+  \item \texttt{front\_dist\_after}：执行 SWAP 后的距离
+  \item \texttt{dist\_improvement}：距离改善量 $(d_{\text{before}} - d_{\text{after}}) / d_{\text{before}}$
+  \item \texttt{num\_improved} / \texttt{num\_worsened}：距离改善/恶化的 front layer 门数量
+\end{itemize}
+
+完整观测为所有边的特征拼接，加上映射向量（每比特的物理位置编码）和进度标量（已执行门比例 + 映射阶段标志）。
+
+\textbf{动作空间}：\texttt{Discrete(num\_edges + 1)}（映射阶段）或 \texttt{Discrete(num\_edges)}（纯路由阶段）。每个动作选择一条物理耦合边执行 SWAP，额外的 commit 动作触发映射阶段到路由阶段的切换。
+
+\textbf{奖励函数}（Phase 1）：
+\[
+r_t = r_{\text{swap}} + \sum r_{\text{execute}} + \sum r_{\text{propagate}} + r_{\text{dist}}
+\]
+\begin{itemize}
+  \item $r_{\text{swap}} = -0.3$：每次 SWAP 的固定代价
+  \item $r_{\text{execute}}$：门执行奖励（CX=2.0，1Q=0.3--0.5）
+  \item $r_{\text{propagate}}$：X/Z 错误传播惩罚
+  \item $r_{\text{dist}} = -\eta \cdot (d_{\text{after}} - d_{\text{before}}) / \max(d_{\text{before}}, 1)$：距离缩短奖励（$\eta = 1.0$）
+\end{itemize}
+
+Phase 2 增加终端保真度奖励：$R_{\text{terminal}} = \lambda_{\text{fid}} \cdot F$，其中 $F$ 通过 Aer 密度矩阵仿真计算。
+
+\textbf{死锁掩码}：检测最近 2 步内同一边的重复 SWAP 震荡，将该边屏蔽以防止无限循环。具体地，维护一个长度为 2 的滑动窗口记录最近执行的 SWAP 边索引，若当前候选边与窗口中的任一历史边相同，则将其从合法动作中排除。
+
+\textbf{未映射比特掩码}：在映射阶段，尚未分配物理位置的逻辑比特对应的 SWAP 动作被屏蔽，确保映射按序进行。
+
+\textbf{克隆方法}：\texttt{clone()} 返回环境的深拷贝，包括 DAG、映射、物理线路、调度时序、错误追踪等全部状态的独立副本，用于 beam search 推理时的状态模拟。克隆操作通过深拷贝和数组拷贝实现，确保副本间无共享可变状态。
+
+\subsubsection{PPOAgent（策略智能体）}
+
+\texttt{routing/rl/agent.py} 实现基于 PPO 的智能体：
+
+\textbf{EdgeActorCritic 网络}：
+\[
+\text{score}_i = \text{MLP}_{\text{actor}}(\text{edge\_feat}_i) \in \mathbb{R}
+\]
+\[
+\pi(a|s) = \text{softmax}([\text{score}_0, \ldots, \text{score}_{K-1}])
+\]
+Critic 使用注意力池化聚合边特征，降低输入维度至 155，提高训练稳定性。
+
+\textbf{超参数}：$\text{lr}=3\times10^{-4}$, $\gamma=0.99$, $\lambda=0.95$, $\text{clip}=0.2$, $\text{entropy}=0.01$
+
+\textbf{联合训练}：GNN 编码器参数纳入 PPO 优化器，实现 RL 驱动的端到端特征学习。
+
+\subsubsection{映射阶段集成}
+
+系统将初始布局选择和 SWAP 路由统一到同一个 MDP 中，通过映射阶段（mapping phase）实现布局-路由联合优化。
+
+\textbf{统一动作空间}：动作空间为 $\text{Discrete}(\text{num\_edges} + 1)$，前 $\text{num\_edges}$ 个动作对应物理耦合边上的 SWAP，第 $\text{num\_edges}$ 个动作为 commit 动作，用于结束映射阶段并切换到路由阶段。观测向量末尾拼接 phase 标识符（映射阶段为 1.0，路由阶段为 0.0），使策略网络感知当前阶段。
+
+\textbf{虚拟 SWAP}：在映射阶段，智能体选择耦合边 $(p, q)$ 执行虚拟 SWAP。该操作仅重排映射向量 $\text{mapping}$（交换 $\text{mapping}[p]$ 和 $\text{mapping}[q]$），不写入物理线路、不递增 SWAP 计数器、不执行任何门操作。虚拟 SWAP 的距离缩短奖励与路由阶段相同：
+\[
+r_{\text{dist}} = -\eta \cdot \frac{d_{\text{after}} - d_{\text{before}}}{\max(d_{\text{before}}, 1)}
+\]
+其中 $d_{\text{before}}$ 和 $d_{\text{after}}$ 分别为虚拟 SWAP 前后 front layer 门到目标边的总距离。
+
+\textbf{映射预算与自动 commit}：最大虚拟 SWAP 数为 $\text{mapping\_budget} = n - 1$（$n$ 为逻辑比特数）。当预算耗尽时，环境自动执行 commit 动作。智能体也可以在预算内提前 commit。commit 时调用 \texttt{\_auto\_execute\_batch()}，自动执行所有前置条件已满足的门，然后切换到路由阶段。
+
+\textbf{布局质量惩罚}：commit 时刻可选施加布局质量惩罚 $r_{\text{layout}} = -\lambda_{\text{layout}} \cdot \frac{1}{|F|} \sum_{g \in F} d(\pi(g.q_1), \pi(g.q_2))$，鼓励智能体在 commit 时已将关键门的操作数放置在近距离物理比特上。
+
+\textbf{未映射比特掩码}：在映射阶段，尚未分配物理位置的逻辑比特对应的 SWAP 动作被屏蔽，确保映射按序进行。当所有逻辑比特完成映射后，所有边的 SWAP 动作均合法。
+
+\subsection{训练流水线}
+
+系统采用两阶段课程训练策略：
+
+\subsubsection{Phase 1：纯路由训练}
+
+目标：学习高效路由策略，最小化 SWAP 数。
+\begin{itemize}
+  \item 时间步数：100,000
+  \item 奖励模式：\texttt{routing}（无终端保真度信号）
+  \item SABRE 距离特征 + 距离即时奖励 + 死锁掩码
+  \item 数据集课程：Phase1 $\to$ Phase2 $\to$ Phase3（深度 2--13）
+\end{itemize}
+
+训练日志显示 entropy 从 1.38 降至 0.79（约 45K 步收敛），value loss 降至 0.1，SWAP 均值稳定在 4.6。
+
+\subsubsection{Phase 2：噪声感知微调}
+
+目标：在保持路由能力的同时优化保真度。
+\begin{itemize}
+  \item 加载 Phase 1 检查点
+  \item 时间步数：100,000
+  \item 奖励模式：\texttt{noise\_aware}（Aer 仿真保真度终端奖励）
+  \item $\lambda_{\text{fid}}$ 从 0 线性退火至 5.0（前 50\% 步）
+  \item 多拓扑混合：cross\_5q, ring\_5q, ibmq\_5\_line
+\end{itemize}
+
+全程 trunc=0\%，entropy 稳定在 0.79，value loss 0.06--0.29，fidelity 约 0.78。
+
+\subsubsection{多规模课程学习}
+
+为支持不同规模线路的泛化训练，系统实现了多规模课程学习策略。训练数据按量子比特数组织为独立的 split 文件：
+
+\begin{itemize}
+  \item \texttt{large\_n8\_phase1/2/3}：8 量子比特线路（150--300 条）
+  \item \texttt{large\_n10\_phase1/2/3}：10 量子比特线路（150--300 条）
+  \item \texttt{large\_n12\_phase1/2/3}：12 量子比特线路（150--300 条）
+  \item \texttt{large\_n16\_phase1/2/3}：16 量子比特线路（300--500 条）
+  \item \texttt{unified\_mixed}：8/10/12/16/20 量子比特混合线路（700 条）
+\end{itemize}
+
+课程通过 \texttt{--curriculum-keys} 参数控制，按训练进度自动切换数据集。例如，从 8 量子比特课程开始，待策略在当前规模收敛后，逐步过渡到 10、12、16 量子比特。每个规模的 Phase1/2/3 分别对应线路深度的浅/中/深三个层次。
+
+\subsubsection{噪声感知训练}
+
+Phase 2 噪声感知微调的关键设计决策包括：
+
+\paragraph{保真度信号来源。} 支持两种保真度计算方式：(1) 轨迹采样（\texttt{trajectory\_sched}），对 $T=16$ 条独立噪声轨迹取平均，精确但计算量随量子比特数指数增长；(2) 解析代理（\texttt{analytic}），一阶错误累积 $O(G)$ 复杂度，适用于 $\geq 16$ 量子比特的大规模线路训练。
+
+\paragraph{保真度奖励权重。} $\lambda_{\text{fid}}$ 控制保真度在总奖励中的比重。采用预热策略：前 50\% 训练步 $\lambda_{\text{fid}}$ 从 0 线性退火至最大值（默认 5.0），使策略先建立路由能力再引入保真度优化。$\lambda_{\text{fid}} = 0$ 时跳过保真度计算，减少训练开销。
+
+\paragraph{保真度归一化。} 终端奖励中使用 per-size SABRE 基线保真度归一化：
+\[
+R_{\text{terminal}} = \lambda_{\text{fid}} \cdot \frac{F - F_{\text{sabre}}(n)}{1 - F_{\text{sabre}}(n)}
+\]
+其中 $F_{\text{sabre}}(n)$ 为 $n$ 量子比特线路的 SABRE 平均保真度。这使得不同规模线路的保真度奖励具有可比性。
+
+\paragraph{噪声扰动。} 每个 episode 的噪声参数在标称值附近 $\pm 20\%$ 随机扰动，增强策略对噪声漂移的鲁棒性。训练过程使用 EMA（指数移动平均）权重定期在验证集上评估，保存最佳模型。
+
+\subsection{Beam Search 推理}
+
+为了弥补 PPO 前馈推理无法搜索的缺陷，实现了 1 步 Beam Search：
+\begin{enumerate}
+  \item 策略网络输出所有边的 logit 分数
+  \item 选取得分最高的 K 个动作（默认 K=3）
+  \item 对每个候选动作：克隆环境、执行虚拟 step、用 Critic 评估 $V(s')$
+  \item 选取得分最高的动作执行真实 step
+\end{enumerate}
+
+\subsection{测试情况}
+
+当前共有 3 个测试文件，18 个测试用例全部通过：
+
+\begin{itemize}
+  \item \textbf{test\_circuit\_dag.py}（5 个测试）：DAG 解析、图特征张量形状、串扰特征、PyG Data 转换
+  \item \textbf{test\_env.py}（12 个测试）：观测空间、动作执行、奖励计算、噪声感知模式、死锁掩码、错误追踪
+  \item \textbf{test\_eval\_phase1.py}（1 个慢测试）：端到端模型评估，验证 PPO 在三个拓扑上 100\% 完成，SWAP 数低于 Greedy
+\end{itemize}
+
+\subsection{当前结果}
+
+在5比特、门数<100的线路上进行验证：
+
+\subsubsection{纯路由模式（routing mode, deterministic）}
+SWAP数：
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+拓扑 & PPO argmax & PPO beam3 & SABRE & Greedy \\
+\hline
+cross\_5q & 2.0 & \textbf{1.3} & \textbf{1.2} & 1.8 \\
+ring\_5q & 1.6 & \textbf{1.2} & \textbf{1.0} & 1.1 \\
+ibmq\_5\_line & 2.8 & \textbf{2.3} & \textbf{2.0} & 3.1 \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsubsection{噪声感知模式（noise\_aware mode, deterministic）}
+
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+拓扑 & PPO SWAPs & SABRE SWAPs & PPO 保真度 & SABRE 保真度 \\
+\hline
+cross\_5q & 3.2 & 3.0 & \textbf{0.9453} & 0.9327 \\
+ring\_5q & 4.5 & 3.5 & \textbf{0.9419} & 0.9371 \\
+ibmq\_5\_line & 6.7 & 5.5 & \textbf{0.9557} & 0.9228 \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection{下一步研究方向}
+
+\subsubsection{多步 Beam Search 与 MCTS}
+
+当前 1 步 lookahead 在线性拓扑上闭合率最低（63\%），因为该拓扑需要多步规划。扩展到 beam depth=2 或 3，并在叶节点进行完整的保真度评估，有望进一步缩小差距。中长期可以引入 MCTS 作为推理时的搜索策略（类似 AlphaZero 范式）。
+
+\subsubsection{更大规模拓扑与电路}
+
+当前系统仅支持 5 量子比特拓扑，实际 NISQ 设备可达 27--127 量子比特。主要挑战：
+\begin{itemize}
+  \item 动作空间从 4--5 条边增长到 30--100+ 条边，策略网络需要扩展到处理可变大边集
+  \item GNN 需要泛化到更大规模的图上
+  \item Quantum Volume 更大的电路需要更长的 rollout
+\end{itemize}
+
+\subsubsection{观测增强}
+
+当前 SABRE 特征提供了 front\_layer 距离信息，但缺失了 gate 权重的区分（如 CX vs CZ 的不同噪声特征）。可以考虑加入：
+\begin{itemize}
+  \item 每个 front\_layer 门的执行代价（保真度影响）
+  \item 门的关键路径深度（影响并行度）
+  \item 量子比特的剩余活动度（未来依赖数量）
+\end{itemize}
+
+\subsubsection{模拟器速度需求}
+
+扩展到 10+ 量子比特时，Aer 仿真时间随量子比特数指数增长（密度矩阵 $O(4^m)$），需要：
+\begin{itemize}
+  \item GPU 加速
+  \item 对于更大规模，需要切换到张量网络仿真或 stabilization-based 方法
+\end{itemize}
+
+\subsubsection{迁移学习与泛化}
+
+当前模型在训练时见过的三种拓扑上表现良好，但对未见过拓扑的零样本迁移能力尚未验证。后续研究可以探索：
+\begin{itemize}
+  \item 基于图编辑距离的拓扑相似度度量
+  \item 域随机化：训练时随机生成多种拓扑提高泛化性
+\end{itemize}
+
+\subsubsection{分布式训练}
+
+当前训练是单进程的，无法多卡并行训练。扩展到大电路和多拓扑需要分布式 PPO：
+\begin{itemize}
+  \item 多个 rollout worker 并行收集
+  \item 中心化 learner 负责参数更新
+  \item 每个 worker 持有一个独立的电路和拓扑副本
+\end{itemize}
+
+\subsubsection{真机测试训练}
+
+目前可用天衍平台提供的高精度含噪模拟器进行fine-tuning。但最好可以在真机上结合真实校准数据进行测试或训练。

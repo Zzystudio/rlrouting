@@ -1,0 +1,49 @@
+% !Mode:: "TeX:UTF-8" 
+
+%========================================= Font ==========================================
+% 定义字号
+\newcommand{\yihao}{\fontsize{26pt}{26pt}\selectfont}       % 一号, 1.倍行距
+\newcommand{\xiaoyi}{\fontsize{24pt}{24pt}\selectfont}      % 小一, 1.倍行距
+\newcommand{\erhao}{\fontsize{22pt}{22pt}\selectfont}		% 二号, 1.倍行距
+\newcommand{\xiaoer}{\fontsize{18pt}{18pt}\selectfont}      % 小二, 单倍行距
+\newcommand{\sanhao}{\fontsize{16pt}{16pt}\selectfont}      % 三号, 1.倍行距
+\newcommand{\xiaosan}{\fontsize{15pt}{15pt}\selectfont}     % 小三, 1.倍行距
+\newcommand{\sihao}{\fontsize{14pt}{14pt}\selectfont}       % 四号, 1.倍行距
+\newcommand{\xiaosi}{\fontsize{12pt}{12pt}\selectfont}      % 小四, 1.倍行距
+\newcommand{\wuhao}{\fontsize{10.5pt}{10.5pt}\selectfont}   % 五号, 单倍行距
+\newcommand{\xiaowu}{\fontsize{9pt}{9pt}\selectfont}        % 小五, 单倍行距
+
+% 默认字体
+\makeatletter
+\renewcommand\normalsize{
+	\@setfontsize\normalsize{12pt}{12pt}
+	\setlength\abovedisplayskip{8pt}
+	\setlength\abovedisplayshortskip{8pt}
+	\setlength\belowdisplayskip{\abovedisplayskip}
+	\setlength\belowdisplayshortskip{\abovedisplayshortskip}
+	\let\@listi\@listI
+}
+
+% 设置行距和段落间垂直距离
+\setlength{\parindent}{2em}
+\setlength{\parskip}{3pt plus1pt minus1pt}
+%\setlist[enumerate]{itemsep=0pt, parsep=0pt}
+%\setlist[itemize]{itemsep=0pt, parsep=0pt}
+\def\defaultfont{\renewcommand{\baselinestretch}{1.5}\normalsize\selectfont}
+
+%============== TOC =======================
+% 中文目录格式定义
+\renewcommand\contentsname{目\quad 录}
+\titlecontents{chapter}[3.8em]{\hspace{-3.8em}}{\thecontentslabel~~}{}{\titlerule*[4pt]{.}\contentspage}
+\dottedcontents{section}[38pt]{}{22pt}{0.3pc}
+\dottedcontents{subsection}[70pt]{}{32pt}{0.3pc}
+
+%=============== Header ====================
+% 定义页眉和页脚
+\newcommand{\makeheadrule}{
+\rule[8pt]{\textwidth}{0.4pt} \\[-22pt]
+\rule{\textwidth}{0.4pt}}
+\renewcommand{\headrule}{
+    {\if@fancyplain\let\headrulewidth\plainheadrulewidth\fi
+     \makeheadrule}}
+\pagestyle{fancyplain}

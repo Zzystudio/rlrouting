@@ -1,0 +1,35 @@
+{
+ "circuit": "mod_mult_55.qasm",
+ "model": "nam_traj_v1",
+ "num_logical_qubits": 9,
+ "num_physical_qubits": 20,
+ "topology": "tianyan176_20q",
+ "initial_layout": {
+  "0": "Q19",
+  "1": "Q37",
+  "2": "Q13",
+  "3": "Q25",
+  "4": "Q12",
+  "5": "Q20",
+  "6": "Q26",
+  "7": "Q32",
+  "8": "Q8"
+ },
+ "routed_qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[20];\nx q[2];\nh q[7];\nh q[0];\nh q[1];\ncx q[4],q[5];\nrz(-pi/4) q[5];\nswap q[4],q[2];\ncx q[4],q[5];\nrz(pi/4) q[5];\nswap q[4],q[2];\ncx q[4],q[5];\nrz(-pi/4) q[5];\nswap q[5],q[4];\ncx q[2],q[4];\nrz(pi/4) q[4];\nh q[4];\nswap q[5],q[4];\ncx q[2],q[4];\nrz(-pi/4) q[4];\ncx q[2],q[4];\nrz(pi/4) q[2];\nrz(pi/4) q[4];\nx q[2];\nx q[4];\ncx q[5],q[7];\nrz(-pi/4) q[7];\ncx q[4],q[1];\nrz(pi/4) q[1];\nswap q[4],q[1];\ncx q[2],q[4];\nrz(-pi/4) q[4];\ncx q[1],q[4];\nrz(pi/4) q[4];\ncx q[2],q[4];\nrz(-pi/4) q[4];\nh q[4];\nswap q[5],q[3];\ncx q[5],q[7];\nrz(pi/4) q[7];\nswap q[7],q[5];\ncx q[3],q[5];\nrz(-pi/4) q[5];\ncx q[7],q[5];\nrz(pi/4) q[5];\nh q[5];\ncx q[5],q[8];\nswap q[2],q[19];\ncx q[19],q[1];\nrz(pi/4) q[1];\ncx q[19],q[1];\nrz(-pi/4) q[19];\nrz(-pi/4) q[1];\nswap q[5],q[4];\ncx q[4],q[6];\nh q[6];\nh q[4];\nswap q[5],q[3];\ncx q[7],q[5];\nrz(-pi/4) q[5];\ncx q[7],q[5];\nrz(pi/4) q[7];\nrz(pi/4) q[5];\nx q[7];\ncx q[3],q[5];\nx q[5];\nswap q[5],q[4];\ncx q[3],q[5];\nrz(pi/4) q[5];\ncx q[4],q[6];\nrz(-pi/4) q[6];\ncx q[7],q[5];\nrz(-pi/4) q[5];\ncx q[3],q[5];\nrz(pi/4) q[5];\ncx q[7],q[5];\nrz(-pi/4) q[5];\nh q[5];\nswap q[5],q[3];\ncx q[7],q[5];\nrz(pi/4) q[5];\ncx q[7],q[5];\nrz(-pi/4) q[7];\nrz(-pi/4) q[5];\ncx q[3],q[0];\ncx q[8],q[5];\nh q[8];\nh q[5];\nswap q[11],q[7];\nswap q[5],q[3];\ncx q[1],q[3];\nrz(-pi/4) q[3];\nswap q[8],q[6];\ncx q[11],q[8];\nrz(pi/4) q[8];\nswap q[5],q[4];\ncx q[5],q[8];\nrz(-pi/4) q[8];\ncx q[11],q[8];\nrz(pi/4) q[8];\nh q[8];\nswap q[8],q[5];\ncx q[11],q[8];\nrz(-pi/4) q[8];\ncx q[11],q[8];\nrz(pi/4) q[11];\nrz(pi/4) q[8];\nx q[11];\ncx q[8],q[6];\nrz(pi/4) q[6];\nswap q[1],q[19];\ncx q[1],q[3];\nrz(pi/4) q[3];\nswap q[3],q[1];\ncx q[19],q[1];\nrz(-pi/4) q[1];\ncx q[3],q[1];\nrz(pi/4) q[1];\nh q[1];\nswap q[8],q[6];\ncx q[11],q[8];\nrz(-pi/4) q[8];\ncx q[6],q[8];\nrz(pi/4) q[8];\ncx q[11],q[8];\nrz(-pi/4) q[8];\nh q[8];\nswap q[8],q[6];\ncx q[11],q[8];\nrz(pi/4) q[8];\ncx q[11],q[8];\nrz(-pi/4) q[11];\nrz(-pi/4) q[8];\nx q[8];\nswap q[6],q[4];\ncx q[4],q[1];\nswap q[1],q[19];\ncx q[3],q[1];\nrz(-pi/4) q[1];\ncx q[3],q[1];\nrz(pi/4) q[3];\nrz(pi/4) q[1];\nx q[3];",
+ "num_swaps": 23,
+ "mapping_swaps": 3,
+ "completed": true,
+ "fidelity": 0.04839372421279872,
+ "final_layout": {
+  "0": "Q12",
+  "1": "Q37",
+  "2": "Q8",
+  "3": "Q26",
+  "4": "Q32",
+  "5": "Q13",
+  "6": "Q25",
+  "7": "Q20",
+  "8": "Q19"
+ },
+ "wall_time_ms": 241.3
+}

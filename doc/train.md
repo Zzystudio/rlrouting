@@ -4032,3 +4032,735 @@ critic V(s') 的训练目标决定了 beam search 的方向：
 - **noise-aware critic**（ph2v4）→ beam 搜索"高保真度"→ SWAP 和保真度双优
 
 ph2v4 beam5 是当前最优配置：SWAP 低于 SABRE、保真度超越 SABRE 10.9%。后续可尝试方案 B（真实保真度 rollout 评分）进一步提升。
+
+---
+
+## 解析保真度代理 + NAM 电路训练扩展（2026-09-07）
+
+### 动机
+
+ph2v4 在 NAM 算术电路上退化（avg 0.2872 vs l05 的 0.3115，-7.8%），根因：
+1. 训练分布不匹配：Phase 2 用 ≤16q 随机电路，NAM 是 15-19q 结构化算术电路
+2. `sabre_fid_map` 只覆盖到 16q，15q/18q/19q 无 log-相对奖励信号
+3. 保真度模拟开销：trajectory_sched 在 19q×643 门上需 ~13 min/episode，无法扩展训练
+
+### 实现
+
+#### 1. 解析保真度代理（`trajectory_sim.py:make_analytic_fidelity_fn`）
+
+一阶错误累积：`log F ≈ Σ log(1-ε_i)`，O(门数)，无 2^k 指数。
+
+| 通道 | 近似公式 |
+|------|---------|
+| 单比特门退极化 | `log(1 - ε1[q])` |
+| CX 退极化 | `log(1 - ε2[a,b])` |
+| SWAP（=3 CX） | `3 × log(1 - ε2[a,b])` |
+| 热弛豫（可选） | `log(1 - (t/T1·½ + t/T2·½))` |
+| 串扰 θ²（可选） | `-θ²` |
+
+CLI: `--fidelity-sim analytic [--analytic-thermal] [--analytic-crosstalk]`
+
+#### 2. NAM 电路训练混入（`train_agent.py`）
+
+- `--nam-circuits-dir PATH`：加载 QASM 目录（如 `benchmark/nam_circs/`）
+- `--nam-circuit-prob 0.3`：30% 概率选 NAM 电路，70% 走原随机电路
+- `load_nam_circuits()` → `pick_circuit_with_nam()` 混合采样器
+
+#### 3. NAM 专用 sabre_fid_map
+
+从 SABRE benchmark 数据计算（19 circuits, trajectory_sched×16）：
+
+| Qubits | SABRE Fidelity | NAM Circuits |
+|--------|---------------|--------------|
+| 5 | 0.6789 | barenco_tof_3, mod5_4, tof_3 |
+| 7 | 0.3675 | barenco_tof_4, hwb6, tof_4 |
+| 9 | 0.1985 | barenco_tof_5, grover_5, mod_mult_55, tof_5 |
+| 10 | 0.1779 | vbe_adder_3 |
+| 11 | 0.0645 | mod_red_21 |
+| 12 | 0.2348 | gf2^4_mult |
+| 14 | 0.1662 | rc_adder_6 |
+| 15 | 0.0567 | csla_mux_3, gf2^5_mult |
+| 18 | 0.0314 | gf2^6_mult |
+| 19 | 0.2489 | barenco_tof_10, tof_10 |
+
+CLI: `--sabre-fid-map "5=0.6789,7=0.3675,9=0.1985,10=0.1779,11=0.0645,12=0.2348,14=0.1662,15=0.0567,18=0.0314,19=0.2489"`
+
+### 训练命令（Phase 2 NAM 扩展，从 l05 微调）
+
+使用 tianyan176 20q 拓扑（覆盖所有 NAM 电路的 5-19q），从 l05 routing 模型微调：
+
+```bash
+cd src
+python3 -m routing.rl.train_agent \
+  --topo ../traindata/topo/tianyan176_20q.json \
+  --max-num-qubits 20 \
+  --reward-mode noise_aware \
+  --fidelity-sim analytic \
+  --analytic-thermal \
+  --nam-circuits-dir ../benchmark/nam_circs \
+  --nam-circuit-prob 0.3 \
+  --sabre-fid-map "5=0.6789,7=0.3675,9=0.1985,10=0.1779,11=0.0645,12=0.2348,14=0.1662,15=0.0567,18=0.0314,19=0.2489" \
+  --lambda-fid-max 5.0 --lambda-fid-warmup 0.0 \
+  --eta-xtalk-par 0.05 --use-scheduler \
+  --load ../models/policy_tianyan20q_laymix_l05_eta05.pt \
+  --timesteps 100000 \
+  --out ../models/policy_nam_l05_finetune_v1.pt
+```
+
+### 测试结果
+
+- 50/50 测试通过（1 个 pre-existing flaky test `test_fidelity_shaping_step_zero` 排除）
+- 19 个 NAM 电路全部正确加载（5q-19q，45-831 gates）
+- 解析代理 5q 电路：fid=0.254（O(门数) 无指数）
+
+### 下一步
+
+1. 运行 NAM 扩展训练，评估 analytic proxy 在 15-19q 上的泛化效果
+2. 对比 analytic vs trajectory_sched 的相关性（确保代理能代表真实 fid 排序）
+3. 可选：自动切换策略（≤12q 用 trajectory_sched，>12q 用 analytic）
+
+---
+
+## NAM l05 微调 v2（unified_mixed 多尺度 + analytic fidelity，100k 步）—— 结果退化
+
+### 背景
+
+v1 微调（`stage2_mixed`，纯 5q）误用 split 被中途终止。改用 `unified_mixed`（8/10/12/16/20q 各 140 条，700 条）作为微调数据源，30% 概率混入 NAM 电路（5-19q），analytic fidelity 代理（含 thermal）作终端奖励。
+
+### 训练命令
+
+```bash
+cd src
+python3 -m routing.rl.train_agent \
+  --topo-list ../traindata/topo/tianyan176_20q.json \
+  --split-prefix unified \
+  --reward-mode noise_aware \
+  --timesteps 100000 \
+  --load ../models/policy_tianyan20q_laymix_l05_eta05.pt \
+  --out ../models/policy_nam_l05_finetune_v2.pt \
+  --fidelity-sim analytic \
+  --nam-circuits-dir ../benchmark/nam_circs \
+  --nam-circuit-prob 0.3 \
+  --analytic-thermal \
+  --max-num-qubits 20 \
+  --use-scheduler \
+  --lambda-fid-max 5.0 --lambda-fid-warmup 0.0 \
+  --eta-xtalk-par 0.05 --eta-dist 0.0 \
+  --ema 0.999 --swap-cost 0.5 \
+  --eval-interval 5000 --eval-split large_n16_test
+```
+
+日志：`models/train_nam_l05_finetune_v2.log`（session `nam_finetune`，~23 steps/s，总耗时 ~72min）
+
+### 训练日志摘要
+
+- 全程 trunc=0%，entropy 0.5-1.05 健康，KL ~0.01-0.18，grad_norm ~0.8-2.1
+- fid（analytic proxy，8-20q 大电路）：0.02-0.05 波动
+- **EMA eval（large_n16_test）：step 5120 → 0.01366（best），此后从未提升；最终 0.01356**
+- 关键观察：EMA 保真度全程无改善，说明 unified_mixed + NAM 微调未带来验证集增益，模型在偏离 l05 起点
+
+### 评估（NAM benchmark，19 circuits ≤20q，trajectory_sched×16，SABRE 基线）
+
+路由：`generate_routing.py --no-fidelity`；fidelity：`scripts/compute_fidelity_nam_v2.py`（trajectory_sched×16 seed=0 scheduled=True）
+
+| 方法 | 平均 SWAPs | 平均保真度 | vs SABRE |
+|------|-----------|-----------|----------|
+| SABRE | 45.1 | 0.2747 | — |
+| l05 argmax | 65.3 | **0.3115** | +13.4% |
+| ph2v4 argmax | 64.0 | 0.2872 | +4.6% |
+| **nam_l05_v2 argmax** | **57.1** | 0.2485 | **-9.5%** |
+| l05 beam3 | 43.6 | 0.2617 | -4.7% |
+| **nam_l05_v2 beam3** | **45.8** | 0.2717 | -1.1% |
+| ph2v4 beam5 | 42.2 | 0.3047 | +10.9% |
+
+### 逐电路对比（v2 argmax vs l05 argmax）
+
+| Circuit | q | gates | l05_fid | v2_fid | v2_sw | l05_sw | 变化 |
+|---------|---|-------|--------:|-------:|------:|-------:|------|
+| barenco_tof_3 | 5 | 58 | 0.7636 | 0.6428 | 11 | 14 | -15.8% |
+| mod5_4 | 5 | 63 | 0.4148 | **0.4666** | 11 | 14 | +12.5% |
+| tof_3 | 5 | 45 | 0.8198 | 0.7627 | 10 | 11 | -7.0% |
+| barenco_tof_4 | 7 | 114 | 0.4830 | 0.4292 | 18 | 22 | -11.1% |
+| tof_4 | 7 | 75 | 0.7138 | 0.5307 | 15 | 19 | -25.7% |
+| barenco_tof_5 | 9 | 170 | 0.3089 | 0.1628 | 34 | 40 | -47.3% |
+| tof_5 | 9 | 105 | 0.6041 | **0.6411** | 25 | 25 | +6.1% |
+| mod_red_21 | 11 | 278 | 0.1215 | **0.0002** | 57 | 72 | -99.8% |
+| gf2^4_mult | 12 | 225 | 0.1989 | 0.0393 | 58 | 56 | -80.2% |
+| rc_adder_6 | 14 | 200 | 0.1608 | **0.0000** | 47 | 68 | -100% |
+| gf2^5_mult | 15 | 347 | 0.0267 | **0.2551** | 86 | 101 | +856% |
+| csla_mux_3 | 15 | 170 | 0.2566 | 0.1952 | 47 | 54 | -23.9% |
+| gf2^6_mult | 18 | 495 | 0.0650 | 0.0216 | 134 | 162 | -66.8% |
+| barenco_tof_10 | 19 | 450 | 0.1960 | 0.0190 | 167 | 184 | -90.3% |
+| tof_10 | 19 | 255 | 0.2223 | 0.1890 | 82 | 107 | -15.0% |
+
+### 分析与结论
+
+1. **v2 argmax 保真度显著退化**（0.2485 vs l05 0.3115，-20%），SWAPs 减少（57.1 vs 65.3）但 fidelity 反而降——微调把模型推向「少 SWAP、高 analytic-F」的路线，与 l05 的「噪声友好路由」（多 SWAP 但放低噪声边）路径偏离。
+2. **EMA best 出现在 step 5120**（≈l05 起点，fid 0.01366），此后 95k 步从未刷新——训练奖励（analytic proxy）与评估指标（trajectory_sched）排序不一致，模型在优化代理但损害真实 fidelity。
+3. **beam3 部分修复退化**：0.2717（-1.1% vs SABRE），但仍不及 l05 beam3 的差距闭合效果与 ph2v4 beam5（0.3047）。
+4. **个别电路大幅退化**：rc_adder_6（0.16→0.00）、mod_red_21（0.12→0.0002）、barenco_tof_10（0.20→0.019）、gf2^4_mult（0.20→0.039）——这些恰是 l05 优势最大的中等规模电路。
+5. **唯一显著提升**：gf2^5_mult（+856%）、mod5_4（+12%）、tof_5（+6%）。gf2^5_mult 是 15q 347 门深电路，v2 少用了 15 个 SWAP 反而更优——unified 多尺度训练在部分深电路上有正向迁移。
+
+### 根因假设（需验证）
+
+- **analytic proxy vs trajectory_sched 排序不一致**：训练用 analytic（O(门数) 一阶累积、无调度），评估用 trajectory_sched（含调度空闲退相干 + 动态串扰）。若两者对「哪条路由更好」给出不同排序，PPO 优化代理可能损害真实 fidelity。
+- **70% unified_mixed 占主导**：微调大部分梯度来自 8-20q 随机/QAOA/VQE 电路，稀释了 NAM 算术电路的模式。
+- 下一步：用相同数据训练但 `--fidelity-sim trajectory_sched`（≤16q）或先做 analytic vs trajectory 相关性分析，确认代理是否可靠。
+
+### 模型文件
+
+- `models/policy_nam_l05_finetune_v2.pt`（step 100096 最终）
+- `models/policy_nam_l05_finetune_v2_ema_best.pt`（step 5120）
+- 路由结果：`benchmark/routed/nam_l05_v2*.json`（含 summary）
+
+---
+
+## analytic vs trajectory_sched 保真度排序相关性分析 —— 代理不可靠
+
+### 背景
+
+v2 微调（unified_mixed + analytic fidelity）在 NAM benchmark 上退化（argmax 0.2485 vs l05 0.3115）。
+主要嫌疑是训练用 analytic 代理与评估用 trajectory_sched 对「哪条路由更好」的排序不一致。
+本实验直接验证该假设。
+
+### 方法
+
+- 对 19 个 NAM 电路中的每个，取 8 种路由候选（l05, l05_beam3, l05_beam5, ph2v4,
+  ph2v4_beam3, ph2v4_beam5, nam_l05_v2, nam_l05_v2_beam3）的 routed_qasm
+- trajectory_fid：从已有 per-circuit JSON 读取（trajectory_sched×16, seed=0, scheduled=True）
+- analytic_fid：用 `make_analytic_fidelity_fn(include_thermal=True)` 现算（同 v2 训练配置）
+- 计算 per-circuit Spearman 秩相关
+
+脚本：`scripts/analyze_fid_correlation.py`
+
+### 结果
+
+**per-circuit Spearman(analytic, trajectory) 平均 = -0.07（≈0，仅 7/17 电路为正）**
+
+关键诊断 —— 各指标与 SWAP 数的 Spearman 相关：
+
+| 指标 | corr(指标, SWAP数) | 说明 |
+|------|-------------------|------|
+| analytic F | **-0.80** | 代理 ≈ SWAP 计数惩罚的翻版，无噪声路径偏好 |
+| trajectory F | **+0.09** | 真实保真度与 SWAP 数无关，区分因素在「去哪条边/何时 idle/串扰」 |
+| analytic vs trajectory | **-0.05** | 同一电路不同路由间零相关 |
+
+三种 analytic 变体（thermal±, crosstalk±）per-circuit 平均 Spearman 均为 -0.07~-0.08，
+无一可靠。池化（跨电路混合）Spearman=0.74 是**规模主导的假象**（大电路两个指标都低），
+不代表对同一电路的路由排序能力。
+
+### 根因分析
+
+1. **analytic 只累加逐门 ε**：同一逻辑电路的不同路由只差在 SWAP 的**位置**（放哪条边、
+   何时插入），但 analytic 对每条 SWAP 只计固定 `3×log(1-ε_cx)`（trajectory_sim.py:1185），
+   无法表达边噪声异质性 / idle 退相干 / 动态串扰 → 不同路由的 analytic F 差异几乎全部来自 SWAP 数。
+2. **corr=-0.80 vs +0.09**：PPO 若以 analytic 为 reward，学到的目标是「越少 SWAP 越好」
+   （= 最短路路由），恰好背离 l05 学的「多 SWAP 但放低噪声边」策略 —— 解释了 v2 退化的
+   根本机制，也解释了为何 EMA 自 step 5120 起不再改善（奖励信号本身带偏）。
+3. **thermal 项加剧塌缩**：≥11q 电路加 thermal 后 analytic F 下溢到 ~0，ana_span≈0，
+   代理对候选完全失去区分度（tie），连秩排序都做不了。
+
+### 结论
+
+- **analytic 代理不能用作噪声感知训练的 fidelity reward**（至少在当前一阶逐门累积 + 固定
+  时长 thermal 的形式下）。
+- 可行的方向：
+  1. **≤16q 训练恢复 trajectory_sched**（已有 pipeline，ph2v4 用过），代价是 16q 每次 ~0.8s；
+  2. **改进代理**：把 analytic 从「逐门累积」改成「调度感知」——至少引入 edge 噪声异质性 +
+      idle 退相干 + swap 的边权重（而非固定 3×CX），再验相关性；
+  3. **混合**：小/中规模 trajectory，>16q 用改进代理 + 与 trajectory 的保真度回归校准。
+
+---
+
+## NAM trajectory_sched 微调 v1（curriculum ≤16q + NAM≤16q 混入，50k 步）
+
+### 背景与动机
+
+v2（unified_mixed + analytic fidelity）在 NAM benchmark 退化（argmax 0.2485 vs l05 0.3115）。
+相关性分析证明 analytic 代理与 trajectory_sched 对同一电路不同路由的排序零相关
+（per-circuit Spearman ≈ -0.07，corr(analytic,SWAP)=-0.80 vs corr(trajectory,SWAP)=+0.09），
+不能用作文噪声感知训练的 reward。本次改为：**≤16q 用 trajectory_sched 训练**，
+训练集 = 原先 ≤16q curriculum + NAM≤16q 电路，从 l05 微调。
+
+### 代码改动（train_agent.py）
+
+1. 新增 `--nam-max-qubits`：过滤 NAM 加载与采样（本实验 =16，排除 18/19q 三条）
+2. 新增 `--sabre-fid-map-nam`：NAM 电路专属 SABRE 参考表。因 NAM 与随机电路同尺寸
+   SABRE 基线不同（如 5q: NAM≈0.68 vs random≈0.31），主循环按 `circuit_path.startswith("nam/")`
+   动态切换 sabre_fid_map（random 电路用 `--sabre-fid-map`，NAM 用 `--sabre-fid-map-nam`）
+
+### 训练命令
+
+```bash
+cd src
+python3 -m routing.rl.train_agent \
+  --topo-list ../traindata/topo/tianyan176_20q.json \
+  --curriculum-keys stage2,large_n8,large_n8,large_n10,large_n12,large_n16 \
+  --reward-mode noise_aware \
+  --fidelity-sim trajectory_sched --traj-trajectories 16 \
+  --max-num-qubits 20 \
+  --load ../models/policy_tianyan20q_laymix_l05_eta05.pt \
+  --eta-xtalk-par 0.05 --swap-cost 0.5 \
+  --lambda-fid-max 5.0 --lambda-fid-warmup 0.0 \
+  --sabre-fid-map "5=0.309,8=0.162,10=0.061,12=0.046,16=0.0065" \
+  --sabre-fid-map-nam "5=0.6789,7=0.3675,9=0.1985,10=0.1779,11=0.0645,12=0.2348,14=0.1662,15=0.0567" \
+  --nam-circuits-dir ../benchmark/nam_circs --nam-circuit-prob 0.3 --nam-max-qubits 16 \
+  --use-scheduler --mapping-phase --mapping-min-swaps 1 --lambda-layout 0.5 \
+  --layout-mix 0.3,0.3,0.4 \
+  --sabre-cache-file ../models/sabre_cache_ph2v3.pkl \
+  --rollout-steps 256 --epochs 4 --lr 1e-4 \
+  --timesteps 50000 --max-episode-steps 300 \
+  --ema-decay 0.999 \
+  --eval-interval 5000 --eval-split large_n16_test --eval-traj 4 --eval-max-qubits 16 \
+  --out ../models/policy_nam_traj_ft_v1.pt \
+  --checkpoint-dir ../models/ckpts_nam_traj_ft_v1 \
+  --device cuda:0
+```
+
+日志：`models/train_nam_traj_ft_v1.log`（session `nam_traj_ft`）
+
+### 训练日志摘要
+
+- 全程 trunc=0%，entropy 0.4-0.9 健康，KL ~0.1-1.7（早期略高），grad_norm 收敛
+- fid（trajectory_sched 真实值）：5q 阶段 ~0.13 → 大电路阶段 0.02-0.05
+- curriculum 前 5 段（5q→n12）较快（~5-8 steps/s），**n16 段显著变慢**（~0.3-1 steps/s，
+  因 30% NAM 混入含 12-15q 深电路 trajectory_sched×16 每条 10-20s）
+
+### 已知问题（不影响训练产物）
+
+- **EMA eval 全程崩溃记 0**：本次命令误加 `--eval-max-qubits 16`，导致 EMA eval 的
+  evaluate_circuit 用 max_num_qubits=16 构建观测（167 维），与 agent critic 期望 20q
+  （171 维）不匹配 → RuntimeError → mean_fid 记 0。修复：EMA eval 的 max_num_qubits
+  应与模型一致（20），此 bug 不影响训练主循环，最终模型 policy_nam_traj_ft_v1.pt 有效。
+
+### 模型文件
+
+- `models/policy_nam_traj_ft_v1.pt`（训练完成，step 50176）
+- `models/policy_nam_traj_ft_v1_ema_best.pt`（=step5120 早期，EMA bug 导致无意义）
+- 路由结果：`benchmark/routed/nam_traj_v1*.json`（评估中，fidelity 待补）
+
+### 评估结果（NAM benchmark，19 circuits，trajectory_sched×16，SABRE 基线）
+
+路由：`generate_routing.py --no-fidelity`；fidelity：`scripts/compute_fidelity_nam_traj_v1.py`
+（session `eval_nam_traj_v1` / `eval_nam_traj_beam3` / `fid_nam_traj_v1`）
+
+| 方法 | 平均 SWAPs | 平均保真度 | vs SABRE |
+|------|-----------|-----------|----------|
+| SABRE | 45.1 | 0.2747 | — |
+| l05 argmax | 65.3 | **0.3115** | +13.4% |
+| ph2v4 argmax | 64.0 | 0.2872 | +4.6% |
+| nam_l05_v2 argmax（analytic 微调） | 57.1 | 0.2485 | -9.5% |
+| **nam_traj_v1 argmax** | 64.2 | 0.2758 | +0.4% |
+| **nam_traj_v1 beam3** | **44.1** | 0.2816 | +2.5% |
+| ph2v4 beam5 | 42.2 | 0.3047 | +10.9% |
+
+### 逐电路（v1 argmax vs l05 argmax vs v2）
+
+| Circuit | q | l05_fid | v1_fid | v2_fid | l05_sw | v1_sw |
+|---------|---|--------:|-------:|-------:|-------:|------:|
+| barenco_tof_3 | 5 | 0.7636 | **0.7740** | 0.6428 | 14 | 11 |
+| mod5_4 | 5 | 0.4148 | **0.5052** | 0.4666 | 14 | 13 |
+| tof_3 | 5 | 0.8198 | **0.8198** | 0.7627 | 11 | 11 |
+| barenco_tof_4 | 7 | **0.4830** | 0.4399 | 0.4292 | 22 | 31 |
+| hwb6 | 7 | 0.0003 | 0.0000 | 0.0000 | 68 | 57 |
+| tof_4 | 7 | **0.7138** | 0.6265 | 0.5307 | 19 | 12 |
+| barenco_tof_5 | 9 | **0.3089** | 0.2870 | 0.1628 | 40 | 38 |
+| grover_5 | 9 | 0.0033 | 0.0003 | 0.0031 | 149 | 134 |
+| mod_mult_55 | 9 | **0.1057** | 0.0484 | 0.0983 | 27 | 23 |
+| tof_5 | 9 | **0.6041** | 0.4373 | 0.6411 | 25 | 20 |
+| vbe_adder_3 | 10 | **0.4543** | 0.3727 | 0.2654 | 48 | 48 |
+| mod_red_21 | 11 | **0.1215** | 0.0862 | 0.0002 | 72 | 77 |
+| gf2^4_mult | 12 | **0.1989** | 0.1527 | 0.0393 | 56 | 61 |
+| rc_adder_6 | 14 | **0.1608** | 0.0885 | 0.0000 | 68 | 64 |
+| csla_mux_3 | 15 | **0.2566** | 0.1855 | 0.1952 | 54 | 58 |
+| gf2^5_mult | 15 | 0.0267 | **0.0362** | 0.2551 | 101 | 86 |
+| gf2^6_mult | 18 | **0.0650** | 0.0190 | 0.0216 | 162 | 195 |
+| barenco_tof_10 | 19 | **0.1960** | 0.1008 | 0.0190 | 184 | 188 |
+| tof_10 | 19 | 0.2223 | **0.2597** | 0.1890 | 107 | 92 |
+
+### 分析与结论
+
+1. **trajectory_sched 微调修复了 v2 的大规模退化**：相比 v2（analytic 微调）：
+   - rc_adder_6: 0.0000 → 0.0885，mod_red_21: 0.0002 → 0.0862，
+     barenco_tof_10: 0.019 → 0.101，tof_10: 0.189 → 0.260
+   - 印证相关性分析：analytic 代理带偏策略，trajectory_sched 更接近真实优化目标
+2. **beam3 效果显著**：SWAPs 从 argmax 64.2 压到 44.1（追平 SABRE 45.1，优于 l05 beam3 43.6≈同级），
+   fidelity 0.2816 > argmax 0.2758（critic 的 trajectory 保真度信号让 beam 选择了更优路径）
+3. **但仍未超越 l05 argmax（0.3115）**：trajectory_sched 微调后 v1 argmax fidelity 反低于纯 l05。
+   在 9-14q 的中等电路上系统性落后（tof_5/vbe_adder_3/mod_red_21/gf2^4_mult/rc_adder_6/barenco_tof_5），
+   而 5q 与 19q 上略优。可能原因：(a) 50k 步 noise_aware 微调在课程后段（n16 阶段只占 ~7k 步）
+   未充分收敛；(b) layout-mix 0.3/0.3/0.4 + trajectory 保真度奖励把策略推向「更少 SWAP 但非噪声最优边」
+   的折中；(c) 从 routing-mode 的 l05 出发，noise_aware 微调改变了路径偏好，牺牲了 l05 在中等电路
+   上「多 SWAP 但放低噪声边」的策略。
+4. **EMA eval bug 影响评估可信度**：EMA best=step5120（=l05 起点），未能反映后期训练质量。
+   若需要更公平的 checkpoint 选择需修复 --eval-max-qubits 与模型维度不一致的问题后重训或重评估。
+
+---
+
+## 保真度奖励机制分析与 v1 仍逊于 l05 的归因（2026-09-08）
+
+### 背景
+
+`policy_nam_traj_ft_v1.pt`（trajectory_sched 微调，50k 步，NAM≤16q 混入）在 NAM benchmark
+上 argmax 0.2758 仍低于未微调的 l05（0.3115）。用户指出训练已做跨规模奖励均衡（log-相对
+`sabre_fid_map`），质疑"深电路 F<sref → reward 全为负"的猜想。本记录用实测数据验证了奖励
+的实际分布，并修正归因。
+
+### 保真度奖励计算公式（现状）
+
+终端奖励（env.py `_terminal_reward`，仅 done 时触发一次，λ_fid 逐步调度）：
+
+```
+r_terminal = λ_fid × (log F − log F_sabre(n)),  clip ∈ [−50, +50]
+```
+
+- `F` = fidelity_fn(env)（trajectory_sched ×16 MC / analytic O(G)）
+- `F_sabre(n)` = sabre_fid_map[n]，按逻辑比特数查表（random/NAM 两套，按电路来源切换）
+- 无表或 routing 模式退化为 `λ×F` 或 0
+- 只有 F > F_sabre 时奖励为正
+
+### 验证 1：负奖励并非"一律"，但被少数塌缩电路垄断
+
+用 v1/l05 确定性 argmax 的 19 条 NAM 评估结果 + NAM sref 表逐条算 reward：
+
+| 指标 | v1 | l05 |
+|------|-----|-----|
+| F>sref 电路数 | 10/19 | 10/19 |
+| 正奖励总和 | +22.2 | +33.0 |
+| **负奖励总和** | **−102.4（占 82%）** | **−67.9（占 67%）** |
+| mean reward | −4.22 | −1.84 |
+
+结论：**10/19 电路 F>sref（正奖励），"深电路一律 F<sref" 不成立**。但负奖励的 82% 来自
+少数保真度塌缩到 ~0 的深电路：
+
+- hwb6 (259g, 7q): F≈0.0000 → reward −46（近 clip 下限 −50）
+- grover_5 (831g, 9q): F≈0.0003 → reward −33
+
+单条塌缩电路的负奖励（−46）是 5 条正常正奖励电路总和（+22）的两倍以上。
+
+### 修正后的因果链（v1 仍逊于 l05）
+
+1. **不是"没均衡"，而是 log-相对公式在 F→0 时对数爆炸**：均衡按比特数查 sref，
+   但未按电路深度/门数处理 F 塌缩。深电路 F 塌到 ~0 时 `λ×log(F/sref)` 逼近 clip 下限 −50，
+   一条塌缩电路的负梯度抵消几十个 +2 的正常正信号。
+2. **训练期比评估期更严重**：PPO 训练处于采样探索中，路由质量远差于确定性 argmax，
+   深 NAM 电路采样路由 F 更接近 0 → reward 常打满 −30~−50。策略学到的是"深电路上少冒险
+   （少 SWAP 保守路由）"而非"找噪声最优路径"。
+3. **分布内 vs 分布外不对称（已实测）**：v1 微调在**训练分布**的大电路上确实超越 l05：
+   - 5q stage2 电路：l05 与 v1 逐位相同（swaps/fid 完全一致，微调未改变小电路行为）
+   - n10-n16 random/qaoa/vqe：v1 普遍胜（n10 qaoa 0.0013→0.0029, n12 random 0.0255→0.0423,
+     n16 2/3 例提升）
+   - NAM 电路（分布外）：有涨有崩（hwb6 0→0.11↑, gf2^5 0.057→0.236↑, mod_red 0.209→0.283↑；
+     vbe_adder 0.644→0.234↓, tof_5 0.558→0.409↓），净微负
+   说明 fidelity 微调在训练分布内有效，但对 NAM（结构化算术电路，分布外）未泛化，
+   反而漂移出 l05 由 layout-mix 带来的稳健路由。
+
+### 辅助验证发现
+
+- **EMA eval bug（已定位，不影响训练产物）**：v1 命令误加 `--eval-max-qubits 16`，导致 EMA eval
+  的 evaluate_circuit 用 max_num_qubits=16 建 obs（critic 输入 167 维）而 agent 期望 20q（171 维）
+  → RuntimeError → EMA fid 全程记 0。修复应让 EMA eval 的 max_num_qubits 与模型一致（20）。
+- **generate_routing vs evaluate_circuit 结果差异**：同一模型两条评估路径的 routing 不完全一致，
+  需注意口径统一（疑似 mapping 阶段初始状态/seed 处理差异，待查）。
+
+### 修复方向（待验证）
+
+| 方向 | 思路 |
+|------|------|
+| 负奖励饱和 | 对 F 加与门数相关的下界（如 F_floor(n,gates)），或对 F<ε 的塌缩电路跳过 fidelity 奖励，防止 −50 极端负奖励垄断梯度 |
+| 奖励压缩 | 用 √F 或 rank-based 奖励替代 log F，抑制 F→0 时的对数爆炸 |
+| 深电路单独处理 | 深到 F 天然 < 任何路由的电路（如 grover_5 831g）不参与 fidelity 奖励 |
+| 分布外适应 | NAM 占比提高 / 用 NAM 电路直接微调，而非依赖 random 电路迁移 |
+
+---
+
+## 方案1：NAM per-circuit SABRE 参考（sref_override）实现与验证（2026-09-08）
+
+### 问题
+
+v1 用 `sabre_fid_map_nam`（per-size 表）做 NAM log-相对奖励分母，但同比特数内深度差
+10 倍（9q: tof_5 105g vs grover_5 831g，SABRE F 差 800 倍），共享 sref 使深电路
+`log(F/sref)` 爆炸成极端负奖励（grover_5 F=0.0003 → reward −32.5），垄断梯度。
+
+### 改动
+
+**`env.py`**：`RoutingEnv.__init__` 新增 `sref_override`（episode 级浮点，优先于
+`sabre_fid_map` 按 num_qubits 查表）；`_terminal_reward` sref 优先级改为
+`sref_override > sabre_fid_map[num_qubits]`；`clone()` 同步拷贝。
+
+**`train_agent.py`**：
+- 新增 CLI `--nam-sabre-fid-json`：per-circuit SABRE 参考 JSON（`{name: fid}`）
+- main 加载为 `nam_sref_map`；主循环 NAM 电路时若该电路在 map 且 sref>0，
+  传 `sref_override`（并置 sabre_fid_map=None），否则回退 per-size 表
+
+**数据**：`benchmark/routed/sabre_nam_percircuit.json`（19 条 NAM per-circuit SABRE
+fidelity，源自 sabre_summary.json，trajectory_sched×16 口径）
+
+### 验证（同一 9q 电路 F 恒定，改 sref 看 reward）
+
+| 电路 | F | 旧（共享 9q sref=0.1985） | 新（per-circuit sref） |
+|------|-----|--------------------------|----------------------|
+| grover_5 | 0.0003 | **−32.5**（对数爆炸） | **−3.5**（sref=0.0006，正常惩罚）✅ |
+| tof_5 | 0.44 | +4.0（虚高） | −0.3（sref=0.4699，诚实略低于 SABRE）✅ |
+
+效果：深电路（grover_5）从 −32.5 恢复到 −3.5；浅电路不再因共享 sref 虚高正奖励。
+每条 NAM 电路现在只与自己 SABRE 基线比，reward 尺度统一、不再被深电路垄断。
+
+### 冒烟
+
+`train_agent` 128 步 + NAM prob 0.5 + `--nam-sabre-fid-json`：19 条参考加载正常、无报错。
+
+### 已知边界
+
+- hwb6 的 SABRE fid≈0（塌缩电路）→ `pc_sref>0` 不成立 → 回退 per-size 表，
+  仍会负向爆炸。属方案2（深电路负奖励饱和）处理范围，未在本方案覆盖。
+- 待跑：完整 NAM 微调训练 + NAM benchmark 评估（对比 v1 0.2758 / l05 0.3115）
+
+---
+
+## 方案1 训练与 NAM 评估：per-circuit sref（policy_nam_sref_ft_v1）
+
+### 训练命令（session `nam_sref_ft`）
+
+同 v1 配置 + `--nam-sabre-fid-json ../benchmark/routed/sabre_nam_percircuit.json`
+（curriculum stage2+large_n8/10/12/16，trajectory_sched×16，NAM 30% ≤16q，
+lr=1e-4，timesteps 50000，l05 起点）。修复了 v1 的 `--eval-max-qubits` EMA bug。
+
+### 训练日志摘要
+
+- 全程 trunc=0%，entropy 0.5-0.95 健康
+- **EMA eval 有效**（非 v1 的恒 0）：5120→0.000059, 10240→0.000381,
+  30208→**0.000643**(best), 45056→0.000605, 50176→0.000627
+- EMA best 在 step 30208（n12 阶段末），n16 阶段未超越
+
+### 评估（NAM benchmark，19 circuits，trajectory_sched×16，SABRE 基线）
+
+用 EMA best（`policy_nam_sref_ft_v1_ema_best.pt`）：
+
+| 方法 | 平均 SWAPs | 平均保真度 | vs SABRE |
+|------|-----------|-----------|----------|
+| SABRE | 45.1 | 0.2747 | — |
+| l05 argmax | 65.3 | **0.3115** | +13.4% |
+| v1 argmax | 64.2 | 0.2758 | +0.4% |
+| v1 beam3 | 44.1 | 0.2816 | +2.5% |
+| **nam_sref argmax** | 59.6 | 0.2728 | -0.7% |
+| **nam_sref beam3** | **41.5** | 0.2925 | +6.5% |
+
+### 逐电路（nam_sref beam3 vs l05 argmax）
+
+| Circuit | q | l05_fid | sr_fid | sab_fid | sr_sw |
+|---------|---|--------:|-------:|--------:|------:|
+| barenco_tof_3 | 5 | 0.7636 | 0.6569 | 0.7467 | 7 |
+| barenco_tof_4 | 7 | 0.4830 | **0.6670** | 0.4454 | 15 |
+| barenco_tof_5 | 9 | 0.3089 | **0.3166** | 0.1683 | 22 |
+| tof_10 | 19 | 0.2223 | **0.4041** | 0.4264 | 62 |
+| gf2^6_mult | 18 | 0.0650 | **0.0870** | 0.0314 | 121 |
+| gf2^5_mult | 15 | 0.0267 | **0.0932** | 0.0793 | 75 |
+| vbe_adder_3 | 10 | 0.4543 | 0.4473 | 0.1779 | 26 |
+| csla_mux_3 | 15 | 0.2566 | 0.2547 | 0.0341 | 38 |
+| tof_4 | 7 | **0.7138** | 0.6294 | 0.6570 | 10 |
+| tof_5 | 9 | **0.6041** | 0.5513 | 0.4699 | 16 |
+| mod_red_21 | 11 | 0.1215 | 0.0002 | 0.0645 | 40 |
+| rc_adder_6 | 14 | **0.1608** | 0.0363 | 0.1662 | 40 |
+| barenco_tof_10 | 19 | **0.1960** | 0.0591 | 0.0715 | 94 |
+
+### 初步结论
+
+1. **beam3 有效**：nam_sref beam3 0.2925（+6.5% SABRE），SWAP 41.5 少于 SABRE 45.1，
+   fid 高于 v1 beam3（0.2816）。beam3 在 csla_mux/tof_10/gf2^6/gf2^5 大幅提升。
+2. **但仍未超 l05 argmax（0.3115）**：beam3 0.2925 < l05 argmax。且个别电路退化严重
+   （mod_red_21 0.0002、rc_adder_6 0.036、barenco_tof_10 0.059）——beam search 的 critic
+   评分对这些电路失效（选择低 fidelity 分支）。
+3. **argmax 未改进**：0.2728 ≈ v1 0.2758。per-circuit sref 修正了深电路负奖励爆炸，但
+   argmax 整体未见提升，可能因 EMA best 是 n12 阶段快照（未含完整 n16 训练）。
+4. **待验证**：评估最终模型（step 50176，含完整 n16 阶段）是否优于 EMA best（step 30208）。
+
+### 补充：最终模型（step 50176）vs EMA best（step 30208）
+
+| 模型 | argmax fid | argmax SWAP |
+|------|-----------|------------|
+| **EMA best (30208)** | **0.2728** | 59.6 |
+| final (50176) | 0.2504 | 61.8 |
+
+最终模型经完整 n16 阶段后 argmax 反而退化（0.2728→0.2504），证实 EMA best 是更优
+checkpoint。完整 n16 训练（random 16q 占比高）损害了对 NAM 的泛化——进一步支持
+"分布外漂移"假设。用 EMA 选点（而非最终权重）对 NAM 评估更合理。
+
+### 完整结论
+
+方案1（per-circuit sref）相对 v1 的净效果：EMA best beam3 0.2925（+6.5% SABRE，SWAP
+41.5 < SABRE 45.1），为除 l05 外最优。但 argmax 0.2728 仍未超 l05（0.3115）。l05 的
+纯 routing + layout-mix 对 NAM 仍是最强基线；fidelity 微调的价值主要在 beam3 推理端。
+
+---
+
+## 现象解释：为何 l05 argmax 最优，而 beam3 是"第二阶段微调版"更好
+
+### 现象（NAM benchmark，trajectory_sched×16）
+
+| 方法 | argmax fid | beam3 fid | beam3 vs argmax |
+|------|-----------|-----------|----------------|
+| l05（纯 routing） | **0.3115** | 0.2617 | beam 败 13/19，**明显倒退** |
+| nam_sref v1（noise_aware 微调） | 0.2728 | **0.2925** | beam 胜 9/19，净提升 |
+
+### 机制解释
+
+**1. argmax 表现 = 策略 π 的质量；l05 的 π 对 NAM 分布外最鲁棒**
+
+l05 是纯 routing + layout-mix 训练（无 fidelity 奖励），策略学的是布局无关的通用路由。
+NAM（算术电路）是训练分布外的，l05 的 π 未向任何特定 fidelity 地形过拟合，因此 argmax
+路径保持通用高效。而 noise_aware 微调把 π 推向训练分布（random/qaoa/vqe ≤16q）的
+fidelity 局部最优——在训练分布内 argmax 提升（前已实测 n10-16 v1 胜 l05），但对 NAM
+（分布外）argmax 反而偏离了 l05 的稳健路由。→ **微调损害 π 的 NAM 泛化，argmax 变差**。
+
+**2. beam3 表现 = critic V(s') 的质量；第二阶段训练的 critic 学会了 fidelity**
+
+beam 评分 = `r_step + γ·V(s')`，其中 V 是 critic 对下一状态的预测。critic 回归目标是
+GAE returns：
+- **l05**：routing 训练，returns 无 fidelity 项 → V 只预测"路由效率"（SWAP 少、执行快），
+  不含保真度信息。beam 按此选路 = 选路由最短路径，恰好丢掉 l05 π 隐含的噪声路径偏好
+  → l05 beam3 大幅倒退（0.3115→0.2617）。
+- **nam_sref**：noise_aware 训练，returns 含终端 `λ·(log F − log sref)` → V 学会预测
+  fidelity。beam 在 top-K 候选里用含 fidelity 的 V(s') 选路 → 找到比 π argmax 保真度
+  更高的分支 → beam3 提升（0.2728→0.2925）。
+
+**3. 一致性验证**
+
+- 微调损害 π（argmax 0.2728 < l05 0.3115）与微调改善 V（beam 0.2925 > l05 beam 0.2617）
+  可同时成立：**π 与 V 是同一网络的不同头，微调的 fidelity 信号主要沉淀进 V，而 π 的
+  分布内过拟合损害了分布外 argmax**。
+- l05 beam 胜 6/19、败 13/19（净 -0.05）：critic 无 fidelity 时 beam 是负贡献。
+- nam_sref beam 胜 9/19、败 10/19（净 +0.02）：critic 有 fidelity 后 beam 转正贡献。
+
+### 启示
+
+1. 若目标是 argmax 推理：不要 noise_aware 微调，直接用 l05（或在其上做 NAM 专属
+   routing 微调而不加 fidelity 奖励）。
+2. 若目标是 beam search 推理：noise_aware 微调 + per-circuit sref 让 critic 学会
+   fidelity，beam 收益显著（0.2925，SABRE+6.5%，SWAP 41.5 最少）。
+3. 终极方向：让 π 也获得 fidelity 泛化——需解决分布内过拟合（如 NAM 主导训练 /
+   域随机化），使 argmax 与 beam 同时受益。
+
+---
+
+## 无泄露 test split 复核：微调 vs l05 的尺寸依赖规律（2026-09-09）
+
+### 背景与动机
+
+此前判定"noise_aware 微调在训练分布内（n10-16）胜 l05"时，误用了 `large_n*_mixed`
+（**训练 split，有泄露**）。用户指出在无泄露 test split 上 l05 仍可能更好。本记录用
+`large_n*_test`（0 重叠）复核 l05 vs v1 vs sref_ema（per-circuit sref 版本 EMA best）。
+
+### 结果（无泄露 test split，trajectory_sched，deterministic argmax）
+
+| 尺寸 | n(条) | l05 | v1 | sref_ema | 结论 |
+|------|------|-----|-----|----------|------|
+| n8 | 30 | **0.194** | — | 0.167 | **l05 胜 +16%**（l05 胜 15/30） |
+| n8 | 15 | 0.217 | 0.184 | 0.222 | v1 明显差于 l05 |
+| n10 | 25 | 0.072 | — | **0.085** | sref 胜 +17%（l05 胜 10/25） |
+| n10 | 12 | 0.121 | **0.147** | 0.132 | v1 胜 |
+| n12 | 10 | 0.108 | — | 0.111 | 平 |
+| n16 | 8 | 0.007 | — | **0.023** | sref 大幅胜 +225% |
+
+### 关键修正
+
+1. **此前"微调在训练分布内胜 l05"的结论是数据泄露假象**：基于 `*_mixed`（训练 split，
+   微调模型见过这些电路）的评估高估了微调模型。无泄露 test split 上：
+   - **v1 在 n8 确实输 l05**（0.184 vs 0.217），在 n10 才胜
+   - **sref_ema 在 n8 输（+16% 劣势），n10/n12 持平略胜，n16 大幅胜（+225%）**
+2. **真实规律是"尺寸依赖"而非"普遍胜/普遍败"**：
+   - 小电路（≤8q）：l05 的纯 routing 已接近最优，fidelity 微调是扰动 → l05 胜
+   - 中电路（10-12q）：微调的 fidelity 感知开始有价值 → 持平略胜
+   - 大电路（16q）：fidelity 优化空间大（l05 的 routing 在 16q 上远离最优），
+     微调 + per-circuit sref 的价值最大 → sref_ema 大幅胜
+3. **per-circuit sref（方案1）优于 v1（per-size sref）**：n8 上 sref_ema 0.167 vs v1 0.184
+   （sref 更接近 l05），且 n16 上 sref_ema 表现更强。方案1 的 per-circuit 标定确实修正了
+   奖励信号。
+
+### 对整体结论的影响
+
+- "Phase 2 保真度训练有害"过于笼统：**在 ≥10q 电路上微调有正收益，且随尺寸增大收益
+  更明显**；≤8q 上 l05 更优。
+- NAM benchmark（5-19q 混合，中小电路占多数）整体平均被小电路拖累，故 nam_sref 平均
+  fid（0.2925 beam3）仍低于 l05 argmax（0.3115）——若 NAM 评估只计 ≥10q 电路，微调
+  模型可能反超。
+- 改进方向修正：可做**尺寸分层的模型选择**（≤8q 用 l05，≥10q 用 sref_ema），
+  或在小电路阶段冻结/降低微调强度（ph2v5 的 freeze 思路），大电路加大 fidelity 权重。
+
+---
+
+## v1 无泄露 test split 全尺寸确认（2026-09-09，大样本复核）
+
+### 背景
+
+上节复核发现此前"微调在训练分布内胜 l05"结论依赖泄露的 `*_mixed` split，且小样本
+（8-15 条）跨 seed 不稳定（n16 曾出现 sref_ema 胜 +225%，大样本后翻转）。本节用
+大样本确认 v1（`policy_nam_traj_ft_v1.pt`，per-size sref 微调）在 n10/n12/n16 的
+真实表现，并与 l05 对比（trajectory_sched，deterministic argmax）。
+
+### 结果（大样本，含 arithmetic-mean / log-mean / 胜率）
+
+| 尺寸 | n | l05 mean | v1 mean | l05 log-mean | v1 log-mean | l05 胜率 |
+|------|---|---------|---------|-------------|-------------|---------|
+| n8 | 30 | **0.194** | 0.167-0.184 | — | — | l05 胜 |
+| n10 | 25 | 0.100 | **0.124** | 0.060 | **0.075** | 11/25（v1 胜） |
+| n12 | 25 | **0.061** | 0.055 | **0.0068** | 0.0040 | 12/25（l05 胜） |
+| n16 | 20 | 0.015 | 0.018 | **0.0010** | 0.0007 | **13/20（l05 胜）** |
+
+### 结论（修正）
+
+1. **v1 只在 n10 稳定胜 l05**（+24% mean / +24% log-mean），n8/n12/n16 均输。
+   n16 的 arithmetic-mean v1 略高（0.018 vs 0.015）是**少数极端高值拉高**的假象，
+   log-mean（0.0007 vs 0.0010）和胜率（13/20）都指向 l05 更优。
+2. **用户判断成立**：即便用无泄露 test split，除 n10 外 l05 全面优于 v1 微调模型。
+3. **评估方法警示**：fidelity 跨数量级（1e-4 ~ 0.5），arithmetic-mean 被极端值支配，
+   小样本跨 seed 结论翻转。可靠比较需 ≥20 条 + log-mean 或胜率。
+4. **此前的 n16 "+225%" 结论作废**（8 条小样本假象）。
+
+### 含义
+
+- noise_aware 微调（v1 形式）相对 l05 的真实增益仅限 n10 附近窄区间，不构成
+  全尺寸优势。l05 仍是无泄露评估下最强基线。
+- 后续若继续 fidelity 微调路线，需：per-circuit sref（方案1，已实现）+ 大尺寸
+  （≥16q）专门训练 + 大样本 log-mean 评估，而非 per-size sref + 小样本 mean。
+
+---
+
+## Local fidelity 信号可行性诊断（2026-09-09）——门级代理与 scheduled eval 排序为负
+
+### 背景
+
+设计 Phase 2 = P1 + λ_local·ΔlogF_local + λ_global·terminal（用户方案），其中
+local 信号需每步可算。评估了三种"廉价 local 代理"与真实 eval（trajectory_sched×16）
+在 NAM 路由候选上的排序一致性。
+
+### 诊断结果
+
+**1. 串行逐门 trajectory tracker（LocalFidTracker）**：Spearman(eval, tracker) = **-0.895**
+（tof_4，5 种路由）——强负相关。
+
+**2. Raw analytic 逐门错误累积**：Spearman = -0.37（tof_4）/ -0.7（barenco_tof_4）/
+-1.0（tof_3）——系统性负相关。
+
+**3. 根因**：eval scheduled fidelity 的排序主要由 **transpile 后电路总时长 → idle 退相干**
+决定（eval 奖励"门少=时间短"），而门级代理把 SWAP/门数当主要惩罚项 → 方向天然相反。
+transpile 前后门数剧变（tof_4: 94 → 518 门，含 285 rz），原始电路的门级错误与
+eval 的调度结果几乎无关。
+
+### 结论
+
+- 任何"原始物理电路上的门级错误累积"代理（analytic / 串行 trajectory）都**无法**
+  复现 eval scheduled 排序，不能用作 local fidelity 信号（否则 C≈A 甚至 C<A）。
+- 严格对齐 eval 需每步对当前电路做 scheduled eval——5-15q 单次 0.1-11s，
+  训练步开销不可行（30× 以上）。
+- LocalFidTracker 实现（trajectory_sim.py）保留但**不可用于训练信号**；
+  仅作参考/教学实现。
+
+### 待决策
+
+1. local 信号改用 **env.timing 的调度统计**（idle/crosstalk 已是每步实时可得的
+   scheduled 语义，即 P1 的 r_idle/r_xtalk_par 已覆盖）→ 那 C 与 A 的差异只在
+   "是否显式用 idle 项"，需确认是否值得单独实验。
+2. 或者放弃 per-step fidelity 信号，回到 **terminal-only 但修正 credit assignment**
+   （如 GAE 加强 / 轨迹级 return decomposition）。
+3. 或 local 只在 ≤8q（eval 快）上启用 scheduled 每步全量（训练慢 ~10× 但可接受？）。

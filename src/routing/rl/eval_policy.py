@@ -193,7 +193,7 @@ def compute_fidelity(qc, config, mapping, executed) -> Optional[float]:
 
 
 def build_fidelity_fn(fidelity_sim: str, config, num_trajectories: int = 64, seed: Optional[int] = None):
-    """构造 RoutingEnv 的 fidelity_fn（--fidelity-sim trajectory/trajectory_sched 时启用）。"""
+    """构造 RoutingEnv 的 fidelity_fn（--fidelity-sim trajectory/trajectory_sched/analytic 时启用）。"""
     if fidelity_sim == "trajectory":
         from sim.trajectory_sim import make_trajectory_fidelity_fn
         return make_trajectory_fidelity_fn(config, num_trajectories=num_trajectories, seed=seed)
@@ -201,6 +201,9 @@ def build_fidelity_fn(fidelity_sim: str, config, num_trajectories: int = 64, see
         from sim.trajectory_sim import make_trajectory_fidelity_fn
         return make_trajectory_fidelity_fn(config, num_trajectories=num_trajectories,
                                            seed=seed, scheduled=True)
+    if fidelity_sim == "analytic":
+        from sim.trajectory_sim import make_analytic_fidelity_fn
+        return make_analytic_fidelity_fn(config)
     return None
 
 
@@ -857,10 +860,11 @@ def main():
     parser.add_argument('--verbose', action='store_true', default=False,
                         help='print per-circuit results')
     parser.add_argument('--fidelity-sim', type=str, default='aer',
-                        choices=['aer', 'trajectory', 'trajectory_sched'],
+                        choices=['aer', 'trajectory', 'trajectory_sched', 'analytic'],
                         help='保真度模拟器: aer=density_matrix/counts (n<=12), '
                              'trajectory=轨迹状态向量(串行, O(2^n) 内存), '
-                             'trajectory_sched=轨迹状态向量+调度感知(空闲退相干/动态串扰)')
+                             'trajectory_sched=轨迹状态向量+调度感知(空闲退相干/动态串扰), '
+                             'analytic=解析错误累积代理(O(门数), 无指数)')
     parser.add_argument('--traj-trajectories', type=int, default=16,
                         help='轨迹模拟器采样条数')
     parser.add_argument('--traj-seed', type=int, default=None,

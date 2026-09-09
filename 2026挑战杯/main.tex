@@ -1,0 +1,32 @@
+
+\newcommand\showchange{TT}%{TT FL}%
+\newcommand\tohuawei{TT}%{TT FL}%
+\newcommand\hasalgo{FL}%{TT FL}%
+\documentclass[a4paper,11pt,titlepage]{article}
+
+\usepackage{import}
+\usepackage{float}
+\subimport{setup/}{local}
+\graphicspath{{figures/}}
+\subimport{setup/}{mycmd}
+
+%=============== Cover and TOC =========================
+\begin{document}
+\subimport{setup/}{format}
+% \frontmatter
+\subimport{setup/}{cover}
+\pagenumbering{Roman}
+\subimport{setup/}{content}
+%=============== Main Body ============================
+
+% \mainmatter
+\defaultfont\sloppy\raggedbottom
+\pagenumbering{arabic}
+\subimport{body/}{part}
+
+\begin{small}
+\bibliography{pa}
+\bibliographystyle{plain}
+\end{small}
+
+\end{document}

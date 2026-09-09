@@ -1,0 +1,43 @@
+%段落缩进
+\usepackage{indentfirst}
+\setlength{\parindent}{20pt}
+\usepackage{pdflscape}
+
+%中文设置
+%\usepackage{ctex}
+
+% 字体设置，Windows自带黑体(simhei.ttf)和宋体(simsun.ttf)
+\usepackage{fontspec}
+\usepackage{xeCJK}
+\defaultfontfeatures{Mapping=tex-text}
+% 中文断行
+\XeTeXlinebreaklocale "zh"
+\XeTeXlinebreakskip = 0pt plus 1pt minus 0.1pt
+% 行距
+\linespread{1.4} 
+
+\def\equationautorefname{式}%
+\def\footnoteautorefname{脚注}%
+\def\itemautorefname{项}%
+\def\figureautorefname{图}%
+\def\subfigureautorefname{图}%
+\def\tableautorefname{表}%
+\def\partautorefname{篇}%
+\def\appendixautorefname{附录}%
+\def\chapterautorefname{章}%
+\def\sectionautorefname{节}%
+\def\subsectionautorefname{节}%
+\def\subsubsectionautorefname{节}%
+%\def\subsectionautorefname{小小节}%
+%\def\subsubsectionautorefname{subsubsection}%
+\def\lstlistingautorefname{代码}%
+\def\paragraphautorefname{段落}%
+\def\subparagraphautorefname{子段落}%
+\def\FancyVerbLineautorefname{行}%
+\def\theoremautorefname{定理}%
+
+\renewcommand{\figurename}{图}
+\renewcommand{\tablename}{表}
+
+
+

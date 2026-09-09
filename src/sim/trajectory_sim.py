@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -1129,3 +1130,298 @@ def make_trajectory_fidelity_fn(config: NoiseConfig,
         return sim.fidelity(meas, ideal_sv=ideal_sv, skip_transpile=True)
 
     return trajectory_fidelity
+
+
+def make_analytic_fidelity_fn(config: NoiseConfig,
+                               include_thermal: bool = True,
+                               include_crosstalk: bool = False):
+    """构造解析保真度代理的 fidelity_fn hook（O(门数)，无 2^k 指数）。
+
+    对每条门/噪声信道做一阶错误累积：log F ≈ Σ log(1 - ε_i)，
+    其中 ε_i 为各门的退极化错误率 +（可选）热弛豫 +（可选）串扰。
+    适用于 16q+ 大电路训练（trajectory_sim 在 20q 上 2^k×门数 成本过高）。
+
+    返回 fn(env) -> float：取 env._phys_circuit 计算解析保真度。
+    """
+    sqe = config.single_q_gate_error
+    tqe = config.two_q_gate_error
+    cts = config.crosstalk_strength
+
+    def analytic_fidelity(env) -> float:
+        rc, rconfig = _reduce_phys_circuit_for_fidelity(env._phys_circuit, config)
+        # 使用裁剪后的噪声参数
+        sqe_r = rconfig.single_q_gate_error
+        tqe_r = rconfig.two_q_gate_error
+        cts_r = rconfig.crosstalk_strength
+        logF = 0.0
+        for inst in rc.data:
+            op = inst.operation
+            name = op.name.lower()
+            if name in ("measure", "barrier", "id"):
+                if name == "id" and include_thermal:
+                    # idle 退相干：ε_idle ≈ t/T1·½ + t/T2·½（一阶近似）
+                    qs = [q._index for q in inst.qubits]
+                    q = qs[0]
+                    t1 = rconfig.t1_times[q] if rconfig.t1_times else 50.0
+                    t2 = rconfig.t2_times[q] if rconfig.t2_times else 70.0
+                    t = rconfig.single_gate_time
+                    eps_idle = t / t1 * 0.5 + t / t2 * 0.5
+                    logF += math.log(max(1.0 - eps_idle, 1e-10))
+                continue
+            qs = [q._index for q in inst.qubits]
+            if name == "cx":
+                a, b = qs
+                if isinstance(tqe_r, dict):
+                    eps = tqe_r.get((a, b), tqe_r.get((b, a), 0.01))
+                else:
+                    eps = float(tqe_r)
+                logF += math.log(max(1.0 - eps, 1e-10))
+            elif name == "swap":
+                a, b = qs
+                if isinstance(tqe_r, dict):
+                    eps = tqe_r.get((a, b), tqe_r.get((b, a), 0.01))
+                else:
+                    eps = float(tqe_r)
+                logF += 3.0 * math.log(max(1.0 - eps, 1e-10))
+            else:
+                # 单比特门
+                q = qs[0]
+                if isinstance(sqe_r, (list, tuple)):
+                    eps = sqe_r[q] if q < len(sqe_r) else 0.01
+                else:
+                    eps = float(sqe_r)
+                logF += math.log(max(1.0 - eps, 1e-10))
+            # 可选：相干 ZZ 串扰（二阶 θ² 惩罚）
+            if include_crosstalk and name in ("cx", "swap") and cts_r is not None:
+                a, b = qs[:2]
+                theta = cts_r.get((a, b), cts_r.get((b, a), 0.0))
+                if theta > 0:
+                    logF -= theta * theta  # 二阶相干错误近似
+            # 可选：门后热弛豫（idle 退相干）
+            if include_thermal and name != "id":
+                for q in qs:
+                    t1 = rconfig.t1_times[q] if rconfig.t1_times else 50.0
+                    t2 = rconfig.t2_times[q] if rconfig.t2_times else 70.0
+                    t = rconfig.two_gate_time if len(qs) == 2 else rconfig.single_gate_time
+                    eps_th = t / t1 * 0.5 + t / t2 * 0.5
+                    if eps_th > 1e-10:
+                        logF += math.log(max(1.0 - eps_th, 1e-10))
+        return max(math.exp(logF), 1e-10)
+
+    return analytic_fidelity
+
+
+class LocalFidTracker:
+    """增量前缀保真度追踪器（local fidelity shaping 用）。
+
+    对 env 已执行的物理电路（env._phys_circuit）做**串行口径**的前缀演化：
+    维护 1 条理想态 + K 条噪声轨迹，只对新增指令做增量演化，返回当前
+    前缀保真度的 log：logF = log(mean_k |<psi_ideal|psi_k>|^2)。
+
+    - swap 按 eval 端口径展开为 3×CX（(a,b),(b,a),(a,b)），每条 CX 带 depol2+串扰；
+    - 2q 门（cx/cz/ecr/swap 外）回退 qiskit Operator 4x4 矩阵，噪声按该边错误率；
+    - 1q 门作用 + thermal(depol 单比特错误)（thermal 每门时长一次，与 _evolve 一致）；
+    - 惰性维度：首次 update 收集全部已用物理比特并 reduce 重映射；
+      后续若出现新物理比特则全量重放（重置），否则增量演化。
+
+    Attributes
+    ----------
+    n_phys_used : int         当前维度 k（状态向量 2^k）
+    logF : float              最近一次 update 后的 log 前缀保真度
+    """
+
+    def __init__(self, config: NoiseConfig, num_trajectories: int = 4,
+                 seed: Optional[int] = None, swap_as_3cx: bool = True,
+                 phys_qubits: Optional[List[int]] = None):
+        self.base_config = config
+        self.num_trajectories = num_trajectories
+        self.seed = seed
+        self.swap_as_3cx = swap_as_3cx
+        self._phys_qubits = phys_qubits   # 固定物理比特集（None=惰性收集）
+        self.reset()
+
+    # ------------------------------------------------------------------ #
+    def reset(self):
+        self._sim = None            # TrajectorySimulator（reduce config，k 维）
+        self._used_phys: List[int] = []
+        self._remap: dict = {}
+        self._n_evolved = 0         # 已演化 phys_circuit.data 指令数
+        self.sv_ideal = None
+        self.svs_noisy = None
+        self.logF = 0.0
+        self._rng = np.random.default_rng(self.seed)
+
+    def _collect_used(self, phys_circuit) -> List[int]:
+        used = []
+        for inst in phys_circuit.data:
+            name = inst.operation.name.lower()
+            if name in ("measure", "barrier"):
+                continue
+            for q in inst.qubits:
+                qi = q._index
+                if qi not in used:
+                    used.append(qi)
+        return sorted(used)
+
+    def _build_sim(self, used_phys: List[int]):
+        """按已用物理比特子集构建 reduced TrajectorySimulator。"""
+        cfg = self.base_config
+        n = len(cfg.t1_times)
+        used = used_phys if used_phys else list(range(n))
+        self._used_phys = list(used)
+        self._remap = {old: new for new, old in enumerate(used)}
+        k = len(used)
+        t1 = [cfg.t1_times[i] for i in used]
+        t2 = [cfg.t2_times[i] for i in used]
+        freq = [cfg.freq_ghz[i] for i in used] if cfg.freq_ghz else None
+        sqe = ([cfg.single_q_gate_error[i] for i in used]
+               if isinstance(cfg.single_q_gate_error, (list, tuple))
+               else cfg.single_q_gate_error)
+        ro = ([cfg.readout_error[i] for i in used]
+              if cfg.readout_error is not None else None)
+        used_set = set(used)
+        cm = [(self._remap[a], self._remap[b]) for (a, b) in cfg.coupling_map
+              if a in used_set and b in used_set]
+        tqe = cfg.two_q_gate_error
+        if isinstance(tqe, dict):
+            new_tqe = {}
+            for (a, b), e in tqe.items():
+                if a in used_set and b in used_set:
+                    new_tqe[(self._remap[a], self._remap[b])] = e
+                    new_tqe[(self._remap[b], self._remap[a])] = e
+        else:
+            new_tqe = tqe
+        cts = cfg.crosstalk_strength
+        if cts is not None:
+            new_cts = {}
+            for (a, b), e in cts.items():
+                if a in used_set and b in used_set:
+                    new_cts[(self._remap[a], self._remap[b])] = e
+                    new_cts[(self._remap[b], self._remap[a])] = e
+        else:
+            new_cts = None
+        rcfg = NoiseConfig(
+            t1_times=t1, t2_times=t2, freq_ghz=freq,
+            single_q_gate_error=sqe, two_q_gate_error=new_tqe,
+            coupling_map=cm, readout_error=ro, crosstalk_strength=new_cts,
+            single_gate_time=cfg.single_gate_time,
+            two_gate_time=cfg.two_gate_time,
+            idle_time=cfg.idle_time, shots=cfg.shots,
+        )
+        self._sim = TrajectorySimulator(rcfg, num_trajectories=self.num_trajectories,
+                                        seed=None)
+        self._sim.rng = self._rng          # 与 tracker 共享 rng
+        k = len(used)
+        self.sv_ideal = self._sim._initial_state()
+        self.svs_noisy = np.array(
+            [self._sim._initial_state() for _ in range(self.num_trajectories)])
+
+    def _apply_gate(self, inst) -> None:
+        """对理想态 + 噪声轨迹应用一条指令（含噪声），并更新 t_last。"""
+        op = inst.operation
+        name = op.name.lower()
+        if name in ("measure", "barrier"):
+            return
+        qs = [self._remap[q._index] for q in inst.qubits]
+        sim = self._sim
+        # 理想态：纯酉
+        self._apply_unitary(self.sv_ideal, name, op, qs, noise=False)
+        # 噪声轨迹
+        for i in range(self.num_trajectories):
+            self._apply_unitary(self.svs_noisy[i], name, op, qs, noise=True)
+
+    def _apply_unitary(self, sv, name, op, qs, noise: bool) -> None:
+        sim = self._sim
+        if name == "swap" and self.swap_as_3cx:
+            # swap = cx(a,b); cx(b,a); cx(a,b)
+            a, b = qs[0], qs[1]
+            self._cx_evolve(sv, a, b, noise)
+            self._cx_evolve(sv, b, a, noise)
+            self._cx_evolve(sv, a, b, noise)
+            return
+        if len(qs) == 2:
+            if name == "cx":
+                self._cx_evolve(sv, qs[0], qs[1], noise)
+            else:
+                # cz/ecr 等：qiskit Operator 4x4
+                from qiskit.quantum_info import Operator
+                mat = np.asarray(Operator(op).data, dtype=complex)
+                sim._apply1q_matrix_2q(sv, qs[0], qs[1], mat) if hasattr(
+                    sim, "_apply1q_matrix_2q") else self._apply2_general(
+                    sv, qs[0], qs[1], mat)
+                if noise:
+                    err = sim._two_error(qs[0], qs[1])
+                    sv = sim._depol2(sv, qs[0], qs[1], err)
+                    sv = sim._crosstalk(sv, qs[0], qs[1])
+        else:
+            q = qs[0]
+            mat = sim._single_qubit_matrix(op, name)
+            sv = sim._apply1(sv, q, mat)
+            if noise:
+                sv = sim._thermal_noise(sv, q, sim.config.single_gate_time)
+                sv = sim._depol1(sv, q, sim._one_error(q))
+
+    def _cx_evolve(self, sv, ctl, tgt, noise: bool) -> None:
+        sim = self._sim
+        sim._apply_cx(sv, ctl, tgt)
+        if noise:
+            err = sim._two_error(ctl, tgt)
+            sv = sim._depol2(sv, ctl, tgt, err)
+            sv = sim._crosstalk(sv, ctl, tgt)
+
+    @staticmethod
+    def _apply2_general(sv, a, b, mat):
+        """作用 4x4 双比特酉到 (a,b)，little-endian 索引。"""
+        n = int(round(np.log2(sv.size)))
+        lo, hi = sorted((a, b))
+        # 构造 4 个 2-bit 逻辑索引段：高位 hi 在 axis hi，低位 lo 在 axis lo
+        A = 1 << (n - 1 - hi)
+        Bm = 1 << (hi - lo - 1)
+        C = 1 << lo
+        s = sv.reshape(A, 2, Bm, 2, C)   # axis1=hi, axis3=lo
+        # 4 组合 (hi,lo) → 目标段
+        comb = np.empty((A, 2, Bm, 2, C), dtype=complex)
+        comb[:, 0, :, 0, :] = mat[0, 0] * s[:, 0, :, 0, :] + mat[0, 1] * s[:, 0, :, 1, :] \
+                              + mat[0, 2] * s[:, 1, :, 0, :] + mat[0, 3] * s[:, 1, :, 1, :]
+        comb[:, 0, :, 1, :] = mat[1, 0] * s[:, 0, :, 0, :] + mat[1, 1] * s[:, 0, :, 1, :] \
+                              + mat[1, 2] * s[:, 1, :, 0, :] + mat[1, 3] * s[:, 1, :, 1, :]
+        comb[:, 1, :, 0, :] = mat[2, 0] * s[:, 0, :, 0, :] + mat[2, 1] * s[:, 0, :, 1, :] \
+                              + mat[2, 2] * s[:, 1, :, 0, :] + mat[2, 3] * s[:, 1, :, 1, :]
+        comb[:, 1, :, 1, :] = mat[3, 0] * s[:, 0, :, 0, :] + mat[3, 1] * s[:, 0, :, 1, :] \
+                              + mat[3, 2] * s[:, 1, :, 0, :] + mat[3, 3] * s[:, 1, :, 1, :]
+        s[...] = comb
+
+    # ------------------------------------------------------------------ #
+    def update(self, env) -> float:
+        """增量消化 env._phys_circuit 中新增指令，返回 log 前缀保真度。
+
+        维度固定为 phys_qubits（构造时给定）或首次 update 时惰性收集的全部
+        已用物理比特。此后不扩维（避免 rng 序列错位导致增量≠全量）。
+        """
+        pc = env._phys_circuit
+        if self._sim is None:
+            if self._phys_qubits is not None:
+                used = sorted(self._phys_qubits)
+            else:
+                used = self._collect_used(pc) or list(range(len(self.base_config.t1_times)))
+            self._build_sim(used)
+            self._n_evolved = 0
+        data = pc.data
+        while self._n_evolved < len(data):
+            inst = data[self._n_evolved]
+            if inst.operation.name.lower() not in ("measure", "barrier"):
+                # 防御：遇到未映射物理比特（不应发生），跳过并复位
+                qi = [q._index for q in inst.qubits]
+                if any(q not in self._remap for q in qi):
+                    self._n_evolved += 1
+                    continue
+            self._apply_gate(inst)
+            self._n_evolved += 1
+        if self.sv_ideal is None:
+            self.logF = 0.0
+            return 0.0
+        # F = mean_k |<ideal|noisy_k>|^2
+        inner = self.svs_noisy @ self.sv_ideal.conj()
+        F = float(np.clip(np.mean(np.abs(inner) ** 2), 1e-12, 1.0))
+        self.logF = float(np.log(F))
+        return self.logF

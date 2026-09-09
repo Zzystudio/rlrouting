@@ -1,0 +1,45 @@
+=== nam_traj_v1 ===
+  barenco_tof_10.json: 19q, swaps=188, fid=0.1008
+  barenco_tof_3.json: 5q, swaps=11, fid=0.7740
+  barenco_tof_4.json: 7q, swaps=31, fid=0.4399
+  barenco_tof_5.json: 9q, swaps=38, fid=0.2870
+  csla_mux_3.json: 15q, swaps=58, fid=0.1855
+  gf2^4_mult.json: 12q, swaps=61, fid=0.1527
+  gf2^5_mult.json: 15q, swaps=86, fid=0.0362
+  gf2^6_mult.json: 18q, swaps=195, fid=0.0190
+  grover_5.json: 9q, swaps=134, fid=0.0003
+  hwb6.json: 7q, swaps=57, fid=0.0000
+  mod5_4.json: 5q, swaps=13, fid=0.5052
+  mod_mult_55.json: 9q, swaps=23, fid=0.0484
+  mod_red_21.json: 11q, swaps=77, fid=0.0862
+  rc_adder_6.json: 14q, swaps=64, fid=0.0885
+  tof_10.json: 19q, swaps=92, fid=0.2597
+  tof_3.json: 5q, swaps=11, fid=0.8198
+  tof_4.json: 7q, swaps=12, fid=0.6265
+  tof_5.json: 9q, swaps=20, fid=0.4373
+  vbe_adder_3.json: 10q, swaps=48, fid=0.3727
+  mean_fid=0.2758 (19 ctks)
+=== nam_traj_v1 done ===
+=== nam_traj_v1_beam3 ===
+  barenco_tof_10.json: 19q, swaps=96, fid=0.0202
+  barenco_tof_3.json: 5q, swaps=7, fid=0.6569
+  barenco_tof_4.json: 7q, swaps=17, fid=0.4555
+  barenco_tof_5.json: 9q, swaps=22, fid=0.3954
+  csla_mux_3.json: 15q, swaps=43, fid=0.1472
+  gf2^4_mult.json: 12q, swaps=50, fid=0.0911
+  gf2^5_mult.json: 15q, swaps=81, fid=0.1834
+  gf2^6_mult.json: 18q, swaps=127, fid=0.0754
+  grover_5.json: 9q, swaps=107, fid=0.0000
+  hwb6.json: 7q, swaps=55, fid=0.0157
+  mod5_4.json: 5q, swaps=9, fid=0.4057
+  mod_mult_55.json: 9q, swaps=18, fid=0.0216
+  mod_red_21.json: 11q, swaps=50, fid=0.0721
+  rc_adder_6.json: 14q, swaps=35, fid=0.1826
+  tof_10.json: 19q, swaps=63, fid=0.2882
+  tof_3.json: 5q, swaps=6, fid=0.8141
+  tof_4.json: 7q, swaps=9, fid=0.6279
+  tof_5.json: 9q, swaps=15, fid=0.5227
+  vbe_adder_3.json: 10q, swaps=27, fid=0.3740
+  mean_fid=0.2816 (19 ctks)
+=== nam_traj_v1_beam3 done ===
+ALL DONE

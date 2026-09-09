@@ -171,6 +171,52 @@ def pick_circuit_with_path(data_dir: str, split_name: str, seed: Optional[int] =
     return CircuitDAG.from_circuit(qc), path
 
 
+def load_nam_circuits(nam_dir: str, max_qubits: int = 20):
+    """加载目录下所有 QASM 文件为 CircuitDAG 列表（过滤 > max_qubits 的电路）。
+
+    返回 [(dag, name), ...]，name 为不带扩展名的文件名。
+    """
+    from qiskit.qasm2 import load as qasm2_load
+    dags = []
+    if not os.path.isdir(nam_dir):
+        return dags
+    for fname in sorted(os.listdir(nam_dir)):
+        if not fname.endswith(".qasm"):
+            continue
+        fpath = os.path.join(nam_dir, fname)
+        try:
+            qc = qasm2_load(fpath)
+            if qc.num_qubits > max_qubits:
+                continue
+            dag = CircuitDAG.from_circuit(qc)
+            name = fname.removesuffix(".qasm")
+            dags.append((dag, name))
+        except Exception as e:
+            print(f"[nam-circuits] 跳过 {fname}: {e}")
+    return dags
+
+
+def pick_circuit_with_nam(args, split_key, split_prefix, split_map, total_steps, topo_qubits, topo_idx,
+                          nam_circuits, nam_prob):
+    """带 NAM 电路混入的电路采样器。
+
+    以 nam_prob 概率从 nam_circuits 中均匀选择，否则走原 pick_circuit_with_path。
+    NAM 电路取不超过当前拓扑容量者（额外受 nam_max_q 上限约束，保证 ≤16q 训练
+    时不用 trajectory_sched 跑大电路）。
+    """
+    if nam_circuits and random.random() < nam_prob:
+        nam_max_q = args.nam_max_qubits or args.max_num_qubits or topo_qubits[topo_idx]
+        cap = min(topo_qubits[topo_idx], nam_max_q)
+        # 从 NAM 电路中均匀选择，找到能放进当前拓扑的
+        candidates = [(d, n) for d, n in nam_circuits if d.num_logical_qubits <= cap]
+        if candidates:
+            dag, name = random.choice(candidates)
+            return dag, f"nam/{name}"
+    return pick_circuit_with_path(args.data_dir, split_key, seed=args.seed + total_steps,
+                                  split_prefix=split_prefix, split_map=split_map,
+                                  max_qubits=topo_qubits[topo_idx])
+
+
 def _build_sabre_layout_cache(args, topo_list) -> dict:
     """预计算训练池中每个电路在各拓扑下的 SABRE 初始布局。
 
@@ -376,7 +422,7 @@ def _parse_sabre_fid_map(spec: Optional[str]) -> dict:
     return out
 
 
-def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_init, seed, gnn=None, use_gnn=True, max_num_edges=None, max_num_qubits=None, noise_config=None, lambda_fid=None, eta_dist=None, mapping_budget=None, mapping_phase=True, fidelity_fn=None, use_scheduler=None, eta_time=None, eta_xtalk_par=None, eta_idle=None, eta_parallel=None, xtalk_alpha=None, swap_duration=None, swap_cost=None, init_mapping=None, lambda_layout=None, sabre_fid_map=None):
+def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_init, seed, gnn=None, use_gnn=True, max_num_edges=None, max_num_qubits=None, noise_config=None, lambda_fid=None, eta_dist=None, mapping_budget=None, mapping_phase=True, fidelity_fn=None, use_scheduler=None, eta_time=None, eta_xtalk_par=None, eta_idle=None, eta_parallel=None, xtalk_alpha=None, swap_duration=None, swap_cost=None, init_mapping=None, lambda_layout=None, sabre_fid_map=None, sref_override=None):
     kw = dict(
         dag=dag, hw=hw, coupling_map=coupling_map,
         reward_mode=reward_mode,
@@ -424,15 +470,19 @@ def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_ini
         kw["lambda_layout"] = lambda_layout
     if sabre_fid_map is not None:
         kw["sabre_fid_map"] = sabre_fid_map
+    if sref_override is not None:
+        kw["sref_override"] = sref_override
     kw["mapping_phase"] = mapping_phase
     return RoutingEnv(**kw)
 
 
-def build_fidelity_fn(fidelity_sim: str, noise_config, num_trajectories: int = 64, seed=None):
+def build_fidelity_fn(fidelity_sim: str, noise_config, num_trajectories: int = 64, seed=None,
+                      analytic_thermal: bool = True, analytic_crosstalk: bool = False):
     """按 --fidelity-sim 构造 env 终端保真度函数；routing 模式或 aer 模式返回 None。
 
     aer: 使用 env 内置 NoiseSimulator（density_matrix + counts overlap，n<=12）。
     trajectory: 使用轨迹状态向量模拟器（O(2^n) 内存，20q+ 可用）。
+    analytic: 解析错误累积代理（O(门数)，无指数，适用于 16q+ 大电路训练）。
     """
     if fidelity_sim == "trajectory":
         from sim.trajectory_sim import make_trajectory_fidelity_fn
@@ -441,6 +491,10 @@ def build_fidelity_fn(fidelity_sim: str, noise_config, num_trajectories: int = 6
         from sim.trajectory_sim import make_trajectory_fidelity_fn
         return make_trajectory_fidelity_fn(noise_config, num_trajectories=num_trajectories,
                                            seed=seed, scheduled=True)
+    if fidelity_sim == "analytic":
+        from sim.trajectory_sim import make_analytic_fidelity_fn
+        return make_analytic_fidelity_fn(noise_config, include_thermal=analytic_thermal,
+                                         include_crosstalk=analytic_crosstalk)
     return None
 
 
@@ -542,6 +596,9 @@ def main():
                         help="每尺寸 SABRE 参考保真度（log-相对奖励分母），格式 "
                              "5=0.309,8=0.162,10=0.061,12=0.046,16=0.0065；"
                              "缺省时用内置常数")
+    parser.add_argument("--sabre-fid-map-nam", type=str, default=None,
+                        help="NAM 电路专用 SABRE 参考保真度表（覆盖 --sabre-fid-map，"
+                             "因 NAM 与随机电路同尺寸 SABRE 基线不同），格式同上")
     parser.add_argument("--clip-return", type=float, default=50.0,
                         help="GAE return 裁剪阈值 (0=不裁剪，默认 50.0)")
     parser.add_argument("--noise-perturb", type=float, default=0.15,
@@ -614,14 +671,31 @@ def main():
                         help="逗号分隔的 split prefix 列表，按训练进度从小规模到大规模递进 "
                              "(如 large_n10,large_n20,tianyan；默认单 prefix)")
     parser.add_argument("--fidelity-sim", type=str, default="aer",
-                        choices=["aer", "trajectory", "trajectory_sched"],
+                        choices=["aer", "trajectory", "trajectory_sched", "analytic"],
                         help="终端保真度模拟器: aer=density_matrix/counts (小比特数), "
                              "trajectory=轨迹状态向量(串行, O(2^n) 内存), "
-                             "trajectory_sched=轨迹状态向量+调度感知(空闲退相干/动态串扰, 需 --use-scheduler)")
+                             "trajectory_sched=轨迹状态向量+调度感知(空闲退相干/动态串扰, 需 --use-scheduler), "
+                             "analytic=解析错误累积代理(O(门数), 无指数, 16q+ 大电路训练)")
     parser.add_argument("--traj-trajectories", type=int, default=16,
                         help="轨迹模拟器采样条数（越大方差越小，训练越慢）")
     parser.add_argument("--traj-seed", type=int, default=None,
                         help="轨迹模拟器随机种子（默认 None=不可复现）")
+    parser.add_argument("--analytic-thermal", action="store_true", default=True,
+                        help="解析保真度代理包含热弛豫（idle 退相干）项")
+    parser.add_argument("--no-analytic-thermal", dest="analytic_thermal", action="store_false",
+                        help="解析保真度代理不包含热弛豫项（纯退极化）")
+    parser.add_argument("--analytic-crosstalk", action="store_true", default=False,
+                        help="解析保真度代理包含串扰 θ² 惩罚项")
+    parser.add_argument("--nam-circuits-dir", type=str, default=None,
+                        help="NAM 电路 QASM 目录（如 benchmark/nam_circs/），训练时混入 NAM 算术电路")
+    parser.add_argument("--nam-circuit-prob", type=float, default=0.3,
+                        help="训练时选择 NAM 电路的概率（默认 0.3）")
+    parser.add_argument("--nam-max-qubits", type=int, default=None,
+                        help="NAM 电路最大逻辑比特数（过滤较大 NAM 电路；默认=--max-num-qubits）")
+    parser.add_argument("--nam-sabre-fid-json", type=str, default=None,
+                        help="NAM per-circuit SABRE 参考保真度 JSON（{circuit_name: fid}，"
+                             "如 benchmark/routed/sabre_nam_percircuit.json）。提供时 NAM 电路用"
+                             "自己电路的 SABRE 基线做 log-相对奖励分母，而非按 num_qubits 共享")
     args = parser.parse_args()
 
     import torch
@@ -698,6 +772,30 @@ def main():
             raise SystemExit("--layout-mix 需 3 个比例 (恒等,随机,SABRE)")
         sabre_cache = _build_sabre_layout_cache(args, topo_list)
 
+    # NAM 电路加载
+    nam_circuits = []
+    nam_sref_map = {}
+    if args.nam_circuits_dir:
+        nam_max_q = args.nam_max_qubits or args.max_num_qubits or 20
+        nam_circuits = load_nam_circuits(args.nam_circuits_dir, max_qubits=nam_max_q)
+        if nam_circuits:
+            print(f"[nam-circuits] 加载 {len(nam_circuits)} 个 NAM 电路（≤{nam_max_q}q，"
+                  f"概率 {args.nam_circuit_prob:.0%}）")
+        else:
+            print(f"[nam-circuits] 警告：{args.nam_circuits_dir} 无有效 QASM 文件")
+        # per-circuit SABRE 参考（方案1：每条 NAM 用自己电路的 SABRE 基线）
+        if args.nam_sabre_fid_json:
+            try:
+                import json as _json
+                raw = _json.load(open(args.nam_sabre_fid_json))
+                for k, v in raw.items():
+                    key = k.removesuffix(".qasm")
+                    nam_sref_map[key] = float(v)
+                print(f"[nam-sabre] per-circuit SABRE 参考：{len(nam_sref_map)} 条")
+            except Exception as e:
+                print(f"[nam-sabre] 警告：加载 {args.nam_sabre_fid_json} 失败: {e}")
+                nam_sref_map = {}
+
     use_gnn = not args.no_gnn
     sample_dag = pick_circuit(args.data_dir, initial_split_key, seed=args.seed,
                               split_prefix=split_prefix, split_map=split_map)
@@ -736,6 +834,8 @@ def main():
                         fidelity_fn=build_fidelity_fn(
                           args.fidelity_sim, noise_config,
                           num_trajectories=args.traj_trajectories, seed=args.traj_seed,
+                          analytic_thermal=args.analytic_thermal,
+                          analytic_crosstalk=args.analytic_crosstalk,
                       ) if args.reward_mode != "routing" else None)
 
     agent_n_qubits = args.max_num_qubits or sample_dag.num_logical_qubits
@@ -835,8 +935,9 @@ def main():
     topo_fids_lists = [[] for _ in range(num_topos)]
     topo_rewards_lists = [[] for _ in range(num_topos)]
 
-    # 每尺寸 SABRE 参考保真度（log-相对奖励分母）
+    # 每尺寸 SABRE 参考保真度（log-相对奖励分母）；NAM 电路用独立表
     sabre_fid_map = _parse_sabre_fid_map(args.sabre_fid_map)
+    sabre_fid_map_nam = _parse_sabre_fid_map(args.sabre_fid_map_nam) if args.sabre_fid_map_nam else None
 
     total_steps = resume_step
     best_metric = resume_best if resume_best > -1.0 else -1.0
@@ -919,10 +1020,9 @@ def main():
                         topo_idx = random.choices(range(num_topos), weights=w, k=1)[0]
                     else:
                         topo_idx = random.randrange(num_topos)
-                new_dag, circuit_path = pick_circuit_with_path(args.data_dir, split_key, seed=args.seed + total_steps,
-                                        split_prefix=split_prefix,
-                                        split_map=split_map,
-                                        max_qubits=topo_qubits[topo_idx])
+                new_dag, circuit_path = pick_circuit_with_nam(
+                    args, split_key, split_prefix, split_map, total_steps, topo_qubits, topo_idx,
+                    nam_circuits, args.nam_circuit_prob)
                 noise_config, coupling_map = topo_list[topo_idx]
                 if args.noise_perturb > 0 or args.noise_perturb_t1t2 > 0:
                     noise_config = perturb_noise_config(
@@ -953,6 +1053,19 @@ def main():
                     progress, args.lambda_fid_warmup,
                     adaptive_lambda_fid_max(progress, args.lambda_fid_max_schedule, args.lambda_fid_max)
                 ) if args.reward_mode != "routing" else None
+                # 方案1：NAM 电路若有 per-circuit SABRE 参考（nam_sref_map）则用它做 log-相对
+                # 分母（sref_override 优先于按 num_qubits 共享的 sabre_fid_map_nam），避免
+                # 深电路因共享同尺寸 sref 而 log(F/sref) 爆炸成极端负奖励。
+                is_nam = circuit_path.startswith("nam/")
+                ep_sabre_map = sabre_fid_map
+                ep_sref_override = None
+                if is_nam:
+                    ep_sabre_map = sabre_fid_map_nam if sabre_fid_map_nam is not None else sabre_fid_map
+                    nam_name = circuit_path.split("/", 1)[1]
+                    pc_sref = nam_sref_map.get(nam_name)
+                    if pc_sref is not None and pc_sref > 0:
+                        ep_sref_override = float(pc_sref)
+                        ep_sabre_map = None  # 用 per-circuit sref，不再需要共享表
                 env = create_env(new_dag, hw, coupling_map, args.reward_mode,
                                  args.max_episode_steps, ep_random_init,
                                  args.seed + total_steps,
@@ -973,12 +1086,15 @@ def main():
                                     swap_duration=args.swap_duration,
                                      init_mapping=ep_init_mapping,
                                      lambda_layout=args.lambda_layout,
-                                     fidelity_fn=build_fidelity_fn(
-                                       args.fidelity_sim, noise_config,
-                                       num_trajectories=args.traj_trajectories,
-                                       seed=args.traj_seed,
-                                   ) if args.reward_mode != "routing" else None,
-                                     sabre_fid_map=sabre_fid_map)
+                                      fidelity_fn=build_fidelity_fn(
+                                        args.fidelity_sim, noise_config,
+                                        num_trajectories=args.traj_trajectories,
+                                        seed=args.traj_seed,
+                                        analytic_thermal=args.analytic_thermal,
+                                        analytic_crosstalk=args.analytic_crosstalk,
+                                     ) if args.reward_mode != "routing" else None,
+                                     sabre_fid_map=ep_sabre_map,
+                                     sref_override=ep_sref_override)
                 obs, _ = env.reset()
                 ep_total_reward = 0.0
 
