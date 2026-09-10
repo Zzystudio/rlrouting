@@ -1482,3 +1482,118 @@ class PolicyScheduler:      # 第 2 步：agent 逐门决策（真正 E2E）
   课程学习
 - 变长 ready 门动作空间 → padding 维度需按数据集上界固定，mask 处理
 - obs/动作空间变更影响面大 → 同步更新 `_forward_obs` / `_build_edge_obs` / 测试断言
+
+---
+
+# Plan: Phase 2 保真度信号加强（fidelity signal strengthening）
+
+> 状态：方案设计，待实施（写自 2026.09.10）
+> 决策（用户确认）：
+> - 目标：**argmax 与 beam 两者都要**（argmax 保真度不退化 + beam 用更强 `V_fid` 反超）
+> - 分布：**暂不引入 NAM / 结构化算术电路**进 Phase 2 训练（NAM 继续作 OOD 评估面）
+> - 方差控制：**traj 8 + 多 seed 平均**（而非单一大 traj）
+
+## 一、背景与根因
+
+Phase 2 的终端保真度奖励进入训练后容易拉偏 actor（argmax 退化）。当前 P2B 已用独立
+`V_fid` 头 + 小 `α_fid` 基本保住 argmax，但 `V_fid` 信号太弱，beam search 未稳定反超。
+根因分三层：
+
+| 层 | 现象 | 本质 |
+|----|------|------|
+| 信号形状 | `F→0` 时 `log(F/sref)` 爆炸，单条塌缩电路打满 clip −50 垄断负梯度 | reward 映射非鲁棒 |
+| 方差 | traj=8 训练 vs traj=16 评估，MC 方差大 | 保真度估计噪声高 |
+| 时间归因 | fidelity 通道与路由共用 `γ=0.99/λ=0.95`，300 步 episode 里终端信号 `0.99^300≈0.05` | 长 horizon 信号衰减 |
+| 结构 | `vfid_loss` 与 `value_loss` 简单相加，无独立权重 | `V_fid` 被路由 value 稀释 |
+
+> 另有一条结构性事实（并非噪声问题）：`ρ(ΔF(a_i), F_final)=0.142, p=0.09`，说明 fidelity
+> 是 trajectory-level 目标、单动作因果信号弱——这决定了本轮**不做 local fidelity reward**，
+> 而是把力气放在"让终端信号更强、更可归因"上。
+
+## 二、现状定位（代码级）
+
+| 位置 | 现状 |
+|------|------|
+| `env.py:784-809` `_terminal_reward` | `r = λ_fid·(log F − log sref)`，`clip ∈ [−50,50]`；`F→0` 时 log 爆炸 |
+| `env.py:792-795` | `lambda_fid==0` 时跳过保真度计算（warmup 语义） |
+| `train_agent.py:1074` | `lambda_fid_schedule` / `lambda_fid_max_schedule` 控制 λ 幅度 |
+| `train_agent.py:1162-1171` | dual_critic 分支对 `norm_term` 做 GAE，但 `gamma/lam` 与路由通道相同 |
+| `train_agent.py:1131` | beam 评分 `V = V_route + λ_V·V_fid`，`λ_V` 默认 1.0 未扫 |
+| `agent.py:73-79` | `critic_fid` zero-init |
+| `agent.py:460-463` | `value_loss = mse(v_route, ret) + mse(v_fid, ret_fid)`，无独立 `vfid` 权重 |
+| `trajectory_sim.py:1098` | `make_trajectory_fidelity_fn(config, n_traj, seed)` 单 seed |
+
+## 三、方案分层
+
+保持 P2B 结构（`α_fid` 小 + 独立 `V_fid`），四层改动，NAM 不进训练。
+
+### A. 信号形状（env.py）
+
+1. **塌缩电路跳过**：`_terminal_reward` 中当 `fid < sref * 1e-3`（或 `fid < --fid-skip-threshold`）
+   时 terminal reward 记 0，不再打满 −50。
+2. **温和目标映射**：新增 `--fid-reward-type {log,sqrt}`，`sqrt` = `sign(z)·sqrt(|z|)`、
+   `z=log(F/sref)`；clip 上界收紧到 `[-10,10]`（新增 `--fid-clip`）。
+3. **λ 调度收紧**：`lambda_fid_max_schedule` 给"fidelity 可优化"的中等尺寸更高权重，整体
+   `λ_fid_max` 取 1.0~2.0（不回到 5.0，避免 π 重燃漂移）。
+
+### B. 方差（trajectory_sim.py + train_agent.py）
+
+4. **多 seed 平均终端 reward**：`make_trajectory_fidelity_fn` 增加 `num_seeds` 参数，对同一
+   `_phys_circuit` 用不同 noise seed 各跑 traj=8，返回均值。CLI 加 `--fid-seeds N`（默认 3）。
+   - 效果 ≈ traj 24 的方差，保持单次 traj=8 的缓存友好。
+   - 评估端不改：eval 仍 `traj=16` 单 seed 统一口径。
+
+### C. 时间归因（train_agent.py + agent.py，核心）
+
+5. **fidelity 通道独立折扣**：dual_critic 分支（`train_agent.py:1162-1171`）新增
+   `--gamma-fid`（默认 1.0）、`--lam-fid`（默认 1.0），只用于 `adv_fid/ret_fid` 的 GAE。
+   - `lam_fid=1.0` 时 GAE 退化为 MC return `ret_fid_t = γ_fid^{T-t}·z_fid`，终端保真度
+     信号贯穿整个长 episode。
+6. **`vfid_loss` 独立权重**：`agent.py:460-463` 改为 `vf_coef·mse_route + vfid_coef·mse_fid`，
+   新增 `--vfid-coef`（默认 1.0，可试 1.5~2.0）。
+
+### D. 结构 / 推理（不重训，eval 侧）
+
+7. 扫 `λ_V ∈ {0.5, 1.0, 2.0}`（`agent.py:lambda_v_fid` / `train_agent.py:1131`）与
+   `beam_width ∈ {3,5}`。
+8. 扫 `α_fid ∈ {0.05, 0.1, 0.2}`，保证 test split argmax 不跌破 `0.95×l05`。
+
+### E. 分布校准（暂不纳入，仅记录）
+
+- 暂不把 NAM 电路引入 Phase 2 训练（用户决策）；NAM benchmark 维持 OOD 评估面。
+- 若后续需要 NAM 泛化，再做 NAM train/test 拆分 + per-circuit sref + 深度加权。
+
+## 四、代码改动清单
+
+| 文件 | 改动 |
+|------|------|
+| `src/routing/rl/env.py` | `_terminal_reward` 加 `--fid-skip-threshold` / `--fid-reward-type` / `--fid-clip` |
+| `src/sim/trajectory_sim.py` | `make_trajectory_fidelity_fn` 增加 `num_seeds` 多 seed 平均 |
+| `src/routing/rl/train_agent.py` | `build_fidelity_fn` 透传 `--fid-seeds`；新增 `--gamma-fid` / `--lam-fid`，dual GAE 分支用独立折扣；新增 `--vfid-coef` |
+| `src/routing/rl/agent.py` | `update()` 拆分 `vf_coef·mse_route + vfid_coef·mse_fid` |
+
+## 五、建议执行顺序（单变量消融，避免结论翻转）
+
+1. **阶段三（C，核心）**：先只加 `--gamma-fid/--lam-fid` + `--vfid-coef`，20-35k 步对照 P2B。
+2. **阶段一（A）**：加塌缩跳过 + `sqrt` 目标 + λ 调度收紧。
+3. **阶段二（B）**：加 `--fid-seeds` 多 seed 平均。
+4. **阶段四（D）**：推理侧超参（`λ_V` / `α_fid` / `beam_width`）。
+
+> 每一步只改一个变量，明确归因"是哪一处让 fid 信号变强"。
+
+## 六、验证与成功判据
+
+1. `PYTHONPATH=src python3 -m pytest test/ -q`
+2. reward 分布：加防护后 terminal reward 不再被 −50 极端值主导。
+3. `vfl`（`V_fid` loss）在训练中持续下降且非 0。
+4. no-leak test split + NAM（OOD）两个评估面：
+   - argmax ≥ `0.95×l05`（不退化）；
+   - beam3/beam5 超过 argmax 与 `nam_sref beam3`（0.2925）。
+5. 统计口径统一：log-mean + win-rate + 分尺寸；argmax / beam 分开下结论。
+
+## 七、风险
+
+- `γ_fid=1.0` 下 bootstrap 误差会直接进 `ret_fid`，但 `lam_fid=1.0` + 终端单脉冲信号下
+  偏差有限；若 `vfl` 不稳可回落 `γ_fid=0.999`。
+- 多 seed 平均使每次终端保真度耗时 ×N，需配合物理比特子集截断控制总吞吐。
+- `sqrt` 目标改变奖励语义，需与默认 `log` 做 A/B 对照确认是增强而非偏移。

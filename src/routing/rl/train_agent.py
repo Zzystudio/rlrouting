@@ -696,6 +696,19 @@ def main():
                         help="NAM per-circuit SABRE 参考保真度 JSON（{circuit_name: fid}，"
                              "如 benchmark/routed/sabre_nam_percircuit.json）。提供时 NAM 电路用"
                              "自己电路的 SABRE 基线做 log-相对奖励分母，而非按 num_qubits 共享")
+    # ---- Phase 2 双价值头（P2A/P2B/P2C）----
+    parser.add_argument("--variant", type=str, default=None,
+                        choices=["P1", "P2A", "P2B", "P2C"],
+                        help="Phase 2 变体：P1=纯路由；P2A=terminal fid 直进 actor（旧行为，α=1）；"
+                             "P2B=独立 V_fid 头 + α 混合 advantage；P2C=P2B + KL 保策略")
+    parser.add_argument("--alpha-fid", type=float, default=0.1,
+                        help="fidelity advantage 混入 actor 的比例 α（P2A 自动=1.0）")
+    parser.add_argument("--beta-kl", type=float, default=0.0,
+                        help="KL(π_P1‖π_P2) 权重 β（P2C 建议 0.05）")
+    parser.add_argument("--lambda-v-fid", type=float, default=1.0,
+                        help="beam/rollout 组合值 V = V_route + λ_V·V_fid 的权重")
+    parser.add_argument("--teacher", type=str, default=None,
+                        help="π_P1 教师 checkpoint（KL 约束用，通常为 P1 模型）")
     args = parser.parse_args()
 
     import torch
@@ -851,6 +864,7 @@ def main():
         coupling_map=coupling_map,
         vf_coef=args.vf_coef,
         with_commit=args.mapping_phase,
+        lambda_v_fid=args.lambda_v_fid,
     )
     if args.load:
         state = agent.load_checkpoint(args.load)
@@ -859,6 +873,11 @@ def main():
             resume_step = int(state["step"])
             resume_best = float(state.get("best_metric", -1.0))
             print(f"  -> resume at step {resume_step}, best_metric={resume_best:.5f}")
+
+    # π_P1 教师（P2C KL 约束用）
+    if args.teacher and args.variant == "P2C":
+        agent.load_teacher(args.teacher)
+        print(f"Teacher loaded (KL target): {args.teacher}")
 
     # EMA 初始化
     if args.ema_decay > 0:
@@ -886,7 +905,7 @@ def main():
     ckpt_dir = args.checkpoint_dir or os.path.join(os.path.dirname(args.out) or ".", "ckpts")
     os.makedirs(ckpt_dir, exist_ok=True)
     _metrics_path = os.path.join(ckpt_dir, "metrics.csv")
-    _metrics_fields = ["step", "reward", "swaps", "map_swaps", "trunc_pct", "pl", "vl", "ent", "kl", "grad", "fid", "time_us", "xtalk", "idle", "par"]
+    _metrics_fields = ["step", "reward", "swaps", "map_swaps", "trunc_pct", "pl", "vl", "vfl", "klp1", "ent", "kl", "grad", "fid", "time_us", "xtalk", "idle", "par"]
     # 续训时追加而非覆盖；已有行丢到 resume_step 为止，避免旧行与新续训混合
     if resume_step > 0 and os.path.exists(_metrics_path):
         _metrics_fh = open(_metrics_path, "r", newline="")
@@ -904,7 +923,8 @@ def main():
         _metrics_writer.writeheader()
 
     obs, _ = env.reset()
-    ep_buffer = {"act": [], "logp": [], "val": [], "rew": [], "term_rew": [], "done": []}
+    ep_buffer = {"act": [], "logp": [], "val": [], "val_route": [], "val_fid": [],
+                 "rew": [], "term_rew": [], "done": []}
     if use_gnn:
         ep_buffer["graph_data"] = []
         ep_buffer["map_vec"] = []
@@ -962,8 +982,8 @@ def main():
             commit_allowed = env.mapping_phase and (
                 env._mapping_swaps >= args.mapping_min_swaps
             )
-            action, logp, val = agent.act(obs, deadlock_mask=combined_mask,
-                                          mapping_phase=commit_allowed)
+            action, logp, val, v_route, v_fid = agent.act(obs, deadlock_mask=combined_mask,
+                                                          mapping_phase=commit_allowed)
             next_obs, reward, done, truncated, info = env.step(action)
 
             episode_end = done or truncated
@@ -973,6 +993,8 @@ def main():
             ep_buffer["act"].append(action)
             ep_buffer["logp"].append(logp)
             ep_buffer["val"].append(val)
+            ep_buffer["val_route"].append(v_route)
+            ep_buffer["val_fid"].append(v_fid)
             ep_buffer["rew"].append(reward - term)
             ep_buffer["term_rew"].append(term)
             ep_buffer["done"].append(episode_end)
@@ -1104,9 +1126,12 @@ def main():
                 mask[:len(agent.coupling_map)] = True
                 if env.mapping_phase and env._mapping_swaps >= args.mapping_min_swaps:
                     mask[agent.num_edges] = True
-                last_val = agent._forward_obs(obs, action_mask=mask.unsqueeze(0))[1]
+                last_logits, last_v_route, last_v_fid = agent._forward_obs_split(
+                    obs, action_mask=mask.unsqueeze(0))
+                last_val = last_v_route + agent.lambda_v_fid * last_v_fid
             else:
-                last_val = agent._forward_obs(obs)[1]
+                last_logits, last_v_route, last_v_fid = agent._forward_obs_split(obs)
+                last_val = last_v_route + agent.lambda_v_fid * last_v_fid
         if use_gnn:
             rew_arr = np.array(ep_buffer["rew"], dtype=float)
             agent.rew_norm.update(rew_arr)
@@ -1120,9 +1145,9 @@ def main():
             m = term_arr != 0
             if m.any():
                 norm_term[m] = agent.term_norm.normalize(term_arr[m])
-            norm_rew = norm_rew + norm_term
         else:
-            norm_rew = ep_buffer["rew"]
+            norm_rew = np.array(ep_buffer["rew"], dtype=float)
+            norm_term = np.array(ep_buffer["term_rew"], dtype=float)
         clip_return = args.clip_return if args.clip_return > 0 else None
         if args.gae_adaptive:
             T = len(norm_rew)
@@ -1130,17 +1155,40 @@ def main():
             lam_t = args.gae_lam_min + (args.gae_lam_max - args.gae_lam_min) * ratio
         else:
             lam_t = agent.lam
-        adv, ret = PPOAgent.compute_gae(
-            norm_rew, ep_buffer["val"], ep_buffer["done"],
-            bootstrap=last_val, gamma=agent.gamma, lam=lam_t,
-            clip_return=clip_return,
-        )
+
+        dual_critic = args.variant in ("P2B", "P2C")
+        if dual_critic:
+            # 双通道：路由与保真度分开估计 advantage/return
+            adv_route, ret_route = PPOAgent.compute_gae(
+                norm_rew, ep_buffer["val_route"], ep_buffer["done"],
+                bootstrap=last_v_route, gamma=agent.gamma, lam=lam_t,
+                clip_return=clip_return,
+            )
+            adv_fid, ret_fid = PPOAgent.compute_gae(
+                norm_term, ep_buffer["val_fid"], ep_buffer["done"],
+                bootstrap=last_v_fid, gamma=agent.gamma, lam=lam_t,
+                clip_return=clip_return,
+            )
+            alpha_fid = float(args.alpha_fid)
+            adv = adv_route + alpha_fid * adv_fid
+            ret = ret_route
+        else:
+            # 单通道（P1 / P2A 旧行为）：terminal fid 并入总奖励，一次 GAE
+            norm_rew = norm_rew + norm_term
+            adv, ret = PPOAgent.compute_gae(
+                norm_rew, ep_buffer["val"], ep_buffer["done"],
+                bootstrap=last_val, gamma=agent.gamma, lam=lam_t,
+                clip_return=clip_return,
+            )
+            ret_fid = None
         train_batch = {
             "act": ep_buffer["act"],
             "logp": ep_buffer["logp"],
             "adv": adv,
             "ret": ret,
         }
+        if dual_critic:
+            train_batch["ret_fid"] = ret_fid
         if use_gnn:
             train_batch["graph_data"] = ep_buffer["graph_data"]
             train_batch["map_vec"] = ep_buffer["map_vec"]
@@ -1154,9 +1202,11 @@ def main():
         if use_gnn:
             agent.gnn.train()
         if total_steps < args.freeze_first_steps:
-            losses = {"pl": 0.0, "vl": 0.0, "ent": 0.0, "kl": 0.0, "grad": 0.0}
+            losses = {"pl": 0.0, "vl": 0.0, "vfl": 0.0, "ent": 0.0, "kl": 0.0,
+                      "klp1": 0.0, "grad": 0.0}
         else:
-            losses = agent.update(train_batch, epochs=args.epochs)
+            beta_kl = float(args.beta_kl) if args.variant == "P2C" else 0.0
+            losses = agent.update(train_batch, epochs=args.epochs, beta_kl=beta_kl)
             agent.update_ema()
         ep_buffer = {k: [] for k in ep_buffer}
 
@@ -1177,6 +1227,9 @@ def main():
             f"kl={losses['kl']:.4f}",
             f"gn={losses['grad']:.3f}",
         ]
+        if args.variant in ("P2B", "P2C"):
+            parts.append(f"vfl={losses['vfl']:.3f}")
+            parts.append(f"klp1={losses['klp1']:.4f}")
         if ep_fids:
             avg_fid = np.mean(ep_fids[-20:])
             parts.append(f"fid={avg_fid:.4f}")
@@ -1213,6 +1266,8 @@ def main():
             "trunc_pct": trunc_pct,
             "pl": losses["pl"],
             "vl": losses["vl"],
+            "vfl": losses.get("vfl", ""),
+            "klp1": losses.get("klp1", ""),
             "ent": losses["ent"],
             "kl": losses["kl"],
             "grad": losses["grad"],

@@ -1,0 +1,23 @@
+=== nam_p2a ===
+  barenco_tof_10.json: 19q, swaps=171, fid=0.0516
+  barenco_tof_3.json: 5q, swaps=11, fid=0.7740
+  barenco_tof_4.json: 7q, swaps=24, fid=0.3710
+  barenco_tof_5.json: 9q, swaps=42, fid=0.4257
+  csla_mux_3.json: 15q, swaps=45, fid=0.2988
+  gf2^4_mult.json: 12q, swaps=57, fid=0.3227
+  gf2^5_mult.json: 15q, swaps=99, fid=0.0470
+  gf2^6_mult.json: 18q, swaps=193, fid=0.0789
+  grover_5.json: 9q, swaps=157, fid=0.0017
+  hwb6.json: 7q, swaps=66, fid=0.0002
+  mod5_4.json: 5q, swaps=14, fid=0.4148
+  mod_mult_55.json: 9q, swaps=24, fid=0.0427
+  mod_red_21.json: 11q, swaps=86, fid=0.1113
+  rc_adder_6.json: 14q, swaps=62, fid=0.1401
+  tof_10.json: 19q, swaps=98, fid=0.1331
+  tof_3.json: 5q, swaps=11, fid=0.8198
+  tof_4.json: 7q, swaps=19, fid=0.7138
+  tof_5.json: 9q, swaps=22, fid=0.4665
+  vbe_adder_3.json: 10q, swaps=46, fid=0.3433
+  mean_fid=0.2925 (19 ctks)
+=== nam_p2a done ===
+ALL DONE

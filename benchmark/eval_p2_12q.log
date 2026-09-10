@@ -1,0 +1,43 @@
+[load] missing keys (random init): ['critic_fid.0.weight', 'critic_fid.0.bias', 'critic_fid.2.weight', 'critic_fid.2.bias']
+[load] l05: models/policy_tianyan20q_laymix_l05_eta05.pt
+[load] p2a: models/policy_p2a_ema_best.pt
+[load] p2b: models/policy_p2b_ema_best.pt
+[load] p2c: models/policy_p2c_ema_best.pt
+random_n12d4_s1020001.pkl    (12q,106g) | l05:0.0358 | p2a:0.0358 | p2b:0.0358 | p2c:0.0358
+random_n12d4_s1020012.pkl    (12q,112g) | l05:0.0000 | p2a:0.0000 | p2b:0.0641 | p2c:0.1047
+random_n12d4_s1020045.pkl    (12q,163g) | l05:0.0857 | p2a:0.0675 | p2b:0.0675 | p2c:0.0139
+random_n12d4_s1020057.pkl    (12q,149g) | l05:0.1504 | p2a:0.1779 | p2b:0.0007 | p2c:0.0700
+random_n12d4_s1020074.pkl    (12q,113g) | l05:0.0465 | p2a:0.0178 | p2b:0.0168 | p2c:0.0190
+random_n12d4_s1020079.pkl    (12q,119g) | l05:0.0495 | p2a:0.0307 | p2b:0.2311 | p2c:0.1768
+random_n12d5_s1020050.pkl    (12q,157g) | l05:0.0133 | p2a:0.1804 | p2b:0.1804 | p2c:0.1003
+random_n12d5_s1020063.pkl    (12q,102g) | l05:0.0016 | p2a:0.0079 | p2b:0.0076 | p2c:0.0020
+random_n12d5_s1020065.pkl    (12q, 99g) | l05:0.0568 | p2a:0.0546 | p2b:0.0545 | p2c:0.0547
+random_n12d5_s1020067.pkl    (12q,202g) | l05:0.0010 | p2a:0.0366 | p2b:0.0046 | p2c:0.0628
+random_n12d6_s1020008.pkl    (12q,214g) | l05:0.0034 | p2a:0.0035 | p2b:0.0035 | p2c:0.0045
+random_n12d6_s1020039.pkl    (12q,169g) | l05:0.0238 | p2a:0.0000 | p2b:0.0000 | p2c:0.0260
+random_n12d6_s1020044.pkl    (12q,163g) | l05:0.0007 | p2a:0.0005 | p2b:0.0007 | p2c:0.0359
+random_n12d6_s1020072.pkl    (12q,162g) | l05:0.0006 | p2a:0.0039 | p2b:0.0039 | p2c:0.0039
+random_n12d6_s1020075.pkl    (12q,204g) | l05:0.0420 | p2a:0.0017 | p2b:0.0170 | p2c:0.0515
+random_n12d6_s1020089.pkl    (12q,136g) | l05:0.1011 | p2a:0.0008 | p2b:0.0008 | p2c:0.0011
+random_n12d7_s1020010.pkl    (12q,153g) | l05:0.0220 | p2a:0.0027 | p2b:0.0008 | p2c:0.0027
+random_n12d8_s1020052.pkl    (12q,263g) | l05:0.0127 | p2a:0.0004 | p2b:0.0004 | p2c:0.0005
+random_n12d9_s1020004.pkl    (12q,216g) | l05:0.0011 | p2a:0.0120 | p2b:0.0021 | p2c:0.0000
+random_n12d9_s1020099.pkl    (12q,189g) | l05:0.0003 | p2a:0.0059 | p2b:0.0036 | p2c:0.0030
+
+=== 汇总 (large_n12_test, 20 circuits, traj=4) ===
+  l05: mean=0.03241 log-mean=0.004604 median=0.01766
+  p2a: mean=0.03203 log-mean=0.003239 median=0.00688
+  p2b: mean=0.03479 log-mean=0.005709 median=0.00426
+  p2c: mean=0.03845 log-mean=0.011351 median=0.02249
+  l05 胜 p2a: 11/20
+  l05 胜 p2b: 9/20
+  l05 胜 p2c: 8/20
+  p2a 胜 l05: 8/20
+  p2a 胜 p2b: 8/20
+  p2a 胜 p2c: 6/20
+  p2b 胜 l05: 9/20
+  p2b 胜 p2a: 4/20
+  p2b 胜 p2c: 6/20
+  p2c 胜 l05: 11/20
+  p2c 胜 p2a: 12/20
+  p2c 胜 p2b: 13/20

@@ -1,0 +1,23 @@
+=== nam_p2c_beam3 ===
+  barenco_tof_10.json: 19q, swaps=93, fid=0.0217
+  barenco_tof_3.json: 5q, swaps=8, fid=0.7227
+  barenco_tof_4.json: 7q, swaps=17, fid=0.4555
+  barenco_tof_5.json: 9q, swaps=22, fid=0.4334
+  csla_mux_3.json: 15q, swaps=41, fid=0.2985
+  gf2^4_mult.json: 12q, swaps=53, fid=0.1430
+  gf2^5_mult.json: 15q, swaps=85, fid=0.1392
+  gf2^6_mult.json: 18q, swaps=125, fid=0.0760
+  grover_5.json: 9q, swaps=102, fid=0.0017
+  hwb6.json: 7q, swaps=40, fid=0.0209
+  mod5_4.json: 5q, swaps=9, fid=0.4057
+  mod_mult_55.json: 9q, swaps=15, fid=0.0053
+  mod_red_21.json: 11q, swaps=44, fid=0.0164
+  rc_adder_6.json: 14q, swaps=36, fid=0.1020
+  tof_10.json: 19q, swaps=62, fid=0.1894
+  tof_3.json: 5q, swaps=6, fid=0.7483
+  tof_4.json: 7q, swaps=10, fid=0.6294
+  tof_5.json: 9q, swaps=16, fid=0.4389
+  vbe_adder_3.json: 10q, swaps=26, fid=0.0698
+  mean_fid=0.2588 (19 ctks)
+=== nam_p2c_beam3 done ===
+ALL DONE

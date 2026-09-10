@@ -1,0 +1,29 @@
+Topo: ../traindata/topo/tianyan176_20q.json (20 qubits, 29 edges)
+Label map: ../traindata/topo/tianyan176_20q_labels.json
+Model: ../models/policy_p2b_ema_best.pt (nam_p2b)
+Circuits: 19 files in ../benchmark/nam_circs
+  OK barenco_tof_10.qasm: 19q, swaps=187, map_swaps=0, fid=--, 108582ms
+  OK barenco_tof_3.qasm: 5q, swaps=14, map_swaps=1, fid=--, 6005ms
+  OK barenco_tof_4.qasm: 7q, swaps=24, map_swaps=1, fid=--, 9835ms
+  OK barenco_tof_5.qasm: 9q, swaps=44, map_swaps=1, fid=--, 21537ms
+  OK csla_mux_3.qasm: 15q, swaps=54, map_swaps=0, fid=--, 25423ms
+  OK gf2^4_mult.qasm: 12q, swaps=56, map_swaps=1, fid=--, 26879ms
+  OK gf2^5_mult.qasm: 15q, swaps=104, map_swaps=2, fid=--, 61010ms
+  OK gf2^6_mult.qasm: 18q, swaps=213, map_swaps=1, fid=--, 123631ms
+  OK grover_5.qasm: 9q, swaps=147, map_swaps=0, fid=--, 118277ms
+  OK hwb6.qasm: 7q, swaps=64, map_swaps=0, fid=--, 37596ms
+  OK mod5_4.qasm: 5q, swaps=14, map_swaps=1, fid=--, 5898ms
+  OK mod_mult_55.qasm: 9q, swaps=24, map_swaps=3, fid=--, 10670ms
+  OK mod_red_21.qasm: 11q, swaps=69, map_swaps=0, fid=--, 39886ms
+  OK rc_adder_6.qasm: 14q, swaps=66, map_swaps=0, fid=--, 30978ms
+  OK tof_10.qasm: 19q, swaps=102, map_swaps=2, fid=--, 48202ms
+  OK tof_3.qasm: 5q, swaps=11, map_swaps=0, fid=--, 2402ms
+  OK tof_4.qasm: 7q, swaps=19, map_swaps=0, fid=--, 3543ms
+  OK tof_5.qasm: 9q, swaps=22, map_swaps=0, fid=--, 4268ms
+  OK vbe_adder_3.qasm: 10q, swaps=40, map_swaps=0, fid=--, 1712ms
+
+=== Summary (nam_p2b) ===
+Routed: 19/19
+Skipped: 0
+Fidelity: N/A
+SWAPs: mean=67.1, min=11, max=213

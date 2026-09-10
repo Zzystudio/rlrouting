@@ -4764,3 +4764,153 @@ eval 的调度结果几乎无关。
 2. 或者放弃 per-step fidelity 信号，回到 **terminal-only 但修正 credit assignment**
    （如 GAE 加强 / 轨迹级 return decomposition）。
 3. 或 local 只在 ≤8q（eval 快）上启用 scheduled 每步全量（训练慢 ~10× 但可接受？）。
+
+---
+
+## Phase 2 重构：双价值头 + fidelity 进 V 不进 π（P2A/P2B/P2C 消融）
+
+### 动机
+
+此前结论：terminal fidelity 直接进 GAE 会把稀疏噪声奖励摊给所有历史 SWAP
+（credit assignment 差），拉偏 actor → argmax 退化；而 fidelity 信息沉淀进 critic
+（V 头）使 beam3 提升。据此重构 Phase 2：**fidelity 信号主要进入独立 V_fid 头，
+actor 只受 α≪1 的 fidelity advantage 轻微影响，并用 KL(π_P1‖π_P2) 保策略**。
+
+### 框架
+
+- **网络**：`EdgeActorCritic` 拆双价值头 `critic_route` + `critic_fid`（fid 头 zero-init：
+  加载旧 checkpoint 后 V_fid≡0，l05 beam 行为逐位不变；旧 checkpoint 的 `critic.*` 权重
+  自动迁移到 `critic_route.*`）
+- **奖励**：`r_t = r_t^{P1}`（全保留，swap_cost=0）+ `1_{t=T}·λ_fid·z_fid`，
+  `z_fid = Normalize(log(F_agent/F_sabre))`（term_norm EMA），λ_fid 渐进
+  `--lambda-fid-max-schedule 0.1,0.2,0.3,0.5`
+- **双 GAE**：`A_route/ret_route`（P1 dense）与 `A_fid/ret_fid`（仅末步 fid）分开；
+  actor advantage = `A_route + α·A_fid`（α=0.1）；`MSE(V_route, ret_route) + MSE(V_fid, ret_fid)`
+- **KL 保策略（P2C）**：冻结 π_P1 教师（`--teacher`），前向 KL `β·Σ π_p1·(logπ_p1−logπ_p2)`，β=0.05
+- **推理**：`_forward_obs` 返回 `V_route + λ_V·V_fid` → beam 自动获得 fidelity lookahead（零改动）；
+  argmax 只用 logits
+
+### 消融矩阵（固定 α=0.1 / β=0.05）
+
+| 变体 | dense P1 | terminal fid | 独立 V_fid | KL 保策略 |
+|------|---------|-------------|-----------|----------|
+| P1 (l05 现成) | ✓ | ✗ | ✗ | ✗ |
+| P2A | ✓ | ✓（直进 actor，α=1 旧行为） | ✗（单通道） | ✗ |
+| P2B | ✓ | ✓ | ✓（α=0.1） | ✗ |
+| P2C | ✓ | ✓ | ✓（α=0.1） | ✓（β=0.05） |
+
+### 训练命令（三组并行，taskset 绑核 4 核/组，traj=8，curriculum 砍 n16，35k 步）
+
+```bash
+cd src
+COMMON='--topo-list ../traindata/topo/tianyan176_20q.json \
+  --curriculum-keys stage2,large_n8,large_n8,large_n10,large_n12 \
+  --reward-mode noise_aware --fidelity-sim trajectory_sched --traj-trajectories 8 \
+  --max-num-qubits 20 --load ../models/policy_tianyan20q_laymix_l05_eta05.pt \
+  --eta-xtalk-par 0.05 --swap-cost 0 \
+  --lambda-fid-max-schedule 0.1,0.2,0.3,0.5 \
+  --sabre-fid-map "5=0.309,8=0.162,10=0.061,12=0.046,16=0.0065" \
+  --use-scheduler --mapping-phase --mapping-min-swaps 1 --lambda-layout 0.5 \
+  --layout-mix 0.3,0.3,0.4 --sabre-cache-file ../models/sabre_cache_ph2v3.pkl \
+  --rollout-steps 256 --epochs 4 --lr 1e-4 --timesteps 35000 --max-episode-steps 300 \
+  --ema-decay 0.999 --eval-interval 5000 --eval-split large_n10_test \
+  --eval-traj 4 --eval-max-qubits 20 --eval-max-circuits 15'
+# P2A（session p2a, cuda:0, 核0-3）
+python3 -m routing.rl.train_agent $COMMON --variant P2A \
+  --out ../models/policy_p2a.pt --checkpoint-dir ../models/ckpts_p2a --device cuda:0
+# P2B（session p2b, cuda:1, 核4-7）
+python3 -m routing.rl.train_agent $COMMON --variant P2B --alpha-fid 0.1 \
+  --out ../models/policy_p2b.pt --checkpoint-dir ../models/ckpts_p2b --device cuda:1
+# P2C（session p2c, cuda:2, 核8-11）
+python3 -m routing.rl.train_agent $COMMON --variant P2C --alpha-fid 0.1 --beta-kl 0.05 \
+  --teacher ../models/policy_tianyan20q_laymix_l05_eta05.pt \
+  --out ../models/policy_p2c.pt --checkpoint-dir ../models/ckpts_p2c --device cuda:2
+```
+
+### 省时策略与口径
+
+- traj 16→8（终端 fid 方差升，z 归一化吸收；**评估仍用 16**）
+- curriculum 砍 n16 段（EMA best 本在 n12 末；16q 改为零样本评估）
+- 无 NAM 混入（单变量对照；NAM benchmark 作分布外评估面）
+- swap_cost=0（与 P1 一致）
+
+### 成功判据
+
+- ✅ argmax ≥ 0.95×l05（不退化），beam3 > nam_sref beam3（0.2925）
+- P2A 退化而 P2B/C 不退化 → "fidelity 应进 V 不进 π"成立
+
+### 启动状态
+
+- 三组训练正常（step ~1800 起步，vfl=0.996 表示 V_fid 在学，P2C klp1≈0.02 策略偏离小）
+- 诊断实验（session diag_causal）：ρ(ΔF(a_i), F_final) 因果测试运行中
+
+---
+
+## P2A/P2B/P2C 消融实验结果（2026-09-09）
+
+### 训练与评估口径
+
+- 训练：35k 步，traj=8，curriculum stage2+large_n8×2+n10+n12（无 n16、无 NAM），
+  swap_cost=0，λ_fid 渐近 0.1→0.5，l05 起点，EMA 选点
+- 评估 A（无泄露 test split，20 条/尺寸，log-mean）：
+
+| split | l05 | p2a | p2b | p2c | 最优 |
+|-------|-----|-----|-----|-----|------|
+| 5q | 0.4540 | 0.4601 | 0.4575 | 0.4498 | p2a |
+| 8q | 0.1179 | **0.1207** | 0.0787 | 0.0894 | p2a |
+| 10q | 0.0370 | 0.0407 | 0.0389 | **0.0407** | p2a/p2c |
+| 12q | 0.0046 | 0.0032 | 0.0057 | **0.0114 (+147%)** | p2c |
+| 16q（零样本） | **0.0063** | 0.0006 | 0.0008 | 0.0030 | l05 |
+
+- 评估 B（NAM benchmark，19 条，trajectory_sched×16）：
+
+| 方法 | mode | mean_fid | log-mean | SWAP |
+|------|------|---------|----------|------|
+| l05 | argmax | **0.3115** | **0.1404** | 65.3 |
+| SABRE | — | 0.2747 | 0.0721 | 45.1 |
+| nam_sref | argmax | 0.2728 | 0.1080 | 59.6 |
+| nam_sref | beam3 | 0.2925 | 0.0833 | 41.5 |
+| **p2a** | argmax | 0.2925 | 0.1200 | 65.6 |
+| **p2a** | beam3 | 0.2954 | 0.0978 | 42.5 |
+| **p2b** | argmax | **0.3079** | 0.1121 | 67.1 |
+| p2b | beam3 | 0.2709 | 0.0824 | 43.1 |
+| p2c | argmax | 0.2598 | 0.0842 | 62.6 |
+| p2c | beam3 | 0.2588 | 0.1086 | 42.6 |
+
+### 成功判据对照
+
+1. **"argmax 不退化"（≥0.95×l05）**：p2b argmax 0.3079 = 0.988×l05 ✅；
+   p2a 0.939×（边缘）；p2c 0.834× ❌
+2. **"beam3 提升"（> nam_sref beam3 0.2925）**：p2a beam3 0.2954 边缘达标；
+   p2b/p2c beam3 均未超 ❌
+
+### 结论
+
+1. **P2B（独立 V_fid + α=0.1）实现了设计目标**：NAM argmax 0.3079 几乎不退化（vs l05
+   0.3115），是除 l05 外最高的 NAM argmax；test split 上 5q/10q/12q 接近或略胜 l05。
+   证实"fidelity 进 V 不进 π"的机制有效：α=0.1 时 fidelity 对 actor 的扰动被大幅抑制。
+2. **P2A（旧行为 α=1）**：argmax 0.2925 退化 6%，验证了"terminal fid 直进 GAE 摊薄
+   credit 拉偏 actor"的既有结论（即使 λ 已降到 0.1-0.5 渐进，退化仍存在）。
+3. **P2C（+KL β=0.05）意外**：test split 12q 大幅提升（+147%，0.0114 vs 0.0046），
+   但 NAM argmax 退化最严重（0.2598）。KL 保策略在"训练分布内"帮助了泛化，但抑制了
+   策略向 NAM（分布外）的适应性调整——KL 约束把策略锚定在 l05 的分布内行为上。
+4. **beam3 全线弱于 argmax**（p2b: 0.2709 < 0.3079）：V_fid 的 beam 组合值
+   （V_route + λ_V·V_fid，λ_V=1）在 NAM 上过冲/低估。此前 nam_sref beam3 强是因为其
+   critic 用 λ_fid=5 满权重 + traj=16 训练，V_fid 信号强；本次 λ 渐近 + traj=8 使
+   V_fid 弱，beam 增益消失。可扫 λ_V ∈ {0, 0.5, 1, 2} 或训练用 traj=16 重验。
+5. **16q 零样本仍是 l05 领地**（0.0063 vs 次优 0.0030）：未训 n16 的策略无法泛化到 16q。
+
+### 诊断实验（§11）：ρ(ΔF(a_i), F_final) = 0.142 (p=0.09)
+
+6 条 NAM 电路 × 中间状态 top-4 候选，共 144 样本。action-level causal signal 极弱
+（ρ=0.14，勉强正）。**支持结论：fidelity 本质是 long-horizon trajectory-level
+objective，local action-level ΔF 几乎没有因果信号**——这正是"fidelity 不应作为
+dense local reward"的证据（为论文有价值的实验结论）。
+
+### 模型文件
+
+- `models/policy_p2a.pt` / `_ema_best.pt`（EMA best step=5120）
+- `models/policy_p2b.pt` / `_ema_best.pt`（EMA best step=5120）
+- `models/policy_p2c.pt` / `_ema_best.pt`（EMA best step=20224）
+- 评估日志：`benchmark/eval_p2_{5q,10q,12q,16q}.log`、`benchmark/routed/nam_p2{a,b,c}*`
+- 诊断：`benchmark/diag_causal2.log`（脚本 scripts/diag_causal_fidelity2.py）

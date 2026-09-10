@@ -1,0 +1,6 @@
+[load] missing keys (random init): ['critic_fid.0.weight', 'critic_fid.0.bias', 'critic_fid.2.weight', 'critic_fid.2.bias']
+  barenco_tof_10.qasm: sampled 5 states, rows=0
+  barenco_tof_3.qasm: sampled 5 states, rows=0
+  barenco_tof_4.qasm: sampled 5 states, rows=0
+  barenco_tof_5.qasm: sampled 5 states, rows=0
+无有效数据

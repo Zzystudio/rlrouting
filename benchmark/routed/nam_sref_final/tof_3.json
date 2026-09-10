@@ -5,11 +5,11 @@
  "num_physical_qubits": 20,
  "topology": "tianyan176_20q",
  "initial_layout": {
-  "0": "Q14",
-  "1": "Q20",
-  "2": "Q12",
-  "3": "Q13",
-  "4": "Q25"
+  "0": 2,
+  "1": 4,
+  "2": 0,
+  "3": 1,
+  "4": 5
  },
  "routed_qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[20];\nh q[0];\nh q[1];\ncx q[4],q[1];\nrz(-pi/4) q[1];\nswap q[4],q[2];\ncx q[4],q[1];\nrz(pi/4) q[1];\nswap q[4],q[2];\ncx q[4],q[1];\nrz(-pi/4) q[1];\nswap q[4],q[1];\ncx q[2],q[4];\nrz(pi/4) q[4];\nh q[4];\nswap q[4],q[1];\ncx q[2],q[4];\nrz(-pi/4) q[4];\ncx q[2],q[4];\nrz(pi/4) q[2];\nrz(pi/4) q[4];\nswap q[3],q[0];\ncx q[1],q[3];\nrz(-pi/4) q[3];\ncx q[0],q[3];\nrz(pi/4) q[3];\ncx q[1],q[3];\nrz(-pi/4) q[3];\ncx q[0],q[3];\nrz(pi/4) q[3];\nh q[3];\nswap q[3],q[1];\ncx q[0],q[3];\nrz(-pi/4) q[3];\ncx q[0],q[3];\nrz(pi/4) q[0];\nrz(pi/4) q[3];\nh q[3];\nswap q[5],q[3];\ncx q[4],q[5];\nrz(pi/4) q[5];\nswap q[4],q[2];\ncx q[4],q[5];\nrz(-pi/4) q[5];\nswap q[4],q[2];\ncx q[4],q[5];\nrz(pi/4) q[5];\nswap q[5],q[4];\ncx q[2],q[4];\nrz(-pi/4) q[4];\nh q[4];\nswap q[5],q[4];\ncx q[2],q[4];\nrz(pi/4) q[4];\ncx q[2],q[4];\nrz(-pi/4) q[2];\nrz(-pi/4) q[4];",
  "num_swaps": 11,
@@ -17,11 +17,33 @@
  "completed": true,
  "fidelity": 0.8465079691876156,
  "final_layout": {
-  "0": "Q14",
-  "1": "Q20",
-  "2": "Q12",
-  "3": "Q13",
-  "4": "Q25"
+  "0": 2,
+  "1": 4,
+  "2": 0,
+  "3": 1,
+  "4": 5
  },
- "wall_time_ms": 58.1
+ "wall_time_ms": 58.1,
+ "from_0_19": {
+  "0": "Q12",
+  "1": "Q13",
+  "2": "Q14",
+  "3": "Q19",
+  "4": "Q20",
+  "5": "Q25",
+  "6": "Q26",
+  "7": "Q31",
+  "8": "Q32",
+  "9": "Q33",
+  "10": "Q36",
+  "11": "Q37",
+  "12": "Q38",
+  "13": "Q43",
+  "14": "Q44",
+  "15": "Q49",
+  "16": "Q50",
+  "17": "Q56",
+  "18": "Q7",
+  "19": "Q8"
+ }
 }

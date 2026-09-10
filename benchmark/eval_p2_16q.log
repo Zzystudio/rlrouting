@@ -1,0 +1,38 @@
+[load] missing keys (random init): ['critic_fid.0.weight', 'critic_fid.0.bias', 'critic_fid.2.weight', 'critic_fid.2.bias']
+[load] l05: models/policy_tianyan20q_laymix_l05_eta05.pt
+[load] p2a: models/policy_p2a_ema_best.pt
+[load] p2b: models/policy_p2b_ema_best.pt
+[load] p2c: models/policy_p2c_ema_best.pt
+random_n16d4_s1060007.pkl    (16q,153g) | l05:0.0151 | p2a:0.0151 | p2b:0.0151 | p2c:0.0186
+random_n16d4_s1060012.pkl    (16q,170g) | l05:0.0179 | p2a:0.0541 | p2b:0.0450 | p2c:0.0285
+random_n16d4_s1060096.pkl    (16q,191g) | l05:0.0320 | p2a:0.0000 | p2b:0.0000 | p2c:0.0492
+random_n16d5_s1060006.pkl    (16q,193g) | l05:0.0039 | p2a:0.0033 | p2b:0.0020 | p2c:0.0004
+random_n16d5_s1060008.pkl    (16q,196g) | l05:0.0778 | p2a:0.0168 | p2b:0.0052 | p2c:0.0844
+random_n16d5_s1060085.pkl    (16q,255g) | l05:0.0001 | p2a:0.0014 | p2b:0.0014 | p2c:0.0000
+random_n16d5_s1060090.pkl    (16q,188g) | l05:0.0427 | p2a:0.0166 | p2b:0.0177 | p2c:0.0027
+random_n16d6_s1060004.pkl    (16q,306g) | l05:0.0053 | p2a:0.0000 | p2b:0.0000 | p2c:0.0084
+random_n16d6_s1060059.pkl    (16q,242g) | l05:0.0034 | p2a:0.0004 | p2b:0.0000 | p2c:0.0001
+random_n16d6_s1060084.pkl    (16q,168g) | l05:0.0211 | p2a:0.0060 | p2b:0.0171 | p2c:0.0171
+random_n16d7_s1060043.pkl    (16q,219g) | l05:0.0144 | p2a:0.0063 | p2b:0.0026 | p2c:0.0008
+random_n16d7_s1060054.pkl    (16q,193g) | l05:0.0059 | p2a:0.0066 | p2b:0.0271 | p2c:0.0633
+random_n16d8_s1060015.pkl    (16q,276g) | l05:0.0258 | p2a:0.0258 | p2b:0.0011 | p2c:0.0268
+random_n16d8_s1060027.pkl    (16q,259g) | l05:0.0071 | p2a:0.0356 | p2b:0.0356 | p2c:0.0003
+random_n16d9_s1060030.pkl    (16q,295g) | l05:0.0000 | p2a:0.0000 | p2b:0.0001 | p2c:0.0000
+
+=== 汇总 (large_n16_test, 15 circuits, traj=4) ===
+  l05: mean=0.01817 log-mean=0.006303 median=0.01439
+  p2a: mean=0.01254 log-mean=0.000644 median=0.00631
+  p2b: mean=0.01133 log-mean=0.000808 median=0.00261
+  p2c: mean=0.02005 log-mean=0.002984 median=0.00845
+  l05 胜 p2a: 9/15
+  l05 胜 p2b: 9/15
+  l05 胜 p2c: 7/15
+  p2a 胜 l05: 4/15
+  p2a 胜 p2b: 6/15
+  p2a 胜 p2c: 7/15
+  p2b 胜 l05: 5/15
+  p2b 胜 p2a: 6/15
+  p2b 胜 p2c: 7/15
+  p2c 胜 l05: 8/15
+  p2c 胜 p2a: 8/15
+  p2c 胜 p2b: 7/15

@@ -122,6 +122,7 @@ def main():
     with open(args.label_map) as f:
         label_data = json.load(f)
     q_label_map = {int(k): v for k, v in label_data["from_0_19"].items()}
+    from_0_19 = label_data["from_0_19"]
     print(f"Label map: {args.label_map}")
 
     # ── 加载模型 ──
@@ -208,6 +209,7 @@ def main():
             lambda_fid=args.lambda_fid_max if args.reward_mode != 'routing' else 0.0,
         )
         obs, _ = env.reset()
+        initial_mapping = env.mapping.copy()
 
         if args.beam_width > 0:
             # Beam search: inline 1-step lookahead
@@ -307,9 +309,10 @@ def main():
 
         wall_time_ms = (time.perf_counter() - t0) * 1000
 
-        initial_layout = {str(i): q_label_map[env.mapping[i]]
+        initial_layout = {str(i): initial_mapping[i]
                           for i in range(num_logical)}
-        final_layout = _compute_final_layout(env, q_label_map, coupling_map)
+        final_layout = {str(i): env.mapping[i]
+                        for i in range(num_logical)}
         routed_qasm = _remap_qasm_to_labels(env._phys_circuit, q_label_map)
 
         result = {
@@ -326,6 +329,7 @@ def main():
             "fidelity": fidelity,
             "final_layout": final_layout,
             "wall_time_ms": round(wall_time_ms, 1),
+            "from_0_19": from_0_19,
         }
         results.append(result)
 
