@@ -4914,3 +4914,196 @@ dense local reward"的证据（为论文有价值的实验结论）。
 - `models/policy_p2c.pt` / `_ema_best.pt`（EMA best step=20224）
 - 评估日志：`benchmark/eval_p2_{5q,10q,12q,16q}.log`、`benchmark/routed/nam_p2{a,b,c}*`
 - 诊断：`benchmark/diag_causal2.log`（脚本 scripts/diag_causal_fidelity2.py）
+
+---
+
+## NAM 电路加入 Phase 1 训练集（l05 + NAM routing 微调，2026.09.10）
+
+### 动机
+
+l05（纯 routing + layout-mix）在 NAM benchmark 上 argmax 最优（0.3115），但其 π 是在
+random/QAOA/VQE 电路上学到的，NAM 结构化算术电路属于分布外。本实验验证**把 NAM 电路
+直接加入 Phase 1 routing 训练分布**能否让 π 学到 NAM 的路由模式，从而提升 NAM 上的
+SWAP 效率与保真度（Phase 1 训练目标仍是纯 routing，不含 fidelity 奖励）。
+
+### 训练设置
+
+```bash
+tmux new-session -d -s l05_nam_ph1 \
+  'bash scripts/train_l05_nam.sh cuda:0 100000 2>&1 | tee logs/train_l05_nam_phase1.log'
+```
+
+`scripts/train_l05_nam.sh` 核心参数（其余与 l05 训练一致）：
+
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| `--load` | `policy_tianyan20q_ft_phase1_sched_fix_eta05.pt` | 与 l05 相同起点 |
+| `--reward-mode` | `routing` | Phase 1 纯路由（无 fidelity 奖励） |
+| `--topo` | `tianyan176_20q` | 单一真机 20q 拓扑 |
+| `--split-prefix` | `tianyan20q` | 原有 random/QAOA/VQE split |
+| `--nam-circuits-dir` | `benchmark/nam_circs` | 19 条 NAM 电路（≤20q） |
+| `--nam-circuit-prob` | `0.5` | 每步以 50% 概率采 NAM 电路 |
+| `--layout-mix` | `0.3,0.3,0.4` | 与 l05 相同 layout-mix |
+| `--lambda-layout` | `0.5` | 与 l05（λ=0.5）一致 |
+| `--use-scheduler` | 开 | 与 l05 相同调度奖励 |
+| `--timesteps` | `100000` | 与 l05 相同步数 |
+
+> NAM 电路不参与 SABRE 布局缓存，`layout-mix` 中 SABRE 档对 NAM 回退到 identity 布局。
+
+### 训练日志摘要
+
+```
+step=   256  rew=+112.6  swp=29.6  map=1.3  trunc=0%  ent=0.586
+step=  5120  rew=+128.2  swp=37.6  map=0.4  trunc=0%  ent=0.656
+step= 25600  rew=+183.0  swp=43.9  map=0.6  trunc=0%  ent=0.848
+step= 51200  rew=+196.7  swp=50.6  map=0.6  trunc=0%  ent=0.863
+step= 76800  rew=+158.4  swp=37.4  map=0.6  trunc=0%  ent=1.087
+step=100096  rew=+261.5  swp=66.3  map=0.4  trunc=0%  ent=0.831
+```
+
+全程 `trunc=0%`，reward/SWAP 随 NAM 深电路课程同步增长。产出
+`models/policy_l05_nam_phase1.pt`。
+
+### 评估设置
+
+- **路由**：`generate_routing.py` argmax，`--no-fidelity`，19 条 NAM 全部完成（19/19）
+- **保真度**：`trajectory_sched ×16, seed=0, scheduled=True`（与历史 NAM 表同口径）
+- **对比**：`l05_nam` vs 原 `l05` vs `SABRE`
+- 结果：`benchmark/routed/l05_nam/`、`benchmark/routed/l05_nam_summary.json`
+- 命令：`bash scripts/eval_nam_l05_nam.sh`
+
+### 汇总结果
+
+| 指标 | l05 | l05_nam | SABRE |
+|------|----:|--------:|------:|
+| SWAPs mean | 65.3 | **56.9** | **45.1** |
+| Fidelity mean | **0.3115** | 0.2552 | 0.2747 |
+| Fidelity log-mean | **0.1404** | 0.0749 | 0.0721 |
+| vs SABRE（mean） | +13.4% | −7.1% | — |
+| 逐电路胜率 vs l05 | — | 5/19 | — |
+| 逐电路胜率 vs SABRE | — | 7/19 | — |
+
+### 逐电路明细
+
+| Circuit | q | l05 SWAPs | l05_nam SWAPs | SABRE SWAPs | l05 Fid | l05_nam Fid | SABRE Fid | 胜者 |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| barenco_tof_10 | 19 | 184 | 147 | 103 | 0.1960 | 0.0658 | 0.0715 | l05 |
+| barenco_tof_3 | 5 | 14 | 12 | 9 | 0.7636 | 0.6119 | 0.7467 | l05 |
+| barenco_tof_4 | 7 | 22 | 17 | 30 | 0.4830 | 0.4734 | 0.4454 | l05 |
+| barenco_tof_5 | 9 | 40 | 38 | 26 | 0.3089 | 0.2637 | 0.1683 | l05 |
+| csla_mux_3 | 15 | 54 | 53 | 39 | 0.2566 | **0.3151** | 0.0341 | new |
+| gf2^4_mult | 12 | 56 | 53 | 50 | **0.1989** | 0.0472 | 0.2348 | SABRE |
+| gf2^5_mult | 15 | 101 | 89 | 72 | 0.0267 | **0.0912** | 0.0793 | new |
+| gf2^6_mult | 18 | 162 | 172 | 109 | **0.0650** | 0.0297 | 0.0314 | l05 |
+| grover_5 | 9 | 149 | 145 | 119 | **0.0033** | 0.0000 | 0.0006 | l05 |
+| hwb6 | 7 | 68 | 51 | 50 | 0.0003 | **0.0015** | 0.0000 | new |
+| mod5_4 | 5 | 14 | 14 | 12 | 0.4148 | 0.4946 | **0.5122** | SABRE |
+| mod_mult_55 | 9 | 27 | 19 | 22 | 0.1057 | 0.0467 | **0.1554** | SABRE |
+| mod_red_21 | 11 | 72 | 58 | 48 | **0.1215** | 0.0212 | 0.0645 | l05 |
+| rc_adder_6 | 14 | 68 | 57 | 38 | 0.1608 | 0.0318 | **0.1662** | SABRE |
+| tof_10 | 19 | 107 | 79 | 57 | 0.2223 | 0.3134 | **0.4264** | SABRE |
+| tof_3 | 5 | 11 | 10 | 11 | **0.8198** | 0.8112 | 0.7779 | l05 |
+| tof_4 | 7 | 19 | 13 | 17 | **0.7138** | 0.6111 | 0.6570 | l05 |
+| tof_5 | 9 | 25 | 22 | 17 | **0.6041** | 0.5951 | 0.4699 | l05 |
+| vbe_adder_3 | 10 | 48 | 33 | 28 | **0.4543** | 0.0235 | 0.1779 | l05 |
+
+### 结论与分析
+
+1. **SWAP 效率提升，但保真度反而下降**：l05_nam 的 mean SWAPs 65.3→56.9（−13%），
+   但 mean fidelity 0.3115→0.2552（−18%），且跌到 SABRE（0.2747）之下。log-mean 同样
+   从 0.1404 降到 0.0749（略高于 SABRE 0.0721，但远低于 l05）。
+2. **逐电路胜率低**：对 l05 仅 5/19 胜，对 SABRE 7/19 胜。改善集中在 csla_mux_3、
+   gf2^5_mult、hwb6 等个别电路；退化集中在 vbe_adder_3（0.454→0.024）、mod_red_21、
+   gf2^4_mult、rc_adder_6、grover_5 等中等规模算术电路。
+3. **“routing 目标学 NAM”没有转化为保真度**：Phase 1 reward 只看 SWAP/距离/时序，
+   学到的是“更少 SWAP”的通用路由倾向；但 l05 原本的优势恰是“多 SWAP 但放在低噪声边”。
+   NAM 微调把 π 拉向少 SWAP，失去了这层噪声路径偏好，导致 fidelity 掉。
+4. **与 Phase 2 fidelity 微调的教训一致**：单纯改训练分布（NAM）或单纯改 reward 形态
+   （fidelity 微调）都不足以同时保住 π 与 V 的质量；l05 的优势是“layout-mix + 纯
+   routing + 分布外鲁棒”，用 NAM 直接替换一部分训练分布反而破坏了这种鲁棒性。
+5. **单次训练、单 seed、traj=16 保真度仍有 MC 方差**；部分电路（grover_5、hwb6）本身
+   fidelity 接近 0，排序噪声大，不宜过度解读逐电路胜率。
+6. **后续方向**：
+   - 若要 NAM 收益，建议不是替换 50% 训练分布，而是保留 l05 checkpoint、以更小比例
+     （如 10-20%）混入 NAM 做保守微调；
+   - 或在 l05 上只做 beam/V_fid 的 fidelity 微调（不动 π），复用 P2B 思路；
+   - 若坚持 NAM 进训练，应加 NAM train/test 拆分，避免用同一批 19 条电路既训练又评估。
+
+---
+
+## 重大 bug 修复：映射阶段 1Q 门预执行导致路由线路损坏 + JSON 布局字段错误（2026-09-10）
+
+### 问题发现（用户对 mod5_4 的手工核查触发）
+
+用户从 `initial_layout` 出发追踪 `routed_qasm` 中全部 SWAP，得到与 `final_layout` 矛盾的
+末布局。深度验证确认问题存在且分两层：
+
+#### 层 1：JSON `initial_layout` 字段错误（旧 380 文件中仅 22 个碰巧正确）
+
+- 旧代码 `_compute_final_layout` 回放 `_swap_history` 时，对「一端为空位」的 SWAP
+  （`if lp is not None and lq is not None`）直接跳过，而真实 `_apply_swap` 会把逻辑比特
+  搬入空位。5 逻辑比特 / 20 物理比特的场景下空端点 SWAP 极常见，回放从第一个空端点
+  SWAP 起偏离真实初始布局。
+- 提交 7aa364c 的「修复」只是把旧字段原地换名 + Q 标签转 int（`routed_qasm` 一字未动），
+  把回放 bug 的错误值继承进了新 `initial_layout`。`final_layout` = 旧 initial 字段 =
+  `env.mapping` 终态，是正确的。
+
+#### 层 2：routed_qasm 线路本身损坏（旧 380 文件中 69 个）
+
+- **根因**：`env.reset()` 无条件调用 `_update()`（env.py:182），非调度模式下急迫执行
+  所有就绪 1Q 门并写入 `_phys_circuit`——发生在映射阶段**之前**。随后映射阶段的虚拟
+  SWAP 重排 mapping，已放置的 1Q 门与逻辑比特归属错乱，物理线路混入两套布局，
+  **任何单一初始布局都无法解释**（mod5_4 实测 720 种起始布局穷举无一自洽）。
+- **判定规律**：全部 69 个损坏文件的 `mapping_swaps ≥ 1`；`mapping_swaps=0` 的文件
+  线路全部正确（虚拟 SWAP 未触碰急迫门位置时也不损坏，如 l05/barenco_tof_3）。
+- **为什么长期未被发现**：`compute_fidelity.py` 将 routed_qasm 与其自身无噪版本比保真度，
+  与逻辑等价性无关，损坏线路照样得到"正常"保真度（mod5_4 = 0.4148）。
+
+### 验证方法（可复现）
+
+1. 状态向量等价性检验：`U_R·P_init = P_final·U_C` 是否为置换矩阵（mod5_4 不通过）；
+2. 720 种起始布局穷举 + 贪心依赖序门匹配（修复前 0 解）；
+3. 实测复现 env 轨迹（同 seed 同模型逐位复现 JSON），确认 reset 后 `_phys_circuit`
+   已含 2 条急迫门（x,h@q[1]）；
+4. 注意教训：QASM 解析时 rz 角度曾被误当物理比特，导致第一轮全量判定失真
+   （380 全坏），修正解析后得到真实的 69 坏 / 311 好。
+
+### 修复内容
+
+1. **env.py**：`_update()` 急迫执行条件改为 `not self.use_scheduler and not self.mapping_phase`
+   ——映射阶段一律不执行门；新增 `_effective_initial_mapping`（reset 时=初始映射，
+   映射阶段 commit 时覆盖为 post-虚拟 SWAP 布局，clone 同步拷贝）。
+2. **generate_routing.py**：`initial_layout` 改用 `env._effective_initial_mapping`
+   （与 routed_qasm 严格对应：initial + 线路内 SWAP 追踪 == final）；
+   `_compute_final_layout` 空端点回放 bug 修复（防御性）。
+3. **训练无需重做**：l05 及后续全部微调均 `--use-scheduler`，调度模式下 `_update()`
+   不急迫执行 1Q 门，训练环境干净；headline 保真度评估走 trajectory_sched 时
+   eval_policy 自动启用调度器（eval_policy.py:970），亦免疫。受影响的只有
+   generate_routing（硬编码 use_scheduler=False）与少量未加 --use-scheduler 的评估。
+
+### 重新生成（scripts/regen_all_routed.sh，tmux 会话 regen_route，~20 分钟）
+
+20 个模型目录全部重跑（同 checkpoint、同 beam 宽度、同 seed=0）：
+l05/l05_beam3/l05_beam5/l05_nam/ph2v4/ph2v4_beam3/ph2v4_beam5/nam_l05_v2(_beam3)/
+nam_p2a(_beam3)/nam_p2b(_beam3)/nam_p2c(_beam3)/nam_sref_v1(_beam3)/nam_sref_final/
+nam_traj_v1(_beam3)。
+
+**验证结果（scripts/verify_routed.py）：380/380 文件全部自洽**
+（initial_layout + SWAP 追踪 == final_layout，且全部门与原始电路依赖序匹配）。
+
+### 新旧对比（l05，19 条 NAM 电路）
+
+| 指标 | 旧（含损坏线路） | 新（修复后） |
+|------|----------------|-------------|
+| 平均 SWAPs | 65.3 | 65.7 |
+| 自洽文件数 | 15/19 | **19/19** |
+
+逐电路 SWAP 变化极小（多数 ±0-2，hwb6 68→57 反而改善），策略能力无损，
+纯簿记/归属修正。mapping_swaps 大多变为 0（观测中 progress 不再被预执行门扭曲，
+agent 倾向立即 commit）。
+
+### 保真度重算
+
+`scripts/compute_fidelity.py` 泛化为全部 20 个模型目录（trajectory_sched×16，seed=0），
+tmux 会话 regen_fid 后台运行中，完成后回填 per-circuit JSON 与 summary。
+SABRE 基线（sabre_results.json）不受影响。挑战杯报告 NAM 表格数字待重算完成后更新。

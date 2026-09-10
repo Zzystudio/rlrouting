@@ -188,6 +188,14 @@ r_{\text{dist}} = -\eta \cdot \frac{d_{\text{after}} - d_{\text{before}}}{\max(d
 
 课程通过 \texttt{--curriculum-keys} 参数控制，按训练进度自动切换数据集。例如，从 8 量子比特课程开始，待策略在当前规模收敛后，逐步过渡到 10、12、16 量子比特。每个规模的 Phase1/2/3 分别对应线路深度的浅/中/深三个层次。
 
+\subsubsection{真机拓扑微调与调度感知训练}
+
+面向真实硬件部署，系统在天衍 176 芯片的 20 比特连通子拓扑 tianyan176\_20q（以 Q23 为根 BFS 截取，20 比特 / 29 耦合边）上进行微调，噪声参数取自真机校准数据（逐比特 T1/T2 弛豫时间、逐边 CX 错误率）。工程上修复了真机噪声配置以字符串键序列化导致逐边错误率被静默丢弃的问题，修复后 28 个互异的逐边 CX 错误率才真正进入 GNN 特征与保真度计算。
+
+训练开启事件级 ASAP 调度器（\texttt{--use-scheduler}），奖励在距离项之外叠加调度感知分量：总执行时长惩罚（$\eta_{\text{time}}$）、空闲退相干惩罚（$\eta_{\text{idle}}$）、并行度奖励（$\eta_{\text{parallel}}$）与 1-hop 动态串扰惩罚（$\eta_{\text{xtalk\_par}}$）。这使策略在压缩 SWAP 数的同时显式权衡 makespan、空闲退相干与串扰，而非单一优化路由长度。配合上一章的 layout-mix 布局混合训练（恒等/随机/SABRE warm-start 按 $0.3/0.3/0.4$ 混合），得到最终主模型（l05）。
+
+串扰建模上，动态串扰采用相干 ZZ 旋转 $e^{-i\theta Z\otimes Z}$（$\theta$ 取逐边串扰强度）而非概率性硬 $Z$ 翻转：后者对叠加态会造成正交归零式的失真惩罚，前者以 $\theta^2$ 量级平滑退化，与真实超导残余耦合的物理一致。同波并行的两对双比特门在其交叉比特于耦合图上相邻（1-hop）时施加该额外演化，与调度器强制同波比特互不相交的约束保持口径一致。
+
 \subsubsection{噪声感知训练}
 
 Phase 2 噪声感知微调的关键设计决策包括：
@@ -255,6 +263,27 @@ ibmq\_5\_line & 6.7 & 5.5 & \textbf{0.9557} & 0.9228 \\
 \hline
 \end{tabular}
 \end{center}
+
+\subsubsection{真机 20 比特拓扑（tianyan176\_20q，30 条测试电路，确定性）}
+
+在真机子拓扑上，l05 主模型配合 warm-start 混合管线（SABRE 布局 + PPO 路由）与 SABRE 基线的对比如下。SWAP 数统计上与 SABRE 基本持平（差 1.9，小于一个标准误），而调度类指标全面占优：
+
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+指标 & PPO 恒等布局 & PPO warm-start & SABRE & PPO/SABRE \\
+\hline
+SWAPs & 30.5 $\pm$ 13.6 & \textbf{28.2 $\pm$ 14.5} & \textbf{26.3 $\pm$ 11.7} & 1.07x \\
+makespan ($\mu$s) & --- & \textbf{22.60} & 34.22 & \textbf{0.66x} \\
+串扰代价 (zz$\cdot\mu$s) & --- & \textbf{0.314} & 0.690 & \textbf{0.45x} \\
+峰值并行度 & --- & \textbf{3.73} & 2.3 & \textbf{1.6x} \\
+\hline
+\end{tabular}
+\end{center}
+
+分析：恒等布局下 SWAP 差距约 +15\%，warm-start 布局下收窄至 +7\%（统计持平），验证了 layout-mix 训练「布局多样性 → 布局无关路由」的设计目标——彻底逆转了此前 warm-start 反而更差（31.0 vs 27.5）的恒等专用问题。同时，PPO 的高并行调度使线路执行更紧凑、空闲退相干更少，虽多用约 7\% 的 SWAP，但换来了 makespan 与串扰的大幅领先，构成多目标严格占优。
+
+保真度层面的无泄露评估与真实 benchmark 电路结果详见「实验结果及分析」章节。
 
 \subsection{下一步研究方向}
 

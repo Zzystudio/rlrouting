@@ -178,6 +178,9 @@ class RoutingEnv(gym.Env):
         self._phys_circuit = QuantumCircuit(self.hw.num_qubits)
         self._pending_measures = []
         self._pending_swaps = []
+        # 有效初始布局：物理线路第一条门执行时刻的映射（映射阶段 commit 后的布局）。
+        # reset 时先等于初始映射；映射阶段发生虚拟 SWAP 后在 commit 时被覆盖。
+        self._effective_initial_mapping = list(self.mapping)
         self.timing = CircuitTiming.create(self.hw.num_qubits) if self.use_scheduler else None
         self._update()
         if not self.enable_mapping_phase:
@@ -227,7 +230,9 @@ class RoutingEnv(gym.Env):
         # 调度模式下，1Q 门不在此处急迫执行（否则绕过事件级调度内核，导致
         # 时长/并行度统计失真）；所有门统一在 _auto_execute_batch_scheduled 中调度。
         # 仅在非调度模式保留「1Q 门自动执行」的遗留行为。
-        if not self.use_scheduler:
+        # 映射阶段一律不执行门：reset 后急迫执行会把 1Q 门钉在映射前的位置，
+        # 随后虚拟 SWAP 重排映射导致门与逻辑比特归属错乱（线路损坏）。
+        if not self.use_scheduler and not self.mapping_phase:
             changed = True
             while changed:
                 changed = False
@@ -472,6 +477,7 @@ class RoutingEnv(gym.Env):
         new.timing = self.timing.clone() if self.timing is not None else None
         new._pending_measures = list(self._pending_measures)
         new._pending_swaps = list(self._pending_swaps)
+        new._effective_initial_mapping = list(self._effective_initial_mapping)
         new.lambda_fid = self.lambda_fid
         new.lambda_layout = self.lambda_layout
         new.fidelity_fn = self.fidelity_fn
@@ -830,6 +836,7 @@ class RoutingEnv(gym.Env):
         reward = 0.0
         if action >= self.num_edges:
             self.mapping_phase = False
+            self._effective_initial_mapping = list(self.mapping)
             r_exec, r_prop = self._auto_execute_batch()
             reward += r_exec + r_prop
             if self.lambda_layout != 0.0:
@@ -847,6 +854,7 @@ class RoutingEnv(gym.Env):
                 reward += -self.eta_dist * (dist_after - dist_before) / max(dist_before, 1e-8)
             if self._mapping_swaps >= self.mapping_budget:
                 self.mapping_phase = False
+                self._effective_initial_mapping = list(self.mapping)
                 r_exec, r_prop = self._auto_execute_batch()
                 reward += r_exec + r_prop
                 if self.lambda_layout != 0.0:

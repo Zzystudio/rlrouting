@@ -1,0 +1,133 @@
+本节给出\ourwork 在真机子拓扑 tianyan176\_20q 上的仿真实验结果。所有实验均在含真机校准噪声（逐比特 T1/T2、逐边 CX 错误率）的调度感知轨迹模拟器上进行，每条电路采样 16 条独立噪声轨迹；对比基线为 SABRE（Qiskit SabreSwap）。主模型 l05 为纯路由 + layout-mix 训练版本，ph2v4 为在其上进行 Phase 2 噪声感知微调的版本。评估电路与全部训练 split 零重叠，以避免数据泄露高估泛化性能。
+
+\subsection{布局多样性消融}
+\label{sec:ablation-layout-mix}
+
+为验证 layout-mix 训练策略的作用，在 30 条测试电路上对比三种初始布局配置下的路由质量（确定性 argmax 推理）。warm-start 指 SABRE 预计算布局注入评估环境：
+
+\begin{table}[htbp]
+\centering
+\caption{布局多样性消融：SWAP 数对比（30 条测试电路，均值 $\pm$ 标准差）}
+\label{tab:ablation-layout}
+\small
+\begin{tabular}{l|ccc}
+\hline
+模型（$\lambda_{\text{layout}}$） & PPO 恒等布局 & PPO warm-start & SABRE \\
+\hline
+l0（0.0，仅布局多样性） & 30.2 $\pm$ 13.9 & 28.7 $\pm$ 15.1 & \multirow{3}{*}{26.3 $\pm$ 11.7} \\
+l05（0.5，最终配置） & 30.5 $\pm$ 13.6 & \textbf{28.2 $\pm$ 14.5} & \\
+l20（2.0） & 30.1 $\pm$ 13.7 & 29.6 $\pm$ 15.8 & \\
+\hline
+\end{tabular}
+\end{table}
+
+三个关键观察：（1）所有模型 warm-start 均优于恒等布局，布局多样性训练成功打破「恒等布局专用」问题——此前的恒等布局专用模型在 warm-start 下反而劣化（31.0 vs 27.5）；（2）$\lambda_{\text{layout}}$ 扫描（0/0.5/2.0）差异很小，且映射阶段平均仅消耗 0.1--0.8 次虚拟 SWAP，说明收益主要来自训练分布多样性本身，commit 布局惩罚贡献次要；（3）warm-start 下 PPO 与 SABRE 的 SWAP 差距收窄至 1.9（28.2 vs 26.3），小于一个标准误（SE $\approx$ 2.5），两者统计上基本持平。
+
+\subsection{多目标调度对比}
+\label{sec:multi-objective}
+
+PPO 的高并行调度带来 SWAP 之外的额外收益。在 warm-start 配置下对比调度类指标：
+
+\begin{table}[htbp]
+\centering
+\caption{多目标调度指标对比（warm-start 布局，30 条测试电路）}
+\label{tab:multi-objective}
+\small
+\begin{tabular}{l|cccc}
+\hline
+指标 & PPO (l05) & SABRE & PPO/SABRE \\
+\hline
+makespan ($\mu$s) & \textbf{22.60} & 34.22 & \textbf{0.66x} \\
+串扰代价（zz$\cdot\mu$s） & \textbf{0.314} & 0.690 & \textbf{0.45x} \\
+峰值并行度 & \textbf{3.73} & 2.3 & \textbf{1.6x} \\
+\hline
+\end{tabular}
+\end{table}
+
+PPO 以约 7\% 的 SWAP 开销换来 makespan 降低 34\%、串扰代价降低 55\%、并行度提升 60\%。事件级 ASAP 调度使不相关比特上的门跨步重叠，线路执行更紧凑，空闲退相干累积更少——这是 PPO 在含噪环境下保真度优势的主要来源。
+
+\subsection{无泄露保真度评估}
+\label{sec:no-leakage-eval}
+
+在 5 个规模共 250 条随机测试电路上评估端到端保真度（每规模 30--60 条，与训练集零重叠）：
+
+\begin{table}[htbp]
+\centering
+\caption{无泄露测试集保真度对比（trajectory\_sched $\times$ 16，确定性 argmax）}
+\label{tab:no-leakage-fidelity}
+\small
+\begin{tabular}{c|ccc|cc}
+\hline
+规模 & l05 & ph2v4 & SABRE & l05 vs SABRE & ph2v4 vs SABRE \\
+\hline
+5q & \textbf{0.5767} & 0.5531 & 0.5382 & +7.2\% & +2.8\% \\
+8q & 0.1859 & \textbf{0.1884} & 0.1621 & +14.7\% & +16.2\% \\
+10q & 0.1003 & \textbf{0.1075} & 0.0614 & +63.3\% & +75.1\% \\
+12q & 0.0861 & \textbf{0.0971} & 0.0541 & +59.1\% & +79.5\% \\
+16q$^{\dagger}$ & \textbf{0.0190} & 0.0174 & 0.0047 & +304\% & +270\% \\
+\hline
+\multicolumn{6}{l}{\footnotesize $^{\dagger}$16q 因 16 轨迹评估超时，采用 4 轨迹。} \\
+\end{tabular}
+\end{table}
+
+对应的 SWAP 数对比：
+
+\begin{table}[htbp]
+\centering
+\caption{无泄露测试集 SWAP 数对比}
+\label{tab:no-leakage-swaps}
+\small
+\begin{tabular}{c|ccc}
+\hline
+规模 & l05 & ph2v4 & SABRE \\
+\hline
+5q & 4.1 & 3.9 & \textbf{3.8} \\
+8q & 11.4 & 10.1 & \textbf{8.9} \\
+10q & 15.1 & 13.5 & \textbf{10.8} \\
+12q & 20.2 & 18.6 & \textbf{15.9} \\
+16q & 27.7 & 27.7 & \textbf{23.2} \\
+\hline
+\end{tabular}
+\end{table}
+
+结果揭示了一个重要现象：\textbf{PPO 的保真度优势并非来自更少的 SWAP}——SABRE 在所有规模上 SWAP 数最少，而 PPO 多用 10\%--25\% 的 SWAP 却取得更高的保真度。这说明 PPO 学到了「噪声友好」的路由偏好：将 SWAP 与门操作安排在低错误率边、以更高并行度压缩执行时间。保真度优势随规模增大而扩大（5q +7.2\% $\to$ 16q +304\%），因为线路越长、空闲退相干累积越多，调度质量的影响越大。
+
+此外，数据泄露检查表明此前基于训练分布内 split 的评估严重低估了模型真实性能（如 12q 上 l05 从 0.0152 被低估至 0.0861 的真实水平，膨胀 $-82\%$），本节全部结论均基于零重叠测试集。
+
+\subsection{真实基准电路评估（NAM Benchmark）}
+\label{sec:nam-benchmark}
+
+为进一步在非训练分布上检验泛化能力，在 19 条 NAM 标准基准电路（5--19 量子比特算术电路，最大 495 门）上对比：
+
+\begin{table}[htbp]
+\centering
+\caption{NAM 基准电路总览（19 条，trajectory\_sched $\times$ 16）}
+\label{tab:nam-overview}
+\small
+\begin{tabular}{l|ccc}
+\hline
+指标 & SABRE & l05 & ph2v4 \\
+\hline
+平均 SWAPs & \textbf{45.1} & 65.3 & 64.0 \\
+平均保真度 & 0.2747 & \textbf{0.3115} & 0.2872 \\
+胜 SABRE 电路数 & --- & \textbf{10/19} & 5/19 \\
+\hline
+\end{tabular}
+\end{table}
+
+l05 平均保真度超越 SABRE 13.4\%，尽管 SWAP 数多 45\%。分电路看，l05 在中等规模电路上优势显著：csla\_mux\_3（15q，保真度 $+652\%$）、barenco\_tof\_10（19q，$+174\%$）、vbe\_adder\_3（10q，$+155\%$）；SABRE 仅在小电路（5q）和个别深电路上保持优势。831 门的 grover\_5 与 259 门的 hwb6 上所有算法保真度均低于 0.005，属于当前噪声水平下的物理极限而非编译策略差异。
+
+值得一提的机制发现：纯路由训练的 l05 在分布外 NAM 电路上 argmax 推理最优，而各噪声感知微调版本的 beam search 推理更强——原因是终端保真度奖励主要沉淀进 Critic 价值头（beam 评分 $r + \gamma V(s')$ 受益）而非直接改进策略先验（argmax 受益）。这一发现指出了策略与价值头在保真度信号利用上的分工，为后续双价值头设计（保真度进 $V$ 不进 $\pi$）提供了依据。
+
+\subsection{结果讨论}
+\label{sec:results-discussion}
+
+综合上述实验，可归纳出四点结论：
+
+\paragraph{（1）联合优化 + 布局多样性的有效性。} 映射阶段联合优化配合 layout-mix 训练，使单一策略同时具备三种工作模式：恒等布局回归、随机布局鲁棒路由、SABRE 布局精细路由。warm-start 混合管线在 SWAP 持平的前提下实现 makespan/串扰/并行度全面占优。
+
+\paragraph{（2）保真度优势的来源是调度而非 SWAP 数。} 无泄露评估与 NAM 基准一致表明：PPO 用更多 SWAP 换取更高并行度与更紧凑的执行时序，在含真机噪声的评估下净收益为正。这否定了「SWAP 数最小化 = 保真度最大化」的传统优化目标，说明调度感知奖励（时长/空闲/串扰分量）是必要的。
+
+\paragraph{（3）噪声感知微调存在尺寸依赖。} Phase 2 微调（ph2v4）在 8--12q 上比 l05 提升最高达 +79.5\%，但在 5q/16q 上略逊于 l05：小电路上纯路由策略已接近最优，微调是扰动；大电路上保真度信号稀疏、方差大，需更强的归一化与逐步保真度信号。
+
+\paragraph{（4）评估协议必须严格无泄露。} 训练分布内 split 的评估曾将 10q+ 规模的真实性能低估 $-75\%$ 至 $-82\%$，并导致「微调有害」的错误结论；零重叠测试集上结论反转为「微调在中规模电路有效」。这提示量子编译领域的基准测试应明确报告训练/评估电路的重叠情况。

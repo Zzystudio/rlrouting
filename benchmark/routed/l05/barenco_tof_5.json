@@ -7,19 +7,19 @@
  "initial_layout": {
   "0": 4,
   "1": 5,
-  "2": 6,
-  "3": 8,
-  "4": 0,
-  "5": 11,
+  "2": 2,
+  "3": 6,
+  "4": 3,
+  "5": 8,
   "6": 7,
-  "7": 1,
-  "8": 3
+  "7": 0,
+  "8": 1
  },
- "routed_qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[20];\nh q[1];\ncx q[3],q[1];\nrz(-pi/4) q[1];\nswap q[3],q[0];\ncx q[3],q[1];\nrz(pi/4) q[1];\nswap q[3],q[1];\ncx q[0],q[3];\nrz(-pi/4) q[3];\ncx q[1],q[3];\nrz(pi/4) q[3];\nswap q[3],q[0];\ncx q[1],q[3];\nrz(-pi/4) q[3];\ncx q[1],q[3];\nrz(pi/4) q[1];\nrz(pi/4) q[3];\nh q[3];\nswap q[5],q[3];\ncx q[7],q[5];\nrz(-pi/4) q[5];\nswap q[8],q[6];\ncx q[8],q[5];\nrz(pi/4) q[5];\ncx q[7],q[5];\nrz(-pi/4) q[5];\ncx q[8],q[5];\nrz(pi/4) q[5];\nswap q[11],q[7];\ncx q[8],q[11];\nrz(-pi/4) q[11];\ncx q[8],q[11];\nrz(pi/4) q[8];\nrz(pi/4) q[11];\nh q[11];\nswap q[8],q[6];\ncx q[8],q[11];\nrz(-pi/4) q[11];\nswap q[4],q[2];\nswap q[11],q[8];\nswap q[6],q[4];\ncx q[6],q[8];\nrz(pi/4) q[8];\ncx q[11],q[8];\nrz(-pi/4) q[8];\ncx q[6],q[8];\nrz(pi/4) q[8];\nswap q[8],q[6];\ncx q[8],q[11];\nrz(-pi/4) q[11];\ncx q[8],q[11];\nrz(pi/4) q[8];\nrz(pi/4) q[11];\nh q[11];\nswap q[11],q[8];\nswap q[8],q[5];\ncx q[3],q[5];\nrz(-pi/4) q[5];\nswap q[4],q[2];\ncx q[4],q[5];\nrz(pi/4) q[5];\ncx q[3],q[5];\nrz(-pi/4) q[5];\ncx q[4],q[5];\nrz(pi/4) q[5];\nh q[5];\nswap q[5],q[4];\ncx q[5],q[3];\nrz(-pi/4) q[3];\ncx q[5],q[3];\nrz(pi/4) q[5];\nrz(pi/4) q[3];\ncx q[4],q[6];\nrz(pi/4) q[6];\nswap q[8],q[6];\ncx q[11],q[8];\nrz(-pi/4) q[8];\nswap q[5],q[4];\ncx q[5],q[8];\nrz(pi/4) q[8];\ncx q[11],q[8];\nrz(-pi/4) q[8];\nh q[8];\ncx q[8],q[6];\nrz(pi/4) q[6];\nswap q[4],q[2];\ncx q[4],q[6];\nrz(-pi/4) q[6];\ncx q[8],q[6];\nrz(pi/4) q[6];\ncx q[4],q[6];\nrz(-pi/4) q[6];\nh q[6];\nswap q[8],q[5];\ncx q[11],q[8];\nrz(pi/4) q[8];\ncx q[11],q[8];\nrz(-pi/4) q[11];\nrz(-pi/4) q[8];\ncx q[4],q[5];\nrz(pi/4) q[5];\ncx q[4],q[5];\nrz(-pi/4) q[4];\nrz(-pi/4) q[5];\nswap q[3],q[0];\nswap q[8],q[6];\nswap q[8],q[5];\ncx q[5],q[3];\nrz(pi/4) q[3];\ncx q[1],q[3];\nrz(-pi/4) q[3];\ncx q[5],q[3];\nrz(pi/4) q[3];\ncx q[1],q[3];\nrz(-pi/4) q[3];\nh q[3];\nswap q[5],q[4];\ncx q[1],q[4];\nrz(pi/4) q[4];\ncx q[1],q[4];\nrz(-pi/4) q[1];\nrz(-pi/4) q[4];\nh q[4];\nswap q[5],q[4];\ncx q[8],q[5];\nrz(-pi/4) q[5];\ncx q[4],q[5];\nrz(pi/4) q[5];\ncx q[8],q[5];\nrz(-pi/4) q[5];\ncx q[4],q[5];\nrz(pi/4) q[5];\nswap q[8],q[6];\ncx q[4],q[6];\nrz(-pi/4) q[6];\ncx q[4],q[6];\nrz(pi/4) q[4];\nrz(pi/4) q[6];\nh q[6];\ncx q[8],q[6];\nrz(-pi/4) q[6];\nswap q[11],q[8];\ncx q[8],q[6];\nrz(pi/4) q[6];\nswap q[8],q[6];\ncx q[11],q[8];\nrz(-pi/4) q[8];\ncx q[6],q[8];\nrz(pi/4) q[8];\nswap q[8],q[6];\ncx q[8],q[11];\nrz(-pi/4) q[11];\ncx q[8],q[11];\nrz(pi/4) q[8];\nrz(pi/4) q[11];\nh q[11];\nswap q[3],q[0];\nswap q[5],q[3];\nswap q[7],q[5];\ncx q[7],q[11];\nrz(pi/4) q[11];\nswap q[4],q[2];\nswap q[5],q[4];\nswap q[8],q[5];\ncx q[8],q[11];\nrz(-pi/4) q[11];\ncx q[7],q[11];\nrz(pi/4) q[11];\ncx q[8],q[11];\nrz(-pi/4) q[11];\nh q[11];\nswap q[11],q[8];\ncx q[11],q[7];\nrz(pi/4) q[7];\ncx q[11],q[7];\nrz(-pi/4) q[11];\nrz(-pi/4) q[7];\ncx q[8],q[6];\nrz(pi/4) q[6];\nswap q[8],q[6];\ncx q[5],q[8];\nrz(-pi/4) q[8];\ncx q[6],q[8];\nrz(pi/4) q[8];\ncx q[5],q[8];\nrz(-pi/4) q[8];\nh q[8];\nswap q[8],q[5];\ncx q[8],q[6];\nrz(pi/4) q[6];\ncx q[8],q[6];\nrz(-pi/4) q[8];\nrz(-pi/4) q[6];\ncx q[5],q[3];\nrz(pi/4) q[3];\nswap q[4],q[2];\nswap q[5],q[3];\ncx q[4],q[5];\nrz(-pi/4) q[5];\ncx q[3],q[5];\nrz(pi/4) q[5];\ncx q[4],q[5];\nrz(-pi/4) q[5];\nh q[5];\nswap q[5],q[3];\ncx q[4],q[5];\nrz(pi/4) q[5];\ncx q[4],q[5];\nrz(-pi/4) q[4];\nrz(-pi/4) q[5];",
- "num_swaps": 40,
- "mapping_swaps": 1,
+ "routed_qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[20];\nh q[1];\nswap q[3],q[0];\ncx q[3],q[1];\nrz(-pi/4) q[1];\nswap q[3],q[0];\ncx q[3],q[1];\nrz(pi/4) q[1];\nswap q[3],q[1];\ncx q[0],q[3];\nrz(-pi/4) q[3];\ncx q[1],q[3];\nrz(pi/4) q[3];\nswap q[3],q[0];\ncx q[1],q[3];\nrz(-pi/4) q[3];\ncx q[1],q[3];\nrz(pi/4) q[1];\nrz(pi/4) q[3];\nh q[3];\nswap q[5],q[3];\ncx q[7],q[5];\nrz(-pi/4) q[5];\nswap q[8],q[6];\ncx q[8],q[5];\nrz(pi/4) q[5];\ncx q[7],q[5];\nrz(-pi/4) q[5];\ncx q[8],q[5];\nrz(pi/4) q[5];\nswap q[11],q[7];\ncx q[8],q[11];\nrz(-pi/4) q[11];\ncx q[8],q[11];\nrz(pi/4) q[8];\nrz(pi/4) q[11];\nh q[11];\nswap q[8],q[6];\ncx q[8],q[11];\nrz(-pi/4) q[11];\nswap q[4],q[2];\nswap q[11],q[8];\nswap q[6],q[4];\ncx q[6],q[8];\nrz(pi/4) q[8];\ncx q[11],q[8];\nrz(-pi/4) q[8];\ncx q[6],q[8];\nrz(pi/4) q[8];\nswap q[8],q[6];\ncx q[8],q[11];\nrz(-pi/4) q[11];\ncx q[8],q[11];\nrz(pi/4) q[8];\nrz(pi/4) q[11];\nh q[11];\nswap q[11],q[8];\nswap q[8],q[5];\ncx q[3],q[5];\nrz(-pi/4) q[5];\nswap q[4],q[2];\ncx q[4],q[5];\nrz(pi/4) q[5];\ncx q[3],q[5];\nrz(-pi/4) q[5];\ncx q[4],q[5];\nrz(pi/4) q[5];\nh q[5];\nswap q[5],q[4];\ncx q[5],q[3];\nrz(-pi/4) q[3];\ncx q[5],q[3];\nrz(pi/4) q[5];\nrz(pi/4) q[3];\ncx q[4],q[6];\nrz(pi/4) q[6];\nswap q[8],q[6];\ncx q[11],q[8];\nrz(-pi/4) q[8];\nswap q[5],q[4];\ncx q[5],q[8];\nrz(pi/4) q[8];\ncx q[11],q[8];\nrz(-pi/4) q[8];\nh q[8];\ncx q[8],q[6];\nrz(pi/4) q[6];\nswap q[4],q[2];\ncx q[4],q[6];\nrz(-pi/4) q[6];\ncx q[8],q[6];\nrz(pi/4) q[6];\ncx q[4],q[6];\nrz(-pi/4) q[6];\nh q[6];\nswap q[8],q[5];\ncx q[11],q[8];\nrz(pi/4) q[8];\ncx q[11],q[8];\nrz(-pi/4) q[11];\nrz(-pi/4) q[8];\ncx q[4],q[5];\nrz(pi/4) q[5];\ncx q[4],q[5];\nrz(-pi/4) q[4];\nrz(-pi/4) q[5];\nswap q[3],q[0];\nswap q[8],q[6];\nswap q[8],q[5];\ncx q[5],q[3];\nrz(pi/4) q[3];\ncx q[1],q[3];\nrz(-pi/4) q[3];\ncx q[5],q[3];\nrz(pi/4) q[3];\ncx q[1],q[3];\nrz(-pi/4) q[3];\nh q[3];\nswap q[5],q[4];\ncx q[1],q[4];\nrz(pi/4) q[4];\ncx q[1],q[4];\nrz(-pi/4) q[1];\nrz(-pi/4) q[4];\nh q[4];\nswap q[5],q[4];\ncx q[8],q[5];\nrz(-pi/4) q[5];\ncx q[4],q[5];\nrz(pi/4) q[5];\ncx q[8],q[5];\nrz(-pi/4) q[5];\ncx q[4],q[5];\nrz(pi/4) q[5];\nswap q[8],q[6];\ncx q[4],q[6];\nrz(-pi/4) q[6];\ncx q[4],q[6];\nrz(pi/4) q[4];\nrz(pi/4) q[6];\nh q[6];\ncx q[8],q[6];\nrz(-pi/4) q[6];\nswap q[11],q[8];\ncx q[8],q[6];\nrz(pi/4) q[6];\nswap q[8],q[6];\ncx q[11],q[8];\nrz(-pi/4) q[8];\ncx q[6],q[8];\nrz(pi/4) q[8];\nswap q[8],q[6];\ncx q[8],q[11];\nrz(-pi/4) q[11];\ncx q[8],q[11];\nrz(pi/4) q[8];\nrz(pi/4) q[11];\nh q[11];\nswap q[3],q[0];\nswap q[5],q[3];\nswap q[7],q[5];\ncx q[7],q[11];\nrz(pi/4) q[11];\nswap q[4],q[2];\nswap q[5],q[4];\nswap q[8],q[5];\ncx q[8],q[11];\nrz(-pi/4) q[11];\ncx q[7],q[11];\nrz(pi/4) q[11];\ncx q[8],q[11];\nrz(-pi/4) q[11];\nh q[11];\nswap q[11],q[8];\ncx q[11],q[7];\nrz(pi/4) q[7];\ncx q[11],q[7];\nrz(-pi/4) q[11];\nrz(-pi/4) q[7];\ncx q[8],q[6];\nrz(pi/4) q[6];\nswap q[8],q[6];\ncx q[5],q[8];\nrz(-pi/4) q[8];\ncx q[6],q[8];\nrz(pi/4) q[8];\ncx q[5],q[8];\nrz(-pi/4) q[8];\nh q[8];\nswap q[8],q[5];\ncx q[8],q[6];\nrz(pi/4) q[6];\ncx q[8],q[6];\nrz(-pi/4) q[8];\nrz(-pi/4) q[6];\ncx q[5],q[3];\nrz(pi/4) q[3];\nswap q[4],q[2];\nswap q[5],q[3];\ncx q[4],q[5];\nrz(-pi/4) q[5];\ncx q[3],q[5];\nrz(pi/4) q[5];\ncx q[4],q[5];\nrz(-pi/4) q[5];\nh q[5];\nswap q[5],q[3];\ncx q[4],q[5];\nrz(pi/4) q[5];\ncx q[4],q[5];\nrz(-pi/4) q[4];\nrz(-pi/4) q[5];",
+ "num_swaps": 41,
+ "mapping_swaps": 0,
  "completed": true,
- "fidelity": 0.30885474001014024,
+ "fidelity": null,
  "final_layout": {
   "0": 11,
   "1": 7,
@@ -31,7 +31,7 @@
   "7": 3,
   "8": 0
  },
- "wall_time_ms": 369.5,
+ "wall_time_ms": 373.7,
  "from_0_19": {
   "0": "Q12",
   "1": "Q13",

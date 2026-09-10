@@ -70,7 +70,15 @@ def _compute_final_layout(env: RoutingEnv, q_label_map: dict, coupling_map: list
             p, q = coupling_map[action]
             inv = {phys: log for log, phys in enumerate(mapping)}
             lp, lq = inv.get(p), inv.get(q)
-            if lp is not None and lq is not None:
+            # 与 env._apply_swap 一致：空端点 SWAP 会把逻辑比特搬到空位上，
+            # 跳过会导致回放偏离真实映射（历史 bug 根因之一）。
+            if lp is None and lq is None:
+                continue
+            if lp is None:
+                mapping[lq] = p
+            elif lq is None:
+                mapping[lp] = q
+            else:
                 mapping[lp], mapping[lq] = mapping[lq], mapping[lp]
     return {str(i): q_label_map[mapping[i]] for i in range(len(mapping))}
 
@@ -209,7 +217,6 @@ def main():
             lambda_fid=args.lambda_fid_max if args.reward_mode != 'routing' else 0.0,
         )
         obs, _ = env.reset()
-        initial_mapping = env.mapping.copy()
 
         if args.beam_width > 0:
             # Beam search: inline 1-step lookahead
@@ -309,7 +316,9 @@ def main():
 
         wall_time_ms = (time.perf_counter() - t0) * 1000
 
-        initial_layout = {str(i): initial_mapping[i]
+        # 有效初始布局 = 映射阶段 commit 后、物理线路第一条门执行时刻的映射。
+        # 与 routed_qasm 严格对应：initial_layout + 线路内 SWAP 逐一追踪 == final_layout。
+        initial_layout = {str(i): env._effective_initial_mapping[i]
                           for i in range(num_logical)}
         final_layout = {str(i): env.mapping[i]
                         for i in range(num_logical)}

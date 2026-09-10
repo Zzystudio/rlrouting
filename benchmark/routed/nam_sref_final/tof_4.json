@@ -5,19 +5,19 @@
  "num_physical_qubits": 20,
  "topology": "tianyan176_20q",
  "initial_layout": {
-  "0": 19,
-  "1": 0,
-  "2": 8,
-  "3": 4,
+  "0": 2,
+  "1": 4,
+  "2": 3,
+  "3": 6,
   "4": 5,
-  "5": 3,
+  "5": 0,
   "6": 1
  },
  "routed_qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[20];\nh q[5];\nh q[0];\nh q[1];\ncx q[4],q[5];\nrz(-pi/4) q[5];\nswap q[4],q[2];\ncx q[4],q[5];\nrz(pi/4) q[5];\nswap q[4],q[2];\ncx q[4],q[5];\nrz(-pi/4) q[5];\nswap q[5],q[4];\ncx q[2],q[4];\nrz(pi/4) q[4];\nh q[4];\nswap q[5],q[4];\ncx q[2],q[4];\nrz(-pi/4) q[4];\ncx q[2],q[4];\nrz(pi/4) q[2];\nrz(pi/4) q[4];\nswap q[3],q[0];\ncx q[5],q[3];\nrz(-pi/4) q[3];\ncx q[0],q[3];\nrz(pi/4) q[3];\ncx q[5],q[3];\nrz(-pi/4) q[3];\ncx q[0],q[3];\nrz(pi/4) q[3];\nh q[3];\ncx q[3],q[1];\nrz(-pi/4) q[1];\nswap q[6],q[4];\ncx q[4],q[1];\nrz(pi/4) q[1];\ncx q[3],q[1];\nrz(-pi/4) q[1];\ncx q[4],q[1];\nrz(pi/4) q[1];\nh q[1];\nswap q[5],q[3];\ncx q[0],q[3];\nrz(-pi/4) q[3];\ncx q[0],q[3];\nrz(pi/4) q[0];\nrz(pi/4) q[3];\ncx q[4],q[5];\nrz(-pi/4) q[5];\ncx q[4],q[5];\nrz(pi/4) q[4];\nrz(pi/4) q[5];\nh q[5];\ncx q[3],q[5];\nrz(pi/4) q[5];\nswap q[3],q[0];\ncx q[3],q[5];\nrz(-pi/4) q[5];\nswap q[3],q[0];\ncx q[3],q[5];\nrz(pi/4) q[5];\nswap q[5],q[3];\ncx q[0],q[3];\nrz(-pi/4) q[3];\nh q[3];\nswap q[5],q[3];\ncx q[0],q[3];\nrz(pi/4) q[3];\ncx q[0],q[3];\nrz(-pi/4) q[0];\nrz(-pi/4) q[3];\nh q[3];\nswap q[8],q[6];\nswap q[8],q[5];\ncx q[5],q[3];\nrz(pi/4) q[3];\nswap q[2],q[19];\nswap q[1],q[19];\ncx q[1],q[3];\nrz(-pi/4) q[3];\ncx q[5],q[3];\nrz(pi/4) q[3];\ncx q[1],q[3];\nrz(-pi/4) q[3];\nh q[3];\nswap q[5],q[3];\ncx q[1],q[3];\nrz(pi/4) q[3];\ncx q[1],q[3];\nrz(-pi/4) q[1];\nrz(-pi/4) q[3];",
  "num_swaps": 16,
  "mapping_swaps": 0,
  "completed": true,
- "fidelity": 0.5207662710280871,
+ "fidelity": null,
  "final_layout": {
   "0": 1,
   "1": 3,
@@ -27,7 +27,7 @@
   "5": 8,
   "6": 19
  },
- "wall_time_ms": 97.8,
+ "wall_time_ms": 96.4,
  "from_0_19": {
   "0": "Q12",
   "1": "Q13",

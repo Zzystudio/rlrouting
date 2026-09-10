@@ -1,4 +1,7 @@
-"""Batch compute fidelity for routed circuits."""
+"""Batch compute fidelity for routed circuits (all model dirs).
+
+Usage: python3 scripts/compute_fidelity.py [group 0-3]   (4-way parallel)
+"""
 import json, os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 from qiskit.qasm2 import loads as qasm2_loads
@@ -8,9 +11,26 @@ from routing.rl.eval_policy import load_topo
 config, hw, coupling_map = load_topo('traindata/topo/tianyan176_20q.json')
 SWAP_DEF = 'gate swap a,b { cx a,b; cx b,a; cx a,b; }\n'
 
-for model in ['ph2v4', 'l05']:
+MODELS = [
+    'l05', 'l05_beam3', 'l05_beam5', 'l05_nam',
+    'ph2v4', 'ph2v4_beam3', 'ph2v4_beam5',
+    'nam_l05_v2', 'nam_l05_v2_beam3',
+    'nam_p2a', 'nam_p2a_beam3', 'nam_p2b', 'nam_p2b_beam3',
+    'nam_p2c', 'nam_p2c_beam3',
+    'nam_sref_v1', 'nam_sref_v1_beam3', 'nam_sref_final',
+    'nam_traj_v1', 'nam_traj_v1_beam3',
+]
+GROUP = int(sys.argv[1]) if len(sys.argv) > 1 else -1
+if GROUP >= 0:
+    MODELS = [m for i, m in enumerate(MODELS) if i % 4 == GROUP]
+
+for model in MODELS:
+    summary_path = f'benchmark/routed/{model}_summary.json'
+    if not os.path.exists(summary_path):
+        print(f'=== {model}: no summary, skip ===', flush=True)
+        continue
     print(f'=== {model} ===', flush=True)
-    summary = json.load(open(f'benchmark/routed/{model}_summary.json'))
+    summary = json.load(open(summary_path))
     for r in summary['results']:
         fname = r['circuit'].replace('.qasm', '.json')
         fpath = f'benchmark/routed/{model}/{fname}'
@@ -31,7 +51,9 @@ for model in ['ph2v4', 'l05']:
         d['fidelity'] = fid
         with open(fpath, 'w') as f:
             json.dump(d, f, indent=1, ensure_ascii=False)
-    with open(f'benchmark/routed/{model}_summary.json', 'w') as f:
+    with open(summary_path, 'w') as f:
         json.dump(summary, f, indent=1, ensure_ascii=False)
-    print(f'=== {model} done ===', flush=True)
+    fids = [r['fidelity'] for r in summary['results'] if r['fidelity'] is not None]
+    if fids:
+        print(f'  >> {model}: mean_fid={sum(fids)/len(fids):.4f} ({len(fids)} circuits)', flush=True)
 print('ALL DONE', flush=True)

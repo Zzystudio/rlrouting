@@ -5,11 +5,11 @@
  "num_physical_qubits": 20,
  "topology": "tianyan176_20q",
  "initial_layout": {
-  "0": 6,
-  "1": 2,
+  "0": 2,
+  "1": 4,
   "2": 3,
-  "3": 4,
-  "4": 8,
+  "3": 6,
+  "4": 5,
   "5": 0,
   "6": 1
  },
@@ -17,7 +17,7 @@
  "num_swaps": 13,
  "mapping_swaps": 0,
  "completed": true,
- "fidelity": 0.6322749512293178,
+ "fidelity": null,
  "final_layout": {
   "0": 4,
   "1": 6,
@@ -27,7 +27,7 @@
   "5": 0,
   "6": 1
  },
- "wall_time_ms": 81.2,
+ "wall_time_ms": 100.7,
  "from_0_19": {
   "0": "Q12",
   "1": "Q13",
