@@ -1,0 +1,106 @@
+=== l05_nam ===
+  barenco_tof_10.qasm: 19q, swaps=152, fid=0.0333
+  barenco_tof_3.qasm: 5q, swaps=13, fid=0.6113
+  barenco_tof_4.qasm: 7q, swaps=18, fid=0.4732
+  barenco_tof_5.qasm: 9q, swaps=39, fid=0.2637
+  csla_mux_3.qasm: 15q, swaps=53, fid=0.3151
+  gf2^4_mult.qasm: 12q, swaps=54, fid=0.1152
+  gf2^5_mult.qasm: 15q, swaps=91, fid=0.1545
+  gf2^6_mult.qasm: 18q, swaps=173, fid=0.0774
+  grover_5.qasm: 9q, swaps=145, fid=0.0000
+  hwb6.qasm: 7q, swaps=46, fid=0.0004
+  mod5_4.qasm: 5q, swaps=15, fid=0.4938
+  mod_mult_55.qasm: 9q, swaps=22, fid=0.1249
+  mod_red_21.qasm: 11q, swaps=58, fid=0.0212
+  rc_adder_6.qasm: 14q, swaps=57, fid=0.0318
+  tof_10.qasm: 19q, swaps=81, fid=0.2974
+  tof_3.qasm: 5q, swaps=10, fid=0.8112
+  tof_4.qasm: 7q, swaps=13, fid=0.6111
+  tof_5.qasm: 9q, swaps=22, fid=0.5951
+  vbe_adder_3.qasm: 10q, swaps=33, fid=0.5144
+  >> l05_nam: mean_fid=0.2918 (19 circuits)
+=== nam_l05_v2 ===
+  barenco_tof_10.qasm: 19q, swaps=167, fid=0.0190
+  barenco_tof_3.qasm: 5q, swaps=12, fid=0.6422
+  barenco_tof_4.qasm: 7q, swaps=19, fid=0.4289
+  barenco_tof_5.qasm: 9q, swaps=35, fid=0.1627
+  csla_mux_3.qasm: 15q, swaps=47, fid=0.1952
+  gf2^4_mult.qasm: 12q, swaps=59, fid=0.2183
+  gf2^5_mult.qasm: 15q, swaps=86, fid=0.2551
+  gf2^6_mult.qasm: 18q, swaps=135, fid=0.0607
+  grover_5.qasm: 9q, swaps=151, fid=0.0031
+  hwb6.qasm: 7q, swaps=66, fid=0.0000
+  mod5_4.qasm: 5q, swaps=12, fid=0.4657
+  mod_mult_55.qasm: 9q, swaps=18, fid=0.0983
+  mod_red_21.qasm: 11q, swaps=57, fid=0.0002
+  rc_adder_6.qasm: 14q, swaps=47, fid=0.0000
+  tof_10.qasm: 19q, swaps=84, fid=0.1890
+  tof_3.qasm: 5q, swaps=10, fid=0.7627
+  tof_4.qasm: 7q, swaps=15, fid=0.5307
+  tof_5.qasm: 9q, swaps=25, fid=0.6411
+  vbe_adder_3.qasm: 10q, swaps=47, fid=0.2654
+  >> nam_l05_v2: mean_fid=0.2599 (19 circuits)
+=== nam_p2b ===
+  barenco_tof_10.qasm: 19q, swaps=187, fid=0.1330
+  barenco_tof_3.qasm: 5q, swaps=15, fid=0.7629
+  barenco_tof_4.qasm: 7q, swaps=25, fid=0.4698
+  barenco_tof_5.qasm: 9q, swaps=45, fid=0.4232
+  csla_mux_3.qasm: 15q, swaps=54, fid=0.2604
+  gf2^4_mult.qasm: 12q, swaps=57, fid=0.1376
+  gf2^5_mult.qasm: 15q, swaps=106, fid=0.3270
+  gf2^6_mult.qasm: 18q, swaps=214, fid=0.2329
+  grover_5.qasm: 9q, swaps=147, fid=0.0006
+  hwb6.qasm: 7q, swaps=55, fid=0.0620
+  mod5_4.qasm: 5q, swaps=15, fid=0.4883
+  mod_mult_55.qasm: 9q, swaps=27, fid=0.1452
+  mod_red_21.qasm: 11q, swaps=69, fid=0.2071
+  rc_adder_6.qasm: 14q, swaps=66, fid=0.1775
+  tof_10.qasm: 19q, swaps=104, fid=0.2582
+  tof_3.qasm: 5q, swaps=11, fid=0.8198
+  tof_4.qasm: 7q, swaps=19, fid=0.7138
+  tof_5.qasm: 9q, swaps=22, fid=0.4665
+  vbe_adder_3.qasm: 10q, swaps=40, fid=0.4172
+  >> nam_p2b: mean_fid=0.3423 (19 circuits)
+=== nam_sref_v1 ===
+  barenco_tof_10.qasm: 19q, swaps=151, fid=0.1022
+  barenco_tof_3.qasm: 5q, swaps=15, fid=0.7274
+  barenco_tof_4.qasm: 7q, swaps=20, fid=0.4436
+  barenco_tof_5.qasm: 9q, swaps=39, fid=0.4044
+  csla_mux_3.qasm: 15q, swaps=62, fid=0.1617
+  gf2^4_mult.qasm: 12q, swaps=56, fid=0.2287
+  gf2^5_mult.qasm: 15q, swaps=97, fid=0.0904
+  gf2^6_mult.qasm: 18q, swaps=163, fid=0.0301
+  grover_5.qasm: 9q, swaps=135, fid=0.0000
+  hwb6.qasm: 7q, swaps=59, fid=0.0100
+  mod5_4.qasm: 5q, swaps=14, fid=0.5044
+  mod_mult_55.qasm: 9q, swaps=22, fid=0.0619
+  mod_red_21.qasm: 11q, swaps=75, fid=0.0709
+  rc_adder_6.qasm: 14q, swaps=62, fid=0.0582
+  tof_10.qasm: 19q, swaps=87, fid=0.1879
+  tof_3.qasm: 5q, swaps=11, fid=0.8198
+  tof_4.qasm: 7q, swaps=12, fid=0.6265
+  tof_5.qasm: 9q, swaps=20, fid=0.5247
+  vbe_adder_3.qasm: 10q, swaps=45, fid=0.2366
+  >> nam_sref_v1: mean_fid=0.2784 (19 circuits)
+=== nam_traj_v1_beam3 ===
+  barenco_tof_10.qasm: 19q, swaps=98, fid=0.0886
+  barenco_tof_3.qasm: 5q, swaps=7, fid=0.6569
+  barenco_tof_4.qasm: 7q, swaps=18, fid=0.4551
+  barenco_tof_5.qasm: 9q, swaps=21, fid=0.3717
+  csla_mux_3.qasm: 15q, swaps=43, fid=0.1472
+  gf2^4_mult.qasm: 12q, swaps=51, fid=0.1952
+  gf2^5_mult.qasm: 15q, swaps=82, fid=0.1834
+  gf2^6_mult.qasm: 18q, swaps=131, fid=0.0454
+  grover_5.qasm: 9q, swaps=107, fid=0.0000
+  hwb6.qasm: 7q, swaps=40, fid=0.0264
+  mod5_4.qasm: 5q, swaps=8, fid=0.4065
+  mod_mult_55.qasm: 9q, swaps=16, fid=0.0863
+  mod_red_21.qasm: 11q, swaps=50, fid=0.0721
+  rc_adder_6.qasm: 14q, swaps=35, fid=0.1826
+  tof_10.qasm: 19q, swaps=68, fid=0.1643
+  tof_3.qasm: 5q, swaps=6, fid=0.8141
+  tof_4.qasm: 7q, swaps=9, fid=0.6279
+  tof_5.qasm: 9q, swaps=15, fid=0.5227
+  vbe_adder_3.qasm: 10q, swaps=27, fid=0.3740
+  >> nam_traj_v1_beam3: mean_fid=0.2853 (19 circuits)
+ALL DONE

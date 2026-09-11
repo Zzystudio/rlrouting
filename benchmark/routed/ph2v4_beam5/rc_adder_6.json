@@ -24,7 +24,7 @@
  "num_swaps": 31,
  "mapping_swaps": 0,
  "completed": true,
- "fidelity": null,
+ "fidelity": 0.11655953285676965,
  "final_layout": {
   "0": 0,
   "1": 3,
