@@ -240,6 +240,31 @@ class PPOAgent:
         return logits, v_route + self.lambda_v_fid * v_fid
 
     @torch.no_grad()
+    def _forward_obs_batch(self, obs_batch, action_masks=None):
+        """批量推理：obs_batch (K, obs_dim) → (logits (K, n_a), value (K,))。
+
+        用于 beam search 的 K 个候选 V(s') 评估，单次前向替代 K 次。
+        """
+        obs_batch = np.asarray(obs_batch)
+        K = obs_batch.shape[0]
+        eff_dim = self.edge_feat_dim
+        n_ef = self.num_edges * eff_dim
+        ef = torch.tensor(obs_batch[:, :n_ef], dtype=torch.float32,
+                          device=self.device).reshape(K, self.num_edges, eff_dim)
+        mv = torch.tensor(obs_batch[:, n_ef:n_ef + self.num_qubits],
+                          dtype=torch.float32, device=self.device)
+        if self.with_commit:
+            pg = torch.tensor(obs_batch[:, n_ef + self.num_qubits:n_ef + self.num_qubits + 1],
+                              dtype=torch.float32, device=self.device)
+            ph = torch.tensor(obs_batch[:, n_ef + self.num_qubits + 1:n_ef + self.num_qubits + 2],
+                              dtype=torch.float32, device=self.device)
+            logits, v_route, v_fid = self.ac(ef, mv, pg, ph, action_mask=action_masks)
+        else:
+            pg = torch.tensor(obs_batch[:, -1:], dtype=torch.float32, device=self.device)
+            logits, v_route, v_fid = self.ac(ef, mv, pg, None, action_mask=action_masks)
+        return logits, v_route + self.lambda_v_fid * v_fid
+
+    @torch.no_grad()
     def _forward_obs_split(self, obs, action_mask=None):
         """返回 (logits, v_route, v_fid) 三值（训练双通道 GAE 用）。"""
         if isinstance(self.ac, EdgeActorCritic):

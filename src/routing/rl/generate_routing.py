@@ -105,6 +105,8 @@ def main():
     parser.add_argument("--traj-trajectories", type=int, default=16)
     parser.add_argument("--max-episode-steps", type=int, default=1000)
     parser.add_argument("--device", default="cpu")
+    parser.add_argument("--torch-threads", type=int, default=8,
+                        help="torch CPU 线程数上限（小图推理多线程同步开销主导，默认 8）")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--no-fidelity", action="store_true",
                         help="Skip fidelity computation (route only)")
@@ -120,6 +122,9 @@ def main():
     parser.add_argument("--lambda-fid-max", type=float, default=5.0,
                         help="Terminal fidelity reward weight (match training)")
     args = parser.parse_args()
+
+    # 小图推理：限制 torch CPU 线程数，避免多线程同步开销主导（实测 2x+）
+    torch.set_num_threads(max(1, args.torch_threads))
 
     # ── 加载拓扑 ──
     from routing.rl.eval_policy import load_topo, build_fidelity_fn
@@ -256,18 +261,22 @@ def main():
                     if agent.gnn is not None:
                         graph_datas = [c.build_graph_data() for c, *_ in clones]
                         qubit_hs = agent.gnn.node_embeddings_batched(graph_datas)
-                        for (clone, a, reward_c, done_c, truncated_c), qh in zip(clones, qubit_hs):
-                            clone_obs = clone._obs(qubit_h=qh.cpu().numpy())
-                            _, v = agent._forward_obs(clone_obs)
+                        clone_obs_list = [t[0]._obs(qubit_h=qh.cpu().numpy())
+                                          for t, qh in zip(clones, qubit_hs)]
+                        # K 个候选的 V(s') 批量前向（单次替代 K 次）
+                        _, values = agent._forward_obs_batch(np.stack(clone_obs_list))
+                        for (clone, a, reward_c, done_c, truncated_c), clone_obs, v in zip(
+                                clones, clone_obs_list, values):
                             score = reward_c if (done_c or truncated_c) else reward_c + agent.gamma * v.item()
                             if score > best_score:
                                 best_score = score
                                 best_action = a
                                 best_clone_obs = clone_obs
                     else:
-                        for clone, a, reward_c, done_c, truncated_c in clones:
-                            clone_obs = clone._obs()
-                            _, v = agent._forward_obs(clone_obs)
+                        clone_obs_list = [c._obs() for c, *_ in clones]
+                        _, values = agent._forward_obs_batch(np.stack(clone_obs_list))
+                        for (clone, a, reward_c, done_c, truncated_c), clone_obs, v in zip(
+                                clones, clone_obs_list, values):
                             score = reward_c if (done_c or truncated_c) else reward_c + agent.gamma * v.item()
                             if score > best_score:
                                 best_score = score

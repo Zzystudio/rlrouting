@@ -5107,3 +5107,97 @@ agent 倾向立即 commit）。
 `scripts/compute_fidelity.py` 泛化为全部 20 个模型目录（trajectory_sched×16，seed=0），
 tmux 会话 regen_fid 后台运行中，完成后回填 per-circuit JSON 与 summary。
 SABRE 基线（sabre_results.json）不受影响。挑战杯报告 NAM 表格数字待重算完成后更新。
+
+---
+
+## 路由推理速度优化：观测管线重构（2026-09-10，4.6–5.1x，输出逐位不变）
+
+### 动机与实测瓶颈（优化前 profile，grover_5，400 步）
+
+- 31.5 ms/step，其中 `build_graph_data` 55.6% + `_sabre_edge_features` 27.7% +
+  GNN 前向 13.6%，**纯环境动力学仅 ~1.3%**——观测构造占 ~97%。
+- `_sabre_edge_features`：29 条边 × 每边重复调用 `_ready_2q_gates()`（O(G) 全门扫描，
+  每步 ~60 次）+ 每边重建 inv dict。
+- `build_routing_graph`：Maps_to 边"完全重建"中 `avg_two`（每物理比特邻居平均错误率）
+  为纯静态量却每门每步重算；`_nearest_occupied_distance` 每步 20 次独立 Python BFS；
+  O(G) Python 循环遍布动态特征。
+
+### 修复内容
+
+1. **T1 `_sabre_edge_features` 重写**（env.py）：ready 集合/inv 映射每步一次；
+   边 (p,q) 虚拟 SWAP 只把逻辑 lp→q、lq→p（含空端点分支），ready 门端点仅在
+   qa/qb ∈ {lp,lq} 时变化——增量更新替代全量重算；求和保序，特征逐元素一致。
+2. **T2 `build_routing_graph` 静态/动态分离**（circuit_dag.py）：
+   - 静态量缓存于 `dag._routing_graph_cache`（门模板/依赖边模板预热、每门端点表、
+     前驱矩阵、每物理比特邻居结构与 avg_two、maps-to per-pq 静态列模板）；
+   - 动态特征全向量化（pending_count=bincount、err/exec_status/rem_pred/map_dist
+     fancy-index、dep 列 8/9 复用 rem_pred 向量、coup 列 10 掩码、maps-to 查表 +
+     2 个动态列）；
+   - `_nearest_occupied_distance_multi`：多源 BFS 替代 20 次单源（结果一致）。
+3. **T3 torch 线程上限**（generate_routing/eval_policy 新增 `--torch-threads`，默认 8）：
+   112 核机上小图前向的多线程同步开销主导，实测 GNN 6.7→3.1 ms（2.2x）。
+   torch.compile 评估后弃用：单电路场景编译开销（每形状数秒~数十秒）超过收益。
+4. **T4 beam 候选批前向**（agent.py 新增 `_forward_obs_batch`，K 候选 V(s') 单次前向；
+   generate_routing/eval_policy beam 循环接入）。
+
+### 验证
+
+- **特征级等价**（scripts/verify_feature_equivalence.py，永久回归工具）：
+  T1 SABRE 特征 1500 步逐元素相等；T2 图特征 600 步全矩阵 `np.array_equal`
+  （gate/dep/qubit/coup/map 全部字段）。
+- **端到端输出等价**：l05/l05_beam3/ph2v4/ph2v4_beam3 四组重跑 19 条 NAM 电路，
+  routed_qasm 与 initial_layout **76/76 逐字节相同** → 保真度数字不变，无需重算。
+- pytest：49 passed（1 个预存无关失败 test_fidelity_shaping_step_zero，
+  HEAD 上同样失败，与本次改动无关）。
+
+### 基准结果（19 条 NAM 电路，wall_time 合计）
+
+| 模型 | 优化前 | 优化后 | 加速 | SWAP 总数（旧→新） |
+|------|-------|-------|------|------------------|
+| l05 argmax | 22.0s | 4.8s | **4.6x** | 1248 → 1248（不变） |
+| l05_beam3 | 38.7s | 8.0s | **4.9x** | 807 → 807（不变） |
+| ph2v4 argmax | 22.2s | 4.7s | **4.7x** | 1235 → 1235（不变） |
+| ph2v4_beam3 | 39.6s | 7.8s | **5.1x** | 804 → 804（不变） |
+
+单步：31.5 → ~4-5 ms（约 7x，含线程优化）；beam3 已快于 argmax（路线更短步数更少）。
+基准产物：`benchmark/routed_bench/`（与官方 routed/ 输出逐字节一致，仅 wall_time 不同）。
+
+### 备注
+
+- T1/T2 为纯计算重构，训练路径共享同一 `_obs`，特征逐元素一致 → 对训练无行为影响。
+- torch.compile 弃用原因：路由 episode 步数不足以摊销每形状编译成本；线程上限
+  已拿到大部分收益且零风险。
+- eval_policy `--fidelity-sim trajectory_sched` 自动启用调度器的既有行为不受影响。
+
+### 优化后 l05 argmax vs SABRE 编译时间对比（NAM 19 电路，同机实测）
+
+- l05 时间取自 `benchmark/routed_bench/l05/`（优化后 wall_time_ms，含 env 构建与整个 episode）；
+- SABRE 为 `evaluate_sabre`（swap_trials=20, decay）3 次取中位数（同机空闲态实测）。
+
+| circuit | q | gates | l05 SWAP | SABRE SWAP | l05 (ms) | SABRE (ms) | 倍数 |
+|---------|---|-------|---------:|-----------:|---------:|-----------:|-----:|
+| barenco_tof_10 | 19 | 450 | 189 | 103 | 832 | 16.4 | 50.7x |
+| barenco_tof_3 | 5 | 58 | 15 | 9 | 45 | 4.1 | 11.0x |
+| barenco_tof_4 | 7 | 114 | 23 | 30 | 74 | 6.3 | 11.8x |
+| barenco_tof_5 | 9 | 170 | 41 | 26 | 134 | 7.8 | 17.2x |
+| csla_mux_3 | 15 | 170 | 54 | 39 | 172 | 8.1 | 21.2x |
+| gf2^4_mult | 12 | 225 | 57 | 50 | 199 | 10.2 | 19.6x |
+| gf2^5_mult | 15 | 347 | 103 | 72 | 391 | 14.3 | 27.4x |
+| gf2^6_mult | 18 | 495 | 163 | 109 | 683 | 19.6 | 34.8x |
+| grover_5 | 9 | 831 | 149 | 119 | 785 | 28.7 | 27.4x |
+| hwb6 | 7 | 259 | 57 | 50 | 212 | 11.1 | 19.1x |
+| mod5_4 | 5 | 63 | 15 | 12 | 44 | 4.9 | 9.1x |
+| mod_mult_55 | 9 | 119 | 30 | 22 | 91 | 6.7 | 13.7x |
+| mod_red_21 | 11 | 278 | 72 | 48 | 252 | 10.6 | 23.7x |
+| rc_adder_6 | 14 | 200 | 68 | 38 | 213 | 7.8 | 27.4x |
+| tof_10 | 19 | 255 | 109 | 57 | 351 | 9.2 | 38.0x |
+| tof_3 | 5 | 45 | 11 | 11 | 33 | 3.3 | 9.9x |
+| tof_4 | 7 | 75 | 19 | 17 | 56 | 4.6 | 12.0x |
+| tof_5 | 9 | 105 | 25 | 17 | 75 | 5.7 | 13.2x |
+| vbe_adder_3 | 10 | 150 | 48 | 28 | 147 | 7.0 | 21.1x |
+| **总计/平均** | | | **1248** | **857** | **4791 (252 平均)** | **186.4 (9.8 平均)** | **25.7x（几何 8.4x）** |
+
+分析：优化前 l05 全套 22.0s（相对 SABRE ~118x），优化后 4.8s（25.7x）。差距随规模增长
+（5q ~9-11x → 19q/深电路 27-50x），主因是 RL 每步 GNN 前向 + 观测构造按步数线性累积，
+而 SABRE 是编译型启发式。交换的价值在保真度（+20.5%）与调度质量（makespan 0.66x、
+串扰 0.45x），编译时间已从"不可用"降到批处理可接受量级。

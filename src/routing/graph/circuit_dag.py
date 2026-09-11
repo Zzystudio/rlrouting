@@ -276,6 +276,12 @@ def build_routing_graph(
     executed_mask: Optional[np.ndarray] = None,
     executable_2q: Optional[set] = None,
 ) -> RoutingGraphData:
+    """构建路由图（每步调用）。
+
+    优化：静态量（门/依赖边模板、每物理比特邻居结构、maps-to 端点表等）
+    按电路/硬件缓存一次；动态量（executed/executable/mapping 相关特征）
+    全部 numpy 向量化，消除逐步 O(G) Python 循环。输出与逐字原实现一致。
+    """
     G = dag.num_gates
     M = dag.num_logical_qubits
     P = hw.num_qubits
@@ -283,156 +289,164 @@ def build_routing_graph(
     if executed_mask is None:
         executed_mask = np.zeros(G, dtype=bool)
 
-    depths = dag.dag_depths()
-    remaining = dag.remaining_depths()
-    succ = dag.successors()
-    max_depth = dag.max_depth()
-    max_dist = int(max(1, hw.dist.max() * P))
+    cache = getattr(dag, "_routing_graph_cache", None)
+    if cache is None or cache.get("G") != G:
+        cache = _build_graph_static_cache(dag, hw)
+        dag._routing_graph_cache = cache
 
-    max_in_deg = max((len(g.predecessors) for g in dag.gates), default=1)
-    max_out_deg = max((len(succ[g.index]) for g in dag.gates), default=1)
+    mapping_arr = np.asarray(mapping, dtype=np.int64)
+    dist = hw.dist
 
-    # ---- 占用掩码（多步复用）----
+    # ---- 占用掩码（向量化）----
     occupied_mask = np.zeros(P, dtype=bool)
-    for lq, pq in enumerate(mapping):
-        occupied_mask[pq] = True
+    occ_vals = mapping_arr[(mapping_arr >= 0) & (mapping_arr < P)]
+    occupied_mask[occ_vals] = True
 
+    # ---- pending_count（向量化：未执行门的操作数物理位直方图）----
+    unexec = ~executed_mask
     pending_count = np.zeros(P, dtype=float)
-    total_pending = 0
-    for g in dag.gates:
-        if not executed_mask[g.index]:
-            for q in g.qubits:
-                pq = mapping[q]
-                pending_count[pq] += 1.0
-                total_pending += 1
+    if unexec.any():
+        gq0 = cache["gate_q0"][unexec]
+        gq1 = cache["gate_q1"][unexec]
+        parts = [q[q >= 0] for q in (gq0, gq1) if (q >= 0).any()]
+        if parts:
+            phys = mapping_arr[np.concatenate(parts)]
+            pending_count = np.bincount(phys, minlength=P).astype(float)
+    total_pending = float(pending_count.sum())
 
+    # ---- executable_on_qubit（小集合，直接迭代）----
     executable_on_qubit: Dict[int, int] = {}
-    for g in dag.gates:
-        if g.is_two_qubit and executable_2q and g.index in executable_2q:
+    if executable_2q:
+        gates = dag.gates
+        for gi in executable_2q:
+            g = gates[gi]
+            if not g.is_two_qubit:
+                continue
             for q in g.qubits:
                 pq = mapping[q]
                 executable_on_qubit[pq] = executable_on_qubit.get(pq, 0) + 1
     max_exec = max(executable_on_qubit.values()) if executable_on_qubit else 1
 
-    nearest_dist = _nearest_occupied_distance(hw.adj, occupied_mask)
-    diameter = int(hw.dist.max() * P)
-    diameter = max(1, diameter)
+    nearest_dist = _nearest_occupied_distance_multi(hw.adj, occupied_mask)
+    diameter = cache["diameter"]
+    max_dist = cache["max_dist"]
 
-    # ---- Gate node features（模板 + 增量更新）----
-    gate_template = dag.build_gate_template()
-    gate_feat = gate_template.copy()
-    for g in dag.gates:
-        phys = [mapping[q] for q in g.qubits]
-        if g.is_measure:
-            err = hw.readout[phys[0]] if phys else 0.0
-        elif not g.is_two_qubit:
-            err = hw.single_q_err[phys[0]] if phys else 0.0
-        else:
-            if len(phys) >= 2:
-                err = max(hw.two_q_err[phys[0], phys[1]], 0.0)
-            else:
-                err = hw.two_q_err.max()
+    # ---- Gate node features（模板拷贝 + 动态列向量化）----
+    gate_feat = cache["gate_template"].copy()
+    gate_q0, gate_q1 = cache["gate_q0"], cache["gate_q1"]
+    has_q0 = gate_q0 >= 0
+    has_q1 = gate_q1 >= 0
+    phys0 = np.zeros(G, dtype=np.int64)
+    phys1 = np.zeros(G, dtype=np.int64)
+    phys0[has_q0] = mapping_arr[gate_q0[has_q0]]
+    phys1[has_q1] = mapping_arr[gate_q1[has_q1]]
 
-        is_executed = bool(executed_mask[g.index])
-        if is_executed:
-            exec_status = 2.0
-        elif g.is_two_qubit and executable_2q and g.index in executable_2q:
-            exec_status = 1.0
-        elif not g.is_two_qubit and all(executed_mask[p] for p in g.predecessors):
-            exec_status = 1.0
-        else:
-            exec_status = 0.0
+    # err（列 15）：measure→readout，1q→single_q_err，2q→max(two_q_err,0)
+    err = np.zeros(G, dtype=float)
+    m_meas = cache["is_measure"] & has_q0
+    m_1q = cache["is_1q"] & has_q0
+    m_2q_full = cache["is_2q"] & has_q0 & has_q1
+    if m_meas.any():
+        err[m_meas] = hw.readout[phys0[m_meas]]
+    if m_1q.any():
+        err[m_1q] = hw.single_q_err[phys0[m_1q]]
+    if m_2q_full.any():
+        err[m_2q_full] = np.maximum(hw.two_q_err[phys0[m_2q_full], phys1[m_2q_full]], 0.0)
+    m_2q_partial = cache["is_2q"] & ~has_q1
+    if m_2q_partial.any():
+        err[m_2q_partial] = hw.two_q_err.max()
 
-        n_rem_pred = sum(1 for p in g.predecessors if not executed_mask[p])
-        rem_pred_norm = n_rem_pred / max(1, len(g.predecessors))
+    # exec_status（列 22）：2.0 已执行 > 1.0 可执行 2Q / 就绪 1Q（含 measure）> 0
+    npred = cache["npred"]
+    pred_mat = cache["pred_mat"]
+    pred_valid = cache["pred_valid"]
+    n_exec_preds = (
+        pred_valid & executed_mask[pred_mat.clip(min=0)]
+    ).sum(axis=1)
+    all_preds_exec = n_exec_preds == npred
+    status = np.zeros(G, dtype=float)
+    is_2q_exec = np.zeros(G, dtype=bool)
+    if executable_2q:
+        for gi in executable_2q:
+            if cache["is_2q"][gi]:
+                is_2q_exec[gi] = True
+    status = np.where(executed_mask, 2.0,
+                      np.where(is_2q_exec, 1.0,
+                               np.where((~cache["is_2q"]) & all_preds_exec, 1.0, 0.0)))
 
-        if g.is_two_qubit and len(phys) >= 2:
-            map_dist = hw.dist[phys[0], phys[1]] * P
-            map_dist_norm = map_dist / max(1, max_dist)
-            is_adj = 1.0 if hw.adj[phys[0], phys[1]] > 0 else 0.0
-        else:
-            map_dist_norm = 0.0
-            is_adj = 0.0
+    # rem_pred_norm（列 23）
+    rem_pred_norm = (npred - n_exec_preds) / np.maximum(1, npred)
 
-        gate_feat[g.index, 15] = err
-        gate_feat[g.index, 22] = exec_status
-        gate_feat[g.index, 23] = rem_pred_norm
-        gate_feat[g.index, 25] = map_dist_norm
-        gate_feat[g.index, 26] = is_adj
+    # map_dist_norm / is_adj（列 25/26）
+    map_dist_norm = np.zeros(G, dtype=float)
+    is_adj = np.zeros(G, dtype=float)
+    if m_2q_full.any():
+        map_dist_norm[m_2q_full] = (dist[phys0[m_2q_full], phys1[m_2q_full]] * P) / max_dist
+        is_adj[m_2q_full] = (hw.adj[phys0[m_2q_full], phys1[m_2q_full]] > 0).astype(float)
 
-    # ---- Qubit node features（模板 + 增量更新）----
+    gate_feat[:, 15] = err
+    gate_feat[:, 22] = status
+    gate_feat[:, 23] = rem_pred_norm
+    gate_feat[:, 25] = map_dist_norm
+    gate_feat[:, 26] = is_adj
+
+    # ---- Qubit node features（模板拷贝 + 动态列向量化）----
     qubit_feat = hw.qubit_template.copy()
-    for pq in range(P):
-        occupied = 1.0 if occupied_mask[pq] else 0.0
-        occupancy = pending_count[pq] / max(1, total_pending)
-        exec_dep = executable_on_qubit.get(pq, 0) / max(1, max_exec)
-        near_dist = nearest_dist[pq] / max(1, diameter)
-        neighbors = [n for n in range(P) if hw.adj[pq, n] > 0]
-        degree = len(neighbors)
-        occ_neighbors = sum(1 for n in neighbors if occupied_mask[n])
-        occ_neighbor_norm = occ_neighbors / max(1, degree) if degree > 0 else 0.0
+    occ_f = occupied_mask.astype(float)
+    qubit_feat[:, 13] = occ_f
+    qubit_feat[:, 14] = pending_count / max(1, total_pending)
+    exec_dep = np.zeros(P, dtype=float)
+    for pq, c in executable_on_qubit.items():
+        exec_dep[pq] = c
+    qubit_feat[:, 16] = exec_dep / max(1, max_exec)
+    qubit_feat[:, 17] = nearest_dist / diameter
+    neigh_mat = cache["neigh_mat"]
+    neigh_valid = cache["neigh_valid"]
+    occ_neighbors = (occ_f[neigh_mat.clip(min=0)] * neigh_valid).sum(axis=1)
+    degree = cache["degree"]
+    qubit_feat[:, 18] = occ_neighbors / np.maximum(1, degree)
 
-        qubit_feat[pq, 13] = occupied
-        qubit_feat[pq, 14] = occupancy
-        qubit_feat[pq, 16] = exec_dep
-        qubit_feat[pq, 17] = near_dist
-        qubit_feat[pq, 18] = occ_neighbor_norm
-
-    # ---- Precedes edges（模板 + 增量 dims 8-9）----
+    # ---- Precedes edges（动态列 8/9 向量化）----
     dep_index, dep_template = dag.build_dep_template()
     dep_attr_arr = dep_template.copy()
     if dep_attr_arr.shape[0] > 0:
-        edge_idx = 0
-        for g in dag.gates:
-            for p in g.predecessors:
-                src_exec = 1.0 if executed_mask[p] else 0.0
-                n_rem = sum(1 for pp in g.predecessors if not executed_mask[pp])
-                tgt_rem = n_rem / max(1, len(g.predecessors))
-                dep_attr_arr[edge_idx, 8] = src_exec
-                dep_attr_arr[edge_idx, 9] = tgt_rem
-                edge_idx += 1
+        dep_src = dep_index[0]
+        dep_tgt = dep_index[1]
+        dep_attr_arr[:, 8] = executed_mask[dep_src].astype(float)
+        dep_attr_arr[:, 9] = rem_pred_norm[dep_tgt]
 
-    # ---- Couples edges（模板 + 增量 dim 10）----
+    # ---- Couples edges（动态列 10 向量化）----
     coup_index = hw.coupling_index
     coup_attr_arr = hw.coupling_template.copy()
     if coup_attr_arr.shape[0] > 0:
-        for i in range(0, len(coupling_map) * 2, 2):
-            q1, q2 = coupling_map[i // 2]
-            both_occ = 1.0 if (occupied_mask[q1] and occupied_mask[q2]) else 0.0
-            coup_attr_arr[i, 10] = both_occ
-            coup_attr_arr[i + 1, 10] = both_occ
+        E = len(coupling_map)
+        q1_arr = np.fromiter((e[0] for e in coupling_map), dtype=np.int64, count=E)
+        q2_arr = np.fromiter((e[1] for e in coupling_map), dtype=np.int64, count=E)
+        both = (occupied_mask[q1_arr] & occupied_mask[q2_arr]).astype(float)
+        coup_attr_arr[0::2, 10] = both
+        coup_attr_arr[1::2, 10] = both
 
-    # ---- Maps_to edges (gate → qubit) — 完全重建 ----
-    map_src, map_tgt = [], []
-    map_attr = []
-    for g in dag.gates:
-        for role, q in enumerate(g.qubits):
-            pq = mapping[q]
-            map_src.append(g.index)
-            map_tgt.append(pq)
-            neighbors = [n for n in range(P) if hw.adj[pq, n] > 0]
-            avg_two = np.mean([hw.two_q_err[pq, n] for n in neighbors]) if neighbors else 0.0
-            dist_to_other = 0.0
-            if g.is_two_qubit and len(g.qubits) == 2:
-                other_role = 1 - role
-                other_pq = mapping[g.qubits[other_role]]
-                dist_to_other = hw.dist[pq, other_pq] * P
-                dist_to_other /= max(1, diameter)
-            map_attr.append(maps_to_edge_feature(
-                phys_index_norm=pq / max(1, P - 1),
-                role=float(role),
-                t1_norm=hw.t1[pq],
-                t2_norm=hw.t2[pq],
-                freq_norm=hw.freq[pq],
-                readout_err_norm=hw.readout[pq],
-                single_q_err_norm=hw.single_q_err[pq],
-                avg_two_q_err_norm=avg_two,
-                occupied=1.0 if occupied_mask[pq] else 0.0,
-                distance_to_other_norm=dist_to_other,
-            ))
-
-    map_index = np.asarray([map_src, map_tgt], dtype=int) if map_src else np.empty((2, 0), dtype=int)
-    map_attr_arr = np.asarray(map_attr, dtype=float) if map_attr else np.empty((0, EDGE_FEATURE_DIM), dtype=float)
+    # ---- Maps_to edges（静态 per-pq 模板查表 + 2 个动态列）----
+    mt_gate = cache["mt_gate"]
+    mt_role = cache["mt_role"]
+    mt_qubit = cache["mt_qubit"]
+    mt_other = cache["mt_other"]
+    map_tgt = mapping_arr[mt_qubit]
+    if mt_gate.size > 0:
+        map_index = np.asarray([mt_gate, map_tgt], dtype=int)
+        map_attr_arr = cache["pq_static"][map_tgt].copy()
+        map_attr_arr[:, 2] = 1.0
+        map_attr_arr[:, 4] = mt_role
+        map_attr_arr[:, 11] = occ_f[map_tgt]
+        d12 = np.zeros(mt_gate.size, dtype=float)
+        m2e = mt_other >= 0
+        if m2e.any():
+            other_pq = mapping_arr[mt_other[m2e]]
+            d12[m2e] = (dist[map_tgt[m2e], other_pq] * P) / diameter
+        map_attr_arr[:, 12] = d12
+    else:
+        map_index = np.empty((2, 0), dtype=int)
+        map_attr_arr = np.empty((0, EDGE_FEATURE_DIM), dtype=float)
 
     return RoutingGraphData(
         num_gates=G,
@@ -447,6 +461,133 @@ def build_routing_graph(
         map_edge_attr=map_attr_arr,
         coupling_edges=list(coupling_map),
     )
+
+
+def _build_graph_static_cache(dag: CircuitDAG, hw: HardwareFeatures) -> Dict[str, Any]:
+    """预计算 build_routing_graph 的每电路/每硬件静态量（每电路一次）。"""
+    G = dag.num_gates
+    P = hw.num_qubits
+    gates = dag.gates
+
+    # 预热 dag 级模板缓存（内部自带 memo）
+    dag.build_gate_template()
+    dag.build_dep_template()
+
+    gate_q0 = np.full(G, -1, dtype=np.int64)
+    gate_q1 = np.full(G, -1, dtype=np.int64)
+    is_measure = np.zeros(G, dtype=bool)
+    is_2q = np.zeros(G, dtype=bool)
+    npred = np.zeros(G, dtype=np.int64)
+    mt_gate_list: List[int] = []
+    mt_role_list: List[float] = []
+    mt_qubit_list: List[int] = []
+    mt_other_list: List[int] = []
+    max_in = 0
+    for g in gates:
+        qs = g.qubits
+        if len(qs) > 0:
+            gate_q0[g.index] = qs[0]
+        if len(qs) > 1:
+            gate_q1[g.index] = qs[1]
+        if g.is_measure:
+            is_measure[g.index] = True
+        if g.is_two_qubit:
+            is_2q[g.index] = True
+        npred[g.index] = len(g.predecessors)
+        if len(g.predecessors) > max_in:
+            max_in = len(g.predecessors)
+        for role, q in enumerate(qs):
+            mt_gate_list.append(g.index)
+            mt_role_list.append(float(role))
+            mt_qubit_list.append(q)
+            if g.is_two_qubit and len(qs) == 2:
+                mt_other_list.append(qs[1 - role])
+            else:
+                mt_other_list.append(-1)
+
+    width = max(1, max_in)
+    pred_mat = np.zeros((G, width), dtype=np.int64)
+    pred_valid = np.zeros((G, width), dtype=bool)
+    for g in gates:
+        for j, p in enumerate(g.predecessors):
+            pred_mat[g.index, j] = p
+            pred_valid[g.index, j] = True
+
+    dist = hw.dist
+    adj = hw.adj
+    max_dist = int(max(1, dist.max() * P))
+    diameter = max(1, int(dist.max() * P))
+
+    # 每物理比特邻居结构 + 静态平均两比特错误率
+    neigh_mat = np.zeros((P, P), dtype=np.int64)
+    neigh_valid = np.zeros((P, P), dtype=bool)
+    degree = np.zeros(P, dtype=float)
+    avg_two = np.zeros(P, dtype=float)
+    for pq in range(P):
+        neigh = [n for n in range(P) if adj[pq, n] > 0]
+        degree[pq] = float(len(neigh))
+        if neigh:
+            neigh_mat[pq, :len(neigh)] = neigh
+            neigh_valid[pq, :len(neigh)] = True
+            avg_two[pq] = np.mean([hw.two_q_err[pq, n] for n in neigh])
+
+    # maps-to 边的 per-pq 静态列模板（cols 3,5-10；2/4/11/12 动态或常量）
+    pq_static = np.zeros((P, EDGE_FEATURE_DIM), dtype=float)
+    pq_static[:, 3] = np.arange(P) / max(1, P - 1)
+    pq_static[:, 5] = hw.t1
+    pq_static[:, 6] = hw.t2
+    pq_static[:, 7] = hw.freq
+    pq_static[:, 8] = hw.readout
+    pq_static[:, 9] = hw.single_q_err
+    pq_static[:, 10] = avg_two
+
+    return {
+        "G": G,
+        "gate_template": dag.build_gate_template(),
+        "gate_q0": gate_q0,
+        "gate_q1": gate_q1,
+        "is_measure": is_measure,
+        "is_1q": ~is_2q & ~is_measure,
+        "is_2q": is_2q,
+        "npred": npred,
+        "pred_mat": pred_mat,
+        "pred_valid": pred_valid,
+        "max_dist": max_dist,
+        "diameter": diameter,
+        "neigh_mat": neigh_mat,
+        "neigh_valid": neigh_valid,
+        "degree": degree,
+        "pq_static": pq_static,
+        "mt_gate": np.asarray(mt_gate_list, dtype=np.int64),
+        "mt_role": np.asarray(mt_role_list, dtype=float),
+        "mt_qubit": np.asarray(mt_qubit_list, dtype=np.int64),
+        "mt_other": np.asarray(mt_other_list, dtype=np.int64),
+    }
+
+
+def _nearest_occupied_distance_multi(
+    adj: np.ndarray, occupied: np.ndarray
+) -> np.ndarray:
+    """多源 BFS：与逐点 BFS（_nearest_occupied_distance）结果完全一致。"""
+    P = len(occupied)
+    dist = np.full(P, float(P))
+    sources = np.where(occupied)[0]
+    if sources.size == 0:
+        return dist
+    from collections import deque
+    visited = occupied.copy()
+    dist[sources] = 0.0
+    queue = deque(sources.tolist())
+    while queue:
+        u = queue.popleft()
+        du = dist[u]
+        row = adj[u]
+        for v in range(P):
+            if row[v] > 0 and not visited[v]:
+                visited[v] = True
+                dist[v] = du + 1.0
+                queue.append(v)
+    return dist
 
 
 # ---------------------------------------------------------------------------

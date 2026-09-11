@@ -470,9 +470,12 @@ def evaluate_circuit_beam(
             if agent.gnn is not None:
                 graph_datas = [c.build_graph_data() for c, *_ in clones]
                 qubit_hs = agent.gnn.node_embeddings_batched(graph_datas)
-                for (clone, a, reward_c, done_c, truncated_c), qh in zip(clones, qubit_hs):
-                    clone_obs = clone._obs(qubit_h=qh.cpu().numpy())
-                    _, v = agent._forward_obs(clone_obs)
+                clone_obs_list = [t[0]._obs(qubit_h=qh.cpu().numpy())
+                                  for t, qh in zip(clones, qubit_hs)]
+                # K 个候选的 V(s') 批量前向（单次替代 K 次）
+                _, values = agent._forward_obs_batch(np.stack(clone_obs_list))
+                for (clone, a, reward_c, done_c, truncated_c), clone_obs, v in zip(
+                        clones, clone_obs_list, values):
                     if done_c or truncated_c:
                         score = reward_c
                     else:
@@ -482,9 +485,10 @@ def evaluate_circuit_beam(
                         best_action = a
                         best_clone_obs = clone_obs
             else:
-                for clone, a, reward_c, done_c, truncated_c in clones:
-                    clone_obs = clone._obs()
-                    _, v = agent._forward_obs(clone_obs)
+                clone_obs_list = [c._obs() for c, *_ in clones]
+                _, values = agent._forward_obs_batch(np.stack(clone_obs_list))
+                for (clone, a, reward_c, done_c, truncated_c), clone_obs, v in zip(
+                        clones, clone_obs_list, values):
                     if done_c or truncated_c:
                         score = reward_c
                     else:
@@ -815,6 +819,8 @@ def main():
                              'the model was trained with a larger fixed dim)')
     parser.add_argument('--max-episode-steps', type=int, default=200)
     parser.add_argument('--device', type=str, default='cpu')
+    parser.add_argument('--torch-threads', type=int, default=8,
+                        help='torch CPU 线程数上限（小图推理多线程同步开销主导，默认 8）')
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--no-gnn', action='store_true', default=False,
                         help='model was trained without GNN')
@@ -876,6 +882,8 @@ def main():
     import torch
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
+    # 小图推理：限制 torch CPU 线程数，避免多线程同步开销主导（实测 2x+）
+    torch.set_num_threads(max(1, args.torch_threads))
 
     # ---- Hardware ----
     if args.topo:

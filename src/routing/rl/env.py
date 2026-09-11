@@ -364,37 +364,56 @@ class RoutingEnv(gym.Env):
         return total
 
     def _sabre_edge_features(self):
-        """为每条 coupling edge 计算 5 维 SABRE 启发式特征。"""
-        n_ready = max(len(self._ready_2q_gates()), 1)
-        dist_before = self._front_layer_dist()
+        """为每条 coupling edge 计算 5 维 SABRE 启发式特征。
+
+        优化：ready 集合与 inv 映射每步只构建一次（旧实现每步约 60 次
+        O(G) 全门扫描 + 每边重建 dict）。关键观察：边 (p,q) 上的虚拟
+        SWAP 只把逻辑 lp 移到 q、逻辑 lq 移到 p（含空端点分支），因此
+        每条 ready 门端点仅在 qa/qb ∈ {lp, lq} 时变化。数值与旧实现
+        逐元素一致（求和顺序相同）。
+        """
+        ready = self._ready_2q_gates()
+        n_ready = max(len(ready), 1)
+        dist = self.hw.dist
+        mapping = self.mapping
+        nq = max(self.num_qubits, 1)
         feats = np.zeros((self.num_edges, 5), dtype=np.float32)
+        if not ready:
+            return feats
+
+        inv = {phys: log for log, phys in enumerate(mapping)}
+        pairs = [(mapping[g.qubits[0]], mapping[g.qubits[1]]) for g in ready]
+
+        # dist_before：与旧实现相同的顺序求和
+        dist_before = 0.0
+        for a, b in pairs:
+            dist_before += dist[a, b]
+        d0 = dist_before / nq
 
         for i, (p, q) in enumerate(self.coupling_map):
-            tmp_map = self.mapping.copy()
-            inv = {phys: log for log, phys in enumerate(tmp_map)}
             lp, lq = inv.get(p), inv.get(q)
-            if lp is not None and lq is not None:
-                tmp_map[lp], tmp_map[lq] = tmp_map[lq], tmp_map[lp]
-            elif lp is not None:
-                tmp_map[lp] = q
-            elif lq is not None:
-                tmp_map[lq] = p
-
-            dist_after = self._front_layer_dist(tmp_map)
-            feats[i, 0] = dist_before / max(self.num_qubits, 1)
-            feats[i, 1] = dist_after / max(self.num_qubits, 1)
-            feats[i, 2] = (dist_before - dist_after) / max(dist_before, 1e-8)
-
+            if lp is None and lq is None:
+                # 两侧均未被逻辑比特占用：SWAP 不改变任何映射
+                feats[i, 0] = d0
+                feats[i, 1] = d0
+                continue
+            dist_after = 0.0
             improved = 0
             worsened = 0
-            for g in self._ready_2q_gates():
+            for g, (a, b) in zip(ready, pairs):
                 qa, qb = g.qubits
-                d_b = self.hw.dist[self.mapping[qa], self.mapping[qb]]
-                d_a = self.hw.dist[tmp_map[qa], tmp_map[qb]]
+                na = q if qa == lp else (p if qa == lq else a)
+                nb = q if qb == lp else (p if qb == lq else b)
+                d_b = dist[a, b]
+                d_a = dist[na, nb]
+                dist_after += d_a
                 if d_a < d_b - 1e-8:
                     improved += 1
                 elif d_a > d_b + 1e-8:
                     worsened += 1
+            feats[i, 0] = d0
+            feats[i, 1] = dist_after / nq
+            feats[i, 2] = (dist_before - dist_after) / max(dist_before, 1e-8)
             feats[i, 3] = improved / n_ready
             feats[i, 4] = worsened / n_ready
 
