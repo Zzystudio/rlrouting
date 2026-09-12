@@ -1,0 +1,344 @@
+[
+ {
+  "model_dir": "sabre",
+  "circuit": "barenco_tof_10.qasm",
+  "swaps": 103,
+  "fid_v1_recorded": 0.07145924413781675,
+  "fid_full": null,
+  "fid_v1sem": 0.024266832174677563,
+  "fid_noswap": 0.03364529857463611
+ },
+ {
+  "model_dir": "l05",
+  "circuit": "barenco_tof_10.qasm",
+  "swaps": 189,
+  "fid_v1_recorded": 0.2152484945193153,
+  "fid_full": 0.025778691972842223,
+  "fid_v1sem": 0.04526172002848202,
+  "fid_noswap": 0.04945930894743936
+ },
+ {
+  "model_dir": "sabre",
+  "circuit": "barenco_tof_3.qasm",
+  "swaps": 9,
+  "fid_v1_recorded": 0.7466949143141477,
+  "fid_full": null,
+  "fid_v1sem": 0.6405511390759699,
+  "fid_noswap": 0.6523967038709022
+ },
+ {
+  "model_dir": "l05",
+  "circuit": "barenco_tof_3.qasm",
+  "swaps": 15,
+  "fid_v1_recorded": 0.7629450767264603,
+  "fid_full": 0.39296056179477024,
+  "fid_v1sem": 0.6297339817873074,
+  "fid_noswap": 0.694621991133007
+ },
+ {
+  "model_dir": "sabre",
+  "circuit": "barenco_tof_4.qasm",
+  "swaps": 30,
+  "fid_v1_recorded": 0.44542558655396125,
+  "fid_full": null,
+  "fid_v1sem": 0.42276543441990955,
+  "fid_noswap": 0.3269493073369156
+ },
+ {
+  "model_dir": "l05",
+  "circuit": "barenco_tof_4.qasm",
+  "swaps": 23,
+  "fid_v1_recorded": 0.48264219560268196,
+  "fid_full": 0.3689122744613356,
+  "fid_v1sem": 0.36295757681168783,
+  "fid_noswap": 0.4639999426946609
+ },
+ {
+  "model_dir": "sabre",
+  "circuit": "barenco_tof_5.qasm",
+  "swaps": 26,
+  "fid_v1_recorded": 0.16834435002077214,
+  "fid_full": null,
+  "fid_v1sem": 0.33137555664420826,
+  "fid_noswap": 0.29331518450797456
+ },
+ {
+  "model_dir": "l05",
+  "circuit": "barenco_tof_5.qasm",
+  "swaps": 41,
+  "fid_v1_recorded": 0.3087808091627482,
+  "fid_full": 0.06053310390810748,
+  "fid_v1sem": 0.3016476758906481,
+  "fid_noswap": 0.3949367098964248
+ },
+ {
+  "model_dir": "sabre",
+  "circuit": "csla_mux_3.qasm",
+  "swaps": 39,
+  "fid_v1_recorded": 0.03408509786711572,
+  "fid_full": null,
+  "fid_v1sem": 0.22350931075298386,
+  "fid_noswap": 0.036250516874451515
+ },
+ {
+  "model_dir": "l05",
+  "circuit": "csla_mux_3.qasm",
+  "swaps": 54,
+  "fid_v1_recorded": 0.256584466378194,
+  "fid_full": 0.234747056394444,
+  "fid_v1sem": 0.1835872008164261,
+  "fid_noswap": 0.2177282236862566
+ },
+ {
+  "model_dir": "sabre",
+  "circuit": "gf2^4_mult.qasm",
+  "swaps": 50,
+  "fid_v1_recorded": 0.23483995909947097,
+  "fid_full": null,
+  "fid_v1sem": 0.11674679353881898,
+  "fid_noswap": 0.12417595607624327
+ },
+ {
+  "model_dir": "l05",
+  "circuit": "gf2^4_mult.qasm",
+  "swaps": 57,
+  "fid_v1_recorded": 0.1988730653915702,
+  "fid_full": 0.09352897847390661,
+  "fid_v1sem": 0.1749107177410182,
+  "fid_noswap": 0.20540406034423403
+ },
+ {
+  "model_dir": "sabre",
+  "circuit": "gf2^5_mult.qasm",
+  "swaps": 72,
+  "fid_v1_recorded": 0.0793403293836398,
+  "fid_full": null,
+  "fid_v1sem": 0.0498293735348697,
+  "fid_noswap": 0.06926033244724322
+ },
+ {
+  "model_dir": "l05",
+  "circuit": "gf2^5_mult.qasm",
+  "swaps": 103,
+  "fid_v1_recorded": 0.147342112513076,
+  "fid_full": 0.052568809311447945,
+  "fid_v1sem": 0.021711316498571026,
+  "fid_noswap": 0.08934283216259117
+ },
+ {
+  "model_dir": "sabre",
+  "circuit": "gf2^6_mult.qasm",
+  "swaps": 109,
+  "fid_v1_recorded": 0.03143190620881076,
+  "fid_full": null,
+  "fid_v1sem": 0.06785057412067322,
+  "fid_noswap": 0.0898424025466236
+ },
+ {
+  "model_dir": "l05",
+  "circuit": "gf2^6_mult.qasm",
+  "swaps": 163,
+  "fid_v1_recorded": 0.06497802994450001,
+  "fid_full": 0.059514691929254654,
+  "fid_v1sem": 0.08073395677720278,
+  "fid_noswap": 0.04351345804320034
+ },
+ {
+  "model_dir": "sabre",
+  "circuit": "grover_5.qasm",
+  "swaps": 119,
+  "fid_v1_recorded": 0.0005738380458848115,
+  "fid_full": null,
+  "fid_v1sem": 9.618335049189366e-05,
+  "fid_noswap": 4.3409728732411136e-05
+ },
+ {
+  "model_dir": "l05",
+  "circuit": "grover_5.qasm",
+  "swaps": 149,
+  "fid_v1_recorded": 0.0032526030048617084,
+  "fid_full": 2.3346701324133285e-05,
+  "fid_v1sem": 0.00013702139313182053,
+  "fid_noswap": 0.00014686553157064184
+ },
+ {
+  "model_dir": "sabre",
+  "circuit": "hwb6.qasm",
+  "swaps": 50,
+  "fid_v1_recorded": 2.8359897232140464e-07,
+  "fid_full": null,
+  "fid_v1sem": 0.00016084262044968652,
+  "fid_noswap": 2.1145061670224287e-08
+ },
+ {
+  "model_dir": "l05",
+  "circuit": "hwb6.qasm",
+  "swaps": 57,
+  "fid_v1_recorded": 0.1288463071182866,
+  "fid_full": 0.007549314556934091,
+  "fid_v1sem": 8.502778641414838e-07,
+  "fid_noswap": 0.00019751360475174593
+ },
+ {
+  "model_dir": "sabre",
+  "circuit": "mod5_4.qasm",
+  "swaps": 12,
+  "fid_v1_recorded": 0.512236712941706,
+  "fid_full": null,
+  "fid_v1sem": 0.5430713776079346,
+  "fid_noswap": 0.6284338568803672
+ },
+ {
+  "model_dir": "l05",
+  "circuit": "mod5_4.qasm",
+  "swaps": 15,
+  "fid_v1_recorded": 0.5536035698910703,
+  "fid_full": 0.3508177418411218,
+  "fid_v1sem": 0.5909345363878671,
+  "fid_noswap": 0.505164192494292
+ },
+ {
+  "model_dir": "sabre",
+  "circuit": "mod_mult_55.qasm",
+  "swaps": 22,
+  "fid_v1_recorded": 0.1553530390999591,
+  "fid_full": null,
+  "fid_v1sem": 0.22894924435658268,
+  "fid_noswap": 0.05930465299501749
+ },
+ {
+  "model_dir": "l05",
+  "circuit": "mod_mult_55.qasm",
+  "swaps": 30,
+  "fid_v1_recorded": 0.16551541152575952,
+  "fid_full": 0.017183208125279337,
+  "fid_v1sem": 0.07992189538012437,
+  "fid_noswap": 0.027631642770675157
+ },
+ {
+  "model_dir": "sabre",
+  "circuit": "mod_red_21.qasm",
+  "swaps": 48,
+  "fid_v1_recorded": 0.0644897993039363,
+  "fid_full": null,
+  "fid_v1sem": 0.0955192788596343,
+  "fid_noswap": 0.1157018761210052
+ },
+ {
+  "model_dir": "l05",
+  "circuit": "mod_red_21.qasm",
+  "swaps": 72,
+  "fid_v1_recorded": 0.12145899011911318,
+  "fid_full": 0.17908396156276388,
+  "fid_v1sem": 0.04561989760177636,
+  "fid_noswap": 0.26239757046199785
+ },
+ {
+  "model_dir": "sabre",
+  "circuit": "rc_adder_6.qasm",
+  "swaps": 38,
+  "fid_v1_recorded": 0.16618694831179026,
+  "fid_full": null,
+  "fid_v1sem": 0.05165741557517609,
+  "fid_noswap": 3.8969476141517943e-35
+ },
+ {
+  "model_dir": "l05",
+  "circuit": "rc_adder_6.qasm",
+  "swaps": 68,
+  "fid_v1_recorded": 0.16082632412640505,
+  "fid_full": 0.05383269083625975,
+  "fid_v1sem": 0.06330769607881671,
+  "fid_noswap": 0.09715874679983505
+ },
+ {
+  "model_dir": "sabre",
+  "circuit": "tof_10.qasm",
+  "swaps": 57,
+  "fid_v1_recorded": 0.4263800118429171,
+  "fid_full": null,
+  "fid_v1sem": 0.40278049283157485,
+  "fid_noswap": 0.2766766730630732
+ },
+ {
+  "model_dir": "l05",
+  "circuit": "tof_10.qasm",
+  "swaps": 109,
+  "fid_v1_recorded": 0.12346008119169566,
+  "fid_full": 0.13002380063003516,
+  "fid_v1sem": 0.24563152977748293,
+  "fid_noswap": 0.33881257919103397
+ },
+ {
+  "model_dir": "sabre",
+  "circuit": "tof_3.qasm",
+  "swaps": 11,
+  "fid_v1_recorded": 0.7779114580241799,
+  "fid_full": null,
+  "fid_v1sem": 0.7820463086038996,
+  "fid_noswap": 0.6214978691088189
+ },
+ {
+  "model_dir": "l05",
+  "circuit": "tof_3.qasm",
+  "swaps": 11,
+  "fid_v1_recorded": 0.8197778806315206,
+  "fid_full": 0.5704674084569488,
+  "fid_v1sem": 0.6892749441725143,
+  "fid_noswap": 0.721315381285849
+ },
+ {
+  "model_dir": "sabre",
+  "circuit": "tof_4.qasm",
+  "swaps": 17,
+  "fid_v1_recorded": 0.6570139828238839,
+  "fid_full": null,
+  "fid_v1sem": 0.6331311635199934,
+  "fid_noswap": 0.5420730609157668
+ },
+ {
+  "model_dir": "l05",
+  "circuit": "tof_4.qasm",
+  "swaps": 19,
+  "fid_v1_recorded": 0.7138032146913033,
+  "fid_full": 0.3773621866795839,
+  "fid_v1sem": 0.47768522805932434,
+  "fid_noswap": 0.5740655337110386
+ },
+ {
+  "model_dir": "sabre",
+  "circuit": "tof_5.qasm",
+  "swaps": 17,
+  "fid_v1_recorded": 0.4698757456319113,
+  "fid_full": null,
+  "fid_v1sem": 0.633575354734467,
+  "fid_noswap": 0.4494489000559322
+ },
+ {
+  "model_dir": "l05",
+  "circuit": "tof_5.qasm",
+  "swaps": 25,
+  "fid_v1_recorded": 0.6040769822829257,
+  "fid_full": 0.32705891539709775,
+  "fid_v1sem": 0.5684971519140369,
+  "fid_noswap": 0.5047607036376025
+ },
+ {
+  "model_dir": "sabre",
+  "circuit": "vbe_adder_3.qasm",
+  "swaps": 28,
+  "fid_v1_recorded": 0.1779229166374216,
+  "fid_full": null,
+  "fid_v1sem": 0.36269074474567276,
+  "fid_noswap": 0.40276288194858056
+ },
+ {
+  "model_dir": "l05",
+  "circuit": "vbe_adder_3.qasm",
+  "swaps": 48,
+  "fid_v1_recorded": 0.45428354937936977,
+  "fid_full": 0.24624175557994382,
+  "fid_v1sem": 0.42403911466786115,
+  "fid_noswap": 0.18587943925261313
+ }
+]

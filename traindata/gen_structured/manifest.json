@@ -1,0 +1,746 @@
+[
+ {
+  "name": "tof_tower_5_0.qasm",
+  "family": "tof_tower",
+  "qubits": 5,
+  "gates": 105,
+  "cx": 42,
+  "depth": 70
+ },
+ {
+  "name": "tof_tower_5_1.qasm",
+  "family": "tof_tower",
+  "qubits": 5,
+  "gates": 585,
+  "cx": 234,
+  "depth": 384
+ },
+ {
+  "name": "tof_tower_6_0.qasm",
+  "family": "tof_tower",
+  "qubits": 6,
+  "gates": 315,
+  "cx": 126,
+  "depth": 196
+ },
+ {
+  "name": "tof_tower_6_1.qasm",
+  "family": "tof_tower",
+  "qubits": 6,
+  "gates": 180,
+  "cx": 72,
+  "depth": 105
+ },
+ {
+  "name": "tof_tower_7_0.qasm",
+  "family": "tof_tower",
+  "qubits": 7,
+  "gates": 450,
+  "cx": 180,
+  "depth": 277
+ },
+ {
+  "name": "tof_tower_7_1.qasm",
+  "family": "tof_tower",
+  "qubits": 7,
+  "gates": 615,
+  "cx": 246,
+  "depth": 351
+ },
+ {
+  "name": "tof_tower_8_0.qasm",
+  "family": "tof_tower",
+  "qubits": 8,
+  "gates": 180,
+  "cx": 72,
+  "depth": 79
+ },
+ {
+  "name": "tof_tower_8_1.qasm",
+  "family": "tof_tower",
+  "qubits": 8,
+  "gates": 480,
+  "cx": 192,
+  "depth": 253
+ },
+ {
+  "name": "tof_tower_9_0.qasm",
+  "family": "tof_tower",
+  "qubits": 9,
+  "gates": 300,
+  "cx": 120,
+  "depth": 166
+ },
+ {
+  "name": "tof_tower_9_1.qasm",
+  "family": "tof_tower",
+  "qubits": 9,
+  "gates": 345,
+  "cx": 138,
+  "depth": 212
+ },
+ {
+  "name": "tof_tower_10_0.qasm",
+  "family": "tof_tower",
+  "qubits": 10,
+  "gates": 60,
+  "cx": 24,
+  "depth": 29
+ },
+ {
+  "name": "tof_tower_10_1.qasm",
+  "family": "tof_tower",
+  "qubits": 10,
+  "gates": 150,
+  "cx": 60,
+  "depth": 69
+ },
+ {
+  "name": "tof_tower_11_0.qasm",
+  "family": "tof_tower",
+  "qubits": 11,
+  "gates": 135,
+  "cx": 54,
+  "depth": 70
+ },
+ {
+  "name": "tof_tower_11_1.qasm",
+  "family": "tof_tower",
+  "qubits": 11,
+  "gates": 105,
+  "cx": 42,
+  "depth": 49
+ },
+ {
+  "name": "tof_tower_12_0.qasm",
+  "family": "tof_tower",
+  "qubits": 12,
+  "gates": 330,
+  "cx": 132,
+  "depth": 174
+ },
+ {
+  "name": "tof_tower_12_1.qasm",
+  "family": "tof_tower",
+  "qubits": 12,
+  "gates": 240,
+  "cx": 96,
+  "depth": 91
+ },
+ {
+  "name": "tof_tower_13_0.qasm",
+  "family": "tof_tower",
+  "qubits": 13,
+  "gates": 225,
+  "cx": 90,
+  "depth": 95
+ },
+ {
+  "name": "tof_tower_13_1.qasm",
+  "family": "tof_tower",
+  "qubits": 13,
+  "gates": 225,
+  "cx": 90,
+  "depth": 121
+ },
+ {
+  "name": "tof_tower_14_0.qasm",
+  "family": "tof_tower",
+  "qubits": 14,
+  "gates": 210,
+  "cx": 84,
+  "depth": 105
+ },
+ {
+  "name": "tof_tower_14_1.qasm",
+  "family": "tof_tower",
+  "qubits": 14,
+  "gates": 285,
+  "cx": 114,
+  "depth": 125
+ },
+ {
+  "name": "tof_tower_15_0.qasm",
+  "family": "tof_tower",
+  "qubits": 15,
+  "gates": 315,
+  "cx": 126,
+  "depth": 122
+ },
+ {
+  "name": "tof_tower_15_1.qasm",
+  "family": "tof_tower",
+  "qubits": 15,
+  "gates": 60,
+  "cx": 24,
+  "depth": 37
+ },
+ {
+  "name": "tof_tower_16_0.qasm",
+  "family": "tof_tower",
+  "qubits": 16,
+  "gates": 195,
+  "cx": 78,
+  "depth": 61
+ },
+ {
+  "name": "tof_tower_16_1.qasm",
+  "family": "tof_tower",
+  "qubits": 16,
+  "gates": 90,
+  "cx": 36,
+  "depth": 41
+ },
+ {
+  "name": "tof_tower_17_0.qasm",
+  "family": "tof_tower",
+  "qubits": 17,
+  "gates": 180,
+  "cx": 72,
+  "depth": 66
+ },
+ {
+  "name": "tof_tower_17_1.qasm",
+  "family": "tof_tower",
+  "qubits": 17,
+  "gates": 75,
+  "cx": 30,
+  "depth": 31
+ },
+ {
+  "name": "tof_tower_18_0.qasm",
+  "family": "tof_tower",
+  "qubits": 18,
+  "gates": 60,
+  "cx": 24,
+  "depth": 21
+ },
+ {
+  "name": "tof_tower_18_1.qasm",
+  "family": "tof_tower",
+  "qubits": 18,
+  "gates": 210,
+  "cx": 84,
+  "depth": 72
+ },
+ {
+  "name": "tof_tower_19_0.qasm",
+  "family": "tof_tower",
+  "qubits": 19,
+  "gates": 210,
+  "cx": 84,
+  "depth": 89
+ },
+ {
+  "name": "tof_tower_19_1.qasm",
+  "family": "tof_tower",
+  "qubits": 19,
+  "gates": 60,
+  "cx": 24,
+  "depth": 26
+ },
+ {
+  "name": "cdkm_adder_6_0.qasm",
+  "family": "cdkm_adder",
+  "qubits": 6,
+  "gates": 69,
+  "cx": 33,
+  "depth": 50
+ },
+ {
+  "name": "cdkm_adder_6_1.qasm",
+  "family": "cdkm_adder",
+  "qubits": 6,
+  "gates": 69,
+  "cx": 33,
+  "depth": 50
+ },
+ {
+  "name": "cdkm_adder_8_0.qasm",
+  "family": "cdkm_adder",
+  "qubits": 8,
+  "gates": 103,
+  "cx": 49,
+  "depth": 74
+ },
+ {
+  "name": "cdkm_adder_8_1.qasm",
+  "family": "cdkm_adder",
+  "qubits": 8,
+  "gates": 103,
+  "cx": 49,
+  "depth": 74
+ },
+ {
+  "name": "cdkm_adder_10_0.qasm",
+  "family": "cdkm_adder",
+  "qubits": 10,
+  "gates": 137,
+  "cx": 65,
+  "depth": 98
+ },
+ {
+  "name": "cdkm_adder_10_1.qasm",
+  "family": "cdkm_adder",
+  "qubits": 10,
+  "gates": 137,
+  "cx": 65,
+  "depth": 98
+ },
+ {
+  "name": "cdkm_adder_12_0.qasm",
+  "family": "cdkm_adder",
+  "qubits": 12,
+  "gates": 171,
+  "cx": 81,
+  "depth": 122
+ },
+ {
+  "name": "cdkm_adder_12_1.qasm",
+  "family": "cdkm_adder",
+  "qubits": 12,
+  "gates": 171,
+  "cx": 81,
+  "depth": 122
+ },
+ {
+  "name": "cdkm_adder_14_0.qasm",
+  "family": "cdkm_adder",
+  "qubits": 14,
+  "gates": 205,
+  "cx": 97,
+  "depth": 146
+ },
+ {
+  "name": "cdkm_adder_14_1.qasm",
+  "family": "cdkm_adder",
+  "qubits": 14,
+  "gates": 205,
+  "cx": 97,
+  "depth": 146
+ },
+ {
+  "name": "cdkm_adder_16_0.qasm",
+  "family": "cdkm_adder",
+  "qubits": 16,
+  "gates": 239,
+  "cx": 113,
+  "depth": 170
+ },
+ {
+  "name": "cdkm_adder_16_1.qasm",
+  "family": "cdkm_adder",
+  "qubits": 16,
+  "gates": 239,
+  "cx": 113,
+  "depth": 170
+ },
+ {
+  "name": "cdkm_adder_18_0.qasm",
+  "family": "cdkm_adder",
+  "qubits": 18,
+  "gates": 273,
+  "cx": 129,
+  "depth": 194
+ },
+ {
+  "name": "cdkm_adder_18_1.qasm",
+  "family": "cdkm_adder",
+  "qubits": 18,
+  "gates": 273,
+  "cx": 129,
+  "depth": 194
+ },
+ {
+  "name": "cdkm_adder_20_0.qasm",
+  "family": "cdkm_adder",
+  "qubits": 20,
+  "gates": 307,
+  "cx": 145,
+  "depth": 218
+ },
+ {
+  "name": "cdkm_adder_20_1.qasm",
+  "family": "cdkm_adder",
+  "qubits": 20,
+  "gates": 307,
+  "cx": 145,
+  "depth": 218
+ },
+ {
+  "name": "vbe_adder_7_0.qasm",
+  "family": "vbe_adder",
+  "qubits": 7,
+  "gates": 98,
+  "cx": 44,
+  "depth": 56
+ },
+ {
+  "name": "vbe_adder_7_1.qasm",
+  "family": "vbe_adder",
+  "qubits": 7,
+  "gates": 98,
+  "cx": 44,
+  "depth": 56
+ },
+ {
+  "name": "vbe_adder_10_0.qasm",
+  "family": "vbe_adder",
+  "qubits": 10,
+  "gates": 162,
+  "cx": 72,
+  "depth": 87
+ },
+ {
+  "name": "vbe_adder_10_1.qasm",
+  "family": "vbe_adder",
+  "qubits": 10,
+  "gates": 162,
+  "cx": 72,
+  "depth": 87
+ },
+ {
+  "name": "vbe_adder_13_0.qasm",
+  "family": "vbe_adder",
+  "qubits": 13,
+  "gates": 226,
+  "cx": 100,
+  "depth": 118
+ },
+ {
+  "name": "vbe_adder_13_1.qasm",
+  "family": "vbe_adder",
+  "qubits": 13,
+  "gates": 226,
+  "cx": 100,
+  "depth": 118
+ },
+ {
+  "name": "vbe_adder_16_0.qasm",
+  "family": "vbe_adder",
+  "qubits": 16,
+  "gates": 290,
+  "cx": 128,
+  "depth": 149
+ },
+ {
+  "name": "vbe_adder_16_1.qasm",
+  "family": "vbe_adder",
+  "qubits": 16,
+  "gates": 290,
+  "cx": 128,
+  "depth": 149
+ },
+ {
+  "name": "vbe_adder_19_0.qasm",
+  "family": "vbe_adder",
+  "qubits": 19,
+  "gates": 354,
+  "cx": 156,
+  "depth": 180
+ },
+ {
+  "name": "vbe_adder_19_1.qasm",
+  "family": "vbe_adder",
+  "qubits": 19,
+  "gates": 354,
+  "cx": 156,
+  "depth": 180
+ },
+ {
+  "name": "draper_add_6_0.qasm",
+  "family": "draper_add",
+  "qubits": 6,
+  "gates": 66,
+  "cx": 24,
+  "depth": 44
+ },
+ {
+  "name": "draper_add_8_0.qasm",
+  "family": "draper_add",
+  "qubits": 8,
+  "gates": 118,
+  "cx": 44,
+  "depth": 64
+ },
+ {
+  "name": "draper_add_10_0.qasm",
+  "family": "draper_add",
+  "qubits": 10,
+  "gates": 185,
+  "cx": 70,
+  "depth": 84
+ },
+ {
+  "name": "draper_add_12_0.qasm",
+  "family": "draper_add",
+  "qubits": 12,
+  "gates": 267,
+  "cx": 102,
+  "depth": 104
+ },
+ {
+  "name": "draper_add_14_0.qasm",
+  "family": "draper_add",
+  "qubits": 14,
+  "gates": 364,
+  "cx": 140,
+  "depth": 124
+ },
+ {
+  "name": "draper_add_16_0.qasm",
+  "family": "draper_add",
+  "qubits": 16,
+  "gates": 476,
+  "cx": 184,
+  "depth": 144
+ },
+ {
+  "name": "draper_add_18_0.qasm",
+  "family": "draper_add",
+  "qubits": 18,
+  "gates": 603,
+  "cx": 234,
+  "depth": 164
+ },
+ {
+  "name": "draper_add_20_0.qasm",
+  "family": "draper_add",
+  "qubits": 20,
+  "gates": 745,
+  "cx": 290,
+  "depth": 184
+ },
+ {
+  "name": "rgqft_mult_8_0.qasm",
+  "family": "rgqft_mult",
+  "qubits": 8,
+  "gates": 788,
+  "cx": 120,
+  "depth": 512
+ },
+ {
+  "name": "rgqft_mult_8_1.qasm",
+  "family": "rgqft_mult",
+  "qubits": 8,
+  "gates": 788,
+  "cx": 120,
+  "depth": 512
+ },
+ {
+  "name": "gf2_mult_8_0.qasm",
+  "family": "gf2_mult",
+  "qubits": 8,
+  "gates": 64,
+  "cx": 28,
+  "depth": 37
+ },
+ {
+  "name": "gf2_mult_8_1.qasm",
+  "family": "gf2_mult",
+  "qubits": 8,
+  "gates": 63,
+  "cx": 27,
+  "depth": 37
+ },
+ {
+  "name": "gf2_mult_12_0.qasm",
+  "family": "gf2_mult",
+  "qubits": 12,
+  "gates": 139,
+  "cx": 58,
+  "depth": 66
+ },
+ {
+  "name": "gf2_mult_12_1.qasm",
+  "family": "gf2_mult",
+  "qubits": 12,
+  "gates": 139,
+  "cx": 58,
+  "depth": 66
+ },
+ {
+  "name": "gf2_mult_16_0.qasm",
+  "family": "gf2_mult",
+  "qubits": 16,
+  "gates": 249,
+  "cx": 105,
+  "depth": 95
+ },
+ {
+  "name": "gf2_mult_16_1.qasm",
+  "family": "gf2_mult",
+  "qubits": 16,
+  "gates": 246,
+  "cx": 102,
+  "depth": 89
+ },
+ {
+  "name": "gf2_mult_20_0.qasm",
+  "family": "gf2_mult",
+  "qubits": 20,
+  "gates": 385,
+  "cx": 160,
+  "depth": 121
+ },
+ {
+  "name": "gf2_mult_20_1.qasm",
+  "family": "gf2_mult",
+  "qubits": 20,
+  "gates": 386,
+  "cx": 161,
+  "depth": 121
+ },
+ {
+  "name": "grover_5_1it_0.qasm",
+  "family": "grover_5",
+  "qubits": 5,
+  "gates": 452,
+  "cx": 108,
+  "depth": 328
+ },
+ {
+  "name": "grover_5_2it_0.qasm",
+  "family": "grover_5",
+  "qubits": 5,
+  "gates": 899,
+  "cx": 216,
+  "depth": 655
+ },
+ {
+  "name": "wadd_5_0.qasm",
+  "family": "wadd",
+  "qubits": 10,
+  "gates": 524,
+  "cx": 196,
+  "depth": 325
+ },
+ {
+  "name": "wadd_6_0.qasm",
+  "family": "wadd",
+  "qubits": 11,
+  "gates": 655,
+  "cx": 245,
+  "depth": 406
+ },
+ {
+  "name": "wadd_7_0.qasm",
+  "family": "wadd",
+  "qubits": 12,
+  "gates": 786,
+  "cx": 294,
+  "depth": 487
+ },
+ {
+  "name": "perm_12_1.qasm",
+  "family": "perm",
+  "qubits": 12,
+  "gates": 30,
+  "cx": 30,
+  "depth": 15
+ },
+ {
+  "name": "perm_14_0.qasm",
+  "family": "perm",
+  "qubits": 14,
+  "gates": 33,
+  "cx": 33,
+  "depth": 12
+ },
+ {
+  "name": "perm_14_1.qasm",
+  "family": "perm",
+  "qubits": 14,
+  "gates": 36,
+  "cx": 36,
+  "depth": 18
+ },
+ {
+  "name": "perm_16_0.qasm",
+  "family": "perm",
+  "qubits": 16,
+  "gates": 39,
+  "cx": 39,
+  "depth": 15
+ },
+ {
+  "name": "perm_16_1.qasm",
+  "family": "perm",
+  "qubits": 16,
+  "gates": 39,
+  "cx": 39,
+  "depth": 12
+ },
+ {
+  "name": "perm_18_0.qasm",
+  "family": "perm",
+  "qubits": 18,
+  "gates": 42,
+  "cx": 42,
+  "depth": 24
+ },
+ {
+  "name": "perm_18_1.qasm",
+  "family": "perm",
+  "qubits": 18,
+  "gates": 48,
+  "cx": 48,
+  "depth": 21
+ },
+ {
+  "name": "perm_20_0.qasm",
+  "family": "perm",
+  "qubits": 20,
+  "gates": 57,
+  "cx": 57,
+  "depth": 24
+ },
+ {
+  "name": "perm_20_1.qasm",
+  "family": "perm",
+  "qubits": 20,
+  "gates": 39,
+  "cx": 39,
+  "depth": 15
+ },
+ {
+  "name": "adder_stack_3_0.qasm",
+  "family": "adder_stack",
+  "qubits": 14,
+  "gates": 309,
+  "cx": 147,
+  "depth": 218
+ },
+ {
+  "name": "adder_stack_4_0.qasm",
+  "family": "adder_stack",
+  "qubits": 18,
+  "gates": 411,
+  "cx": 195,
+  "depth": 264
+ },
+ {
+  "name": "adder_stack_5_0.qasm",
+  "family": "adder_stack",
+  "qubits": 20,
+  "gates": 513,
+  "cx": 243,
+  "depth": 336
+ },
+ {
+  "name": "adder_stack_6_0.qasm",
+  "family": "adder_stack",
+  "qubits": 20,
+  "gates": 615,
+  "cx": 291,
+  "depth": 382
+ },
+ {
+  "name": "adder_stack_7_0.qasm",
+  "family": "adder_stack",
+  "qubits": 20,
+  "gates": 478,
+  "cx": 226,
+  "depth": 312
+ }
+]

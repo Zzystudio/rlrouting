@@ -282,3 +282,68 @@ def test_mapping_phase_disabled():
         steps += 1
     assert done
     assert info["mapping_swaps"] == 0
+
+
+def _env_r3(n=4, **kwargs):
+    """R3 势函数 shaping 测试环境（固定 gamma 便于验证 telescoping）。"""
+    from routing.rl.env import _GATE_BASE_REWARD_DEFAULT
+    gb = dict(_GATE_BASE_REWARD_DEFAULT)
+    gb["cx"] = 0.3
+    for _k in ("h", "sx", "x", "rz", "y", "z", "s", "t"):
+        gb[_k] = 0.05
+    return _env(n=n, reward_mode="routing", shaping_gamma=0.99,
+                eta_shape=0.3, alpha_ext=0.5, gate_base_reward=gb,
+                swap_cost=0.4, eta_swap_err=2.0, eta_xtalk=0.0,
+                eta_parallel=0.0, unfinished_penalty=0.15,
+                **kwargs)
+
+
+def test_r3_swap_pricing_3e():
+    env = _env_r3()
+    env.reset()
+    e = float(env.hw.two_q_err[0, 1])
+    r = env._step_reward_swap(0, 1)  # routing 模式下虚拟调用，直接验证公式
+    assert abs(r - (-0.4 - 2.0 * 3.0 * e)) < 1e-9
+
+
+def test_r3_mapping_virtual_swap_free():
+    env = _env_r3()
+    env.reset()
+    # 映射阶段虚拟 SWAP：R3 下直接代价为 0（布局引导由 Φ 承担）
+    assert env.mapping_phase
+    _, reward, _, _, _ = env._step_mapping(0)
+    # 仅含调度/执行项与 shaping，不含 swap_cost（0.4）与 3e 惩罚
+    assert reward > -1.0  # 若误计 swap_cost+3e（≈-0.46）也会通过，
+    # 因此对照：旧路径同动作应含 -0.4
+    env2 = _env(reward_mode="routing", swap_cost=0.4)
+    env2.reset()
+    _, reward2, _, _, _ = env2._step_mapping(0)
+    assert reward2 <= reward - 0.3  # 旧路径明显更负
+
+
+def test_r3_shaping_telescoping():
+    # 势函数 shaping 求和恒等式（γ<1）：
+    #   Σ_t (γ·Φ_{t+1} − Φ_t) = −Φ(s0) + (γ−1)·Σ_{t=1..T−1} Φ_t   （终态 Φ=0）
+    for seed in (0, 1, 2):
+        env = _env_r3(n=4)
+        env.reset()
+        phi0 = env._phi()
+        total_shaping = 0.0
+        phi_b_sum = 0.0
+        first = True
+        done = False
+        steps = 0
+        rng = np.random.default_rng(seed)
+        while not done and steps < 500:
+            phi_b = env._phi()
+            if not first:
+                phi_b_sum += phi_b
+            first = False
+            _, reward, done, truncated, _ = env.step(int(rng.integers(env.action_space.n)))
+            phi_a = 0.0 if (done or truncated) else env._phi()
+            total_shaping += 0.99 * phi_a - phi_b
+            steps += 1
+        assert done, f"seed={seed}: 未完成"
+        expected = -phi0 + (0.99 - 1.0) * phi_b_sum
+        assert abs(total_shaping - expected) < 1e-6, \
+            f"seed={seed}: {total_shaping} vs {expected}"

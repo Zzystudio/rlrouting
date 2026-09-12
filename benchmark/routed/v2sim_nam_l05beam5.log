@@ -1,0 +1,25 @@
+barenco_tof_10.qasm: [l05_beam5] q=20 sw=95 fid_v2=0.0436 (130s)
+barenco_tof_3.qasm: [l05_beam5] q=20 sw=8 fid_v2=0.6483 (0s)
+barenco_tof_4.qasm: [l05_beam5] q=20 sw=16 fid_v2=0.4216 (0s)
+barenco_tof_5.qasm: [l05_beam5] q=20 sw=23 fid_v2=0.3062 (0s)
+csla_mux_3.qasm: [l05_beam5] q=20 sw=40 fid_v2=0.1576 (3s)
+gf2^4_mult.qasm: [l05_beam5] q=20 sw=47 fid_v2=0.1730 (2s)
+gf2^5_mult.qasm: [l05_beam5] q=20 sw=84 fid_v2=0.1048 (6s)
+gf2^6_mult.qasm: [l05_beam5] q=20 sw=129 fid_v2=0.0327 (74s)
+grover_5.qasm: [l05_beam5] q=20 sw=101 fid_v2=0.0001 (2s)
+hwb6.qasm: [l05_beam5] q=20 sw=39 fid_v2=0.0000 (0s)
+mod5_4.qasm: [l05_beam5] q=20 sw=8 fid_v2=0.4072 (0s)
+mod_mult_55.qasm: [l05_beam5] q=20 sw=15 fid_v2=0.0288 (0s)
+mod_red_21.qasm: [l05_beam5] q=20 sw=43 fid_v2=0.0267 (2s)
+rc_adder_6.qasm: [l05_beam5] q=20 sw=33 fid_v2=0.0661 (13s)
+tof_10.qasm: [l05_beam5] q=20 sw=67 fid_v2=0.2051 (78s)
+tof_3.qasm: [l05_beam5] q=20 sw=6 fid_v2=0.7253 (0s)
+tof_4.qasm: [l05_beam5] q=20 sw=9 fid_v2=0.4083 (0s)
+tof_5.qasm: [l05_beam5] q=20 sw=16 fid_v2=0.3941 (0s)
+vbe_adder_3.qasm: [l05_beam5] q=20 sw=27 fid_v2=0.2693 (0s)
+=== 汇总 [l05_beam5] (trajectory_v2 x16, seed=0) ===
+SWAPs mean:  sabre=45.1  l05_beam5=42.4
+Fid mean:    sabre=0.2301  l05_beam5=0.2326
+Fid logmean: sabre=0.0395  l05_beam5=0.0569
+l05_beam5 胜 SABRE: 10/19
+ALL DONE

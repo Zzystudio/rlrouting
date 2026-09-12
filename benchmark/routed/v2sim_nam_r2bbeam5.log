@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/home/zzy/opencode-server/opencode-docker/projects/rlrouting/scripts/eval_nam_v2sim.py", line 75, in <module>
+    d = json.load(open(os.path.join('benchmark/routed', MODEL_DIR,
+FileNotFoundError: [Errno 2] No such file or directory: 'benchmark/routed/r2b_beam5/barenco_tof_10.json'

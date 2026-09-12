@@ -101,7 +101,7 @@ def main():
     parser.add_argument("--reward-mode", default="noise_aware",
                         choices=["routing", "noise_aware"])
     parser.add_argument("--fidelity-sim", default="trajectory_sched",
-                        choices=["aer", "trajectory", "trajectory_sched"])
+                        choices=["aer", "trajectory", "trajectory_sched", "trajectory_v2"])
     parser.add_argument("--traj-trajectories", type=int, default=16)
     parser.add_argument("--max-episode-steps", type=int, default=1000)
     parser.add_argument("--device", default="cpu")

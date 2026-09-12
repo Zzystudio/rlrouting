@@ -201,6 +201,9 @@ def build_fidelity_fn(fidelity_sim: str, config, num_trajectories: int = 64, see
         from sim.trajectory_sim import make_trajectory_fidelity_fn
         return make_trajectory_fidelity_fn(config, num_trajectories=num_trajectories,
                                            seed=seed, scheduled=True)
+    if fidelity_sim == "trajectory_v2":
+        from sim.trajectory_sim_v2 import make_event_fidelity_fn
+        return make_event_fidelity_fn(config, num_trajectories=num_trajectories, seed=seed)
     if fidelity_sim == "analytic":
         from sim.trajectory_sim import make_analytic_fidelity_fn
         return make_analytic_fidelity_fn(config)
@@ -217,6 +220,11 @@ def phys_fidelity(phys, config, fidelity_sim: str, num_trajectories: int = 64, s
         from sim.trajectory_sim import trajectory_circuit_fidelity
         return trajectory_circuit_fidelity(phys, config, num_trajectories=num_trajectories,
                                            seed=seed, scheduled=True)
+    if fidelity_sim == "trajectory_v2":
+        from sim.trajectory_sim_v2 import trajectory_circuit_fidelity_events
+        return trajectory_circuit_fidelity_events(phys, config,
+                                                  num_trajectories=num_trajectories,
+                                                  seed=seed)
     from sim.sim import NoiseSimulator
     from qiskit_aer import AerSimulator
     try:
@@ -344,7 +352,7 @@ def evaluate_circuit(
     # aer 模式下也用 post-hoc Hellinger 保真度（phys_fidelity）覆盖 env 内的 min-count，
     # 确保 PPO 与 SABRE 基线使用同一口径。
     post_fid = None
-    if config is not None and fidelity_sim in ('aer', 'trajectory', 'trajectory_sched'):
+    if config is not None and fidelity_sim in ('aer', 'trajectory', 'trajectory_sched', 'trajectory_v2'):
         try:
             post_fid = phys_fidelity(
                 env._phys_circuit, config, fidelity_sim,
@@ -526,7 +534,7 @@ def evaluate_circuit_beam(
     # aer 模式下也用 post-hoc Hellinger 保真度（phys_fidelity）覆盖 env 内的 min-count，
     # 确保 PPO 与 SABRE 基线使用同一口径。
     post_fid = None
-    if config is not None and fidelity_sim in ('aer', 'trajectory', 'trajectory_sched'):
+    if config is not None and fidelity_sim in ('aer', 'trajectory', 'trajectory_sched', 'trajectory_v2'):
         try:
             post_fid = phys_fidelity(
                 env._phys_circuit, config, fidelity_sim,
@@ -632,7 +640,7 @@ def evaluate_greedy(
     # 即便 reward_mode='routing'，只要指定了态级保真度模拟器（trajectory/
     # trajectory_sched），也对基线计算保真度，便于与 PPO 的 fidelity_fn 结果同口径对比。
     fid = phys_fidelity(phys, config, fidelity_sim, num_trajectories, seed) \
-        if (reward_mode != 'routing' or fidelity_sim in ('trajectory', 'trajectory_sched')) else None
+        if (reward_mode != 'routing' or fidelity_sim in ('trajectory', 'trajectory_sched', 'trajectory_v2')) else None
 
     return CircuitMetrics(
         circuit_path='',
@@ -672,7 +680,7 @@ def evaluate_sabre(
     # 即便 reward_mode='routing'，只要指定了态级保真度模拟器（trajectory/
     # trajectory_sched），也对基线计算保真度，便于与 PPO 的 fidelity_fn 结果同口径对比。
     fid = phys_fidelity(phys, config, fidelity_sim, num_trajectories, seed) \
-        if (reward_mode != 'routing' or fidelity_sim in ('trajectory', 'trajectory_sched')) else None
+        if (reward_mode != 'routing' or fidelity_sim in ('trajectory', 'trajectory_sched', 'trajectory_v2')) else None
 
     sched_stats = None
     if use_scheduler and hw is not None:
@@ -866,10 +874,11 @@ def main():
     parser.add_argument('--verbose', action='store_true', default=False,
                         help='print per-circuit results')
     parser.add_argument('--fidelity-sim', type=str, default='aer',
-                        choices=['aer', 'trajectory', 'trajectory_sched', 'analytic'],
+                        choices=['aer', 'trajectory', 'trajectory_sched', 'trajectory_v2', 'analytic'],
                         help='保真度模拟器: aer=density_matrix/counts (n<=12), '
                              'trajectory=轨迹状态向量(串行, O(2^n) 内存), '
                              'trajectory_sched=轨迹状态向量+调度感知(空闲退相干/动态串扰), '
+                             'trajectory_v2=事件级调度感知 v2(per-gate 时长/重叠缩放串扰/always-on 可选), '
                              'analytic=解析错误累积代理(O(门数), 无指数)')
     parser.add_argument('--traj-trajectories', type=int, default=16,
                         help='轨迹模拟器采样条数')
@@ -975,7 +984,7 @@ def main():
                     max_num_edges=args.max_num_edges,
                     random_init=random_init,
                     init_mapping=init_mapping,
-                    use_scheduler=(args.use_scheduler or args.fidelity_sim == "trajectory_sched"),
+                    use_scheduler=(args.use_scheduler or args.fidelity_sim in ("trajectory_sched", "trajectory_v2")),
                     eta_time=args.eta_time,
                     eta_xtalk_par=args.eta_xtalk_par,
                     eta_idle=args.eta_idle,
@@ -1001,7 +1010,7 @@ def main():
                     max_num_edges=args.max_num_edges,
                     random_init=random_init,
                     init_mapping=init_mapping,
-                    use_scheduler=(args.use_scheduler or args.fidelity_sim == "trajectory_sched"),
+                    use_scheduler=(args.use_scheduler or args.fidelity_sim in ("trajectory_sched", "trajectory_v2")),
                     eta_time=args.eta_time,
                     eta_xtalk_par=args.eta_xtalk_par,
                     eta_idle=args.eta_idle,
@@ -1028,7 +1037,7 @@ def main():
     # 即便 reward_mode='routing'，只要指定了态级保真度模拟器（trajectory/
     # trajectory_sched），也展示保真度列（PPO 的来自环境 fidelity_fn，SABRE 的来自
     # baseline 的 phys_fidelity），以便做同口径对比。
-    show_fid = (args.reward_mode != 'routing') or (args.fidelity_sim in ('trajectory', 'trajectory_sched'))
+    show_fid = (args.reward_mode != 'routing') or (args.fidelity_sim in ('trajectory', 'trajectory_sched', 'trajectory_v2'))
     print_header(show_fidelity=show_fid)
     print_report(label, agent_stats, show_fidelity=show_fid)
 

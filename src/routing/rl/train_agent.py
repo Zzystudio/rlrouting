@@ -378,7 +378,7 @@ def _eval_ema(agent, eval_circuits, args, gnn, use_gnn, max_edges, topo_list):
                 deterministic=True, seed=0,
                 noise_config=noise_config if args.reward_mode != "routing" else None,
                 max_num_qubits=args.eval_max_qubits,
-                use_scheduler=(args.use_scheduler or args.fidelity_sim == "trajectory_sched"),
+                use_scheduler=(args.use_scheduler or args.fidelity_sim in ("trajectory_sched", "trajectory_v2")),
                 eta_time=args.eta_time,
                 eta_xtalk_par=args.eta_xtalk_par,
                 eta_idle=args.eta_idle,
@@ -422,7 +422,7 @@ def _parse_sabre_fid_map(spec: Optional[str]) -> dict:
     return out
 
 
-def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_init, seed, gnn=None, use_gnn=True, max_num_edges=None, max_num_qubits=None, noise_config=None, lambda_fid=None, eta_dist=None, mapping_budget=None, mapping_phase=True, fidelity_fn=None, use_scheduler=None, eta_time=None, eta_xtalk_par=None, eta_idle=None, eta_parallel=None, xtalk_alpha=None, swap_duration=None, swap_cost=None, init_mapping=None, lambda_layout=None, sabre_fid_map=None, sref_override=None):
+def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_init, seed, gnn=None, use_gnn=True, max_num_edges=None, max_num_qubits=None, noise_config=None, lambda_fid=None, eta_dist=None, mapping_budget=None, mapping_phase=True, fidelity_fn=None, use_scheduler=None, eta_time=None, eta_xtalk_par=None, eta_idle=None, eta_parallel=None, xtalk_alpha=None, swap_duration=None, swap_cost=None, eta_swap_err=None, eta_err=None, reward_potential=None, eta_xtalk=None, unfinished_penalty=None, gate_base_cx=None, gate_base_1q=None, shaping_gamma=None, eta_shape=None, alpha_ext=None, init_mapping=None, lambda_layout=None, sabre_fid_map=None, sref_override=None):
     kw = dict(
         dag=dag, hw=hw, coupling_map=coupling_map,
         reward_mode=reward_mode,
@@ -464,6 +464,31 @@ def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_ini
         kw["swap_duration_us"] = swap_duration
     if swap_cost is not None:
         kw["swap_cost"] = swap_cost
+    if eta_swap_err is not None:
+        kw["eta_swap_err"] = eta_swap_err
+    if eta_err is not None:
+        kw["eta_err"] = eta_err
+    if reward_potential is not None:
+        kw["reward_potential"] = reward_potential
+    if eta_xtalk is not None:
+        kw["eta_xtalk"] = eta_xtalk
+    if unfinished_penalty is not None:
+        kw["unfinished_penalty"] = unfinished_penalty
+    if gate_base_cx is not None or gate_base_1q is not None:
+        from routing.rl.env import _GATE_BASE_REWARD_DEFAULT
+        gb = dict(_GATE_BASE_REWARD_DEFAULT)
+        if gate_base_cx is not None:
+            gb["cx"] = gate_base_cx
+        if gate_base_1q is not None:
+            for _k in ("h", "sx", "x", "rz", "y", "z", "s", "t"):
+                gb[_k] = gate_base_1q
+        kw["gate_base_reward"] = gb
+    if shaping_gamma is not None:
+        kw["shaping_gamma"] = shaping_gamma
+    if eta_shape is not None:
+        kw["eta_shape"] = eta_shape
+    if alpha_ext is not None:
+        kw["alpha_ext"] = alpha_ext
     if init_mapping is not None:
         kw["init_mapping"] = init_mapping
     if lambda_layout is not None:
@@ -491,6 +516,10 @@ def build_fidelity_fn(fidelity_sim: str, noise_config, num_trajectories: int = 6
         from sim.trajectory_sim import make_trajectory_fidelity_fn
         return make_trajectory_fidelity_fn(noise_config, num_trajectories=num_trajectories,
                                            seed=seed, scheduled=True)
+    if fidelity_sim == "trajectory_v2":
+        from sim.trajectory_sim_v2 import make_event_fidelity_fn
+        return make_event_fidelity_fn(noise_config, num_trajectories=num_trajectories,
+                                      seed=seed)
     if fidelity_sim == "analytic":
         from sim.trajectory_sim import make_analytic_fidelity_fn
         return make_analytic_fidelity_fn(noise_config, include_thermal=analytic_thermal,
@@ -637,6 +666,32 @@ def main():
                         help="duration of a SWAP gate (us) in scheduler timing")
     parser.add_argument("--swap-cost", type=float, default=0.5,
                         help="per-SWAP direct penalty (eta_swap); 0 disables the dead-code swap_cost")
+    parser.add_argument("--eta-swap-err", type=float, default=None,
+                        help="SWAP 边噪声惩罚权重（v2 口径：SWAP=3×CX，按所在边 two_q_err 计价；"
+                             "≈3×eta_err 时完全对价；默认 None=0 关闭）")
+    parser.add_argument("--eta-err", type=float, default=None,
+                        help="门边噪声惩罚权重（默认 None=env 默认 0.5；v2 对价标定建议 20，"
+                             "使噪声惩罚与 +2.0/门 的完成奖励同量级）")
+    parser.add_argument("--reward-potential", action=argparse.BooleanOptionalAction,
+                        default=None,
+                        help="R2 势函数奖励：r=进度(0.045/门)−物理噪声代价（边感知，"
+                             "SWAP=3×e_edge，虚拟SWAP免费，取消 +2.0/门 完成奖励）；"
+                             "与 routing 模式组合，默认 None=关闭")
+    parser.add_argument("--gate-base-cx", type=float, default=None,
+                        help="R3：CX 执行奖励覆盖（env 默认 2.0；R3 建议 0.3）")
+    parser.add_argument("--gate-base-1q", type=float, default=None,
+                        help="R3：1Q 门执行奖励覆盖（env 默认 0.3；R3 建议 0.05）")
+    parser.add_argument("--eta-xtalk", type=float, default=None,
+                        help="静态门级串扰惩罚（env 默认 0.02；与调度串扰 double counting，R3 建议 0）")
+    parser.add_argument("--unfinished-penalty", type=float, default=None,
+                        help="截断时每剩余门惩罚（env 默认 0.5；R3 标定建议 0.15）")
+    parser.add_argument("--shaping-gamma", type=float, default=None,
+                        help="R3 势函数 shaping 折扣（必须等于 PPO gamma，默认 0.99）；"
+                             "设置后激活 Φ(s)=−eta_shape·(D_front+α·D_ext) 前瞻塑形并停用 eta_dist")
+    parser.add_argument("--eta-shape", type=float, default=None,
+                        help="R3 势函数尺度（env 默认 0.3）")
+    parser.add_argument("--alpha-ext", type=float, default=None,
+                        help="R3 extended-set 前瞻权重 α（env 默认 0.5，对齐 SabreSwap W）")
     parser.add_argument("--layout-mix", type=str, default=None,
                         help="布局混合比例 恒等/随机/SABRE，逗号分隔如 0.3,0.3,0.4（None=关，即现行为）")
     parser.add_argument("--lambda-layout", type=float, default=0.0,
@@ -671,10 +726,11 @@ def main():
                         help="逗号分隔的 split prefix 列表，按训练进度从小规模到大规模递进 "
                              "(如 large_n10,large_n20,tianyan；默认单 prefix)")
     parser.add_argument("--fidelity-sim", type=str, default="aer",
-                        choices=["aer", "trajectory", "trajectory_sched", "analytic"],
+                        choices=["aer", "trajectory", "trajectory_sched", "trajectory_v2", "analytic"],
                         help="终端保真度模拟器: aer=density_matrix/counts (小比特数), "
                              "trajectory=轨迹状态向量(串行, O(2^n) 内存), "
                              "trajectory_sched=轨迹状态向量+调度感知(空闲退相干/动态串扰, 需 --use-scheduler), "
+                             "trajectory_v2=事件级调度感知 v2(per-gate 时长/重叠缩放串扰/always-on 可选, 需 --use-scheduler), "
                              "analytic=解析错误累积代理(O(门数), 无指数, 16q+ 大电路训练)")
     parser.add_argument("--traj-trajectories", type=int, default=16,
                         help="轨迹模拟器采样条数（越大方差越小，训练越慢）")
@@ -790,7 +846,11 @@ def main():
     nam_sref_map = {}
     if args.nam_circuits_dir:
         nam_max_q = args.nam_max_qubits or args.max_num_qubits or 20
-        nam_circuits = load_nam_circuits(args.nam_circuits_dir, max_qubits=nam_max_q)
+        # 支持逗号分隔多目录（如原始 NAM + 结构化增广集），合并加载
+        for _dir in args.nam_circuits_dir.split(","):
+            _dir = _dir.strip()
+            if _dir:
+                nam_circuits.extend(load_nam_circuits(_dir, max_qubits=nam_max_q))
         if nam_circuits:
             print(f"[nam-circuits] 加载 {len(nam_circuits)} 个 NAM 电路（≤{nam_max_q}q，"
                   f"概率 {args.nam_circuit_prob:.0%}）")
@@ -834,18 +894,28 @@ def main():
                       eta_dist=args.eta_dist,
                       mapping_budget=args.mapping_budget,
                       mapping_phase=args.mapping_phase,
-                       use_scheduler=(args.use_scheduler or args.fidelity_sim == "trajectory_sched"),
+                       use_scheduler=(args.use_scheduler or args.fidelity_sim in ("trajectory_sched", "trajectory_v2")),
                        eta_time=args.eta_time,
                        eta_xtalk_par=args.eta_xtalk_par,
                        eta_idle=args.eta_idle,
                        eta_parallel=args.eta_parallel,
-                                    xtalk_alpha=args.xtalk_alpha,
-                                     swap_duration=args.swap_duration,
-                                     swap_cost=args.swap_cost,
-                                     init_mapping=None,
-                                     lambda_layout=args.lambda_layout,
-                        fidelity_fn=build_fidelity_fn(
-                          args.fidelity_sim, noise_config,
+                                     xtalk_alpha=args.xtalk_alpha,
+                                      swap_duration=args.swap_duration,
+                                      swap_cost=args.swap_cost,
+                                      eta_swap_err=args.eta_swap_err,
+                                      eta_err=args.eta_err,
+                                      reward_potential=args.reward_potential,
+                                      eta_xtalk=args.eta_xtalk,
+                                      unfinished_penalty=args.unfinished_penalty,
+                                      gate_base_cx=args.gate_base_cx,
+                                      gate_base_1q=args.gate_base_1q,
+                                      shaping_gamma=args.shaping_gamma,
+                                      eta_shape=args.eta_shape,
+                                      alpha_ext=args.alpha_ext,
+                                      init_mapping=None,
+                                      lambda_layout=args.lambda_layout,
+                         fidelity_fn=build_fidelity_fn(
+                           args.fidelity_sim, noise_config,
                           num_trajectories=args.traj_trajectories, seed=args.traj_seed,
                           analytic_thermal=args.analytic_thermal,
                           analytic_crosstalk=args.analytic_crosstalk,
@@ -1099,14 +1169,25 @@ def main():
                                   eta_dist=args.eta_dist,
                                   mapping_budget=args.mapping_budget,
                                   mapping_phase=args.mapping_phase,
-                                   use_scheduler=(args.use_scheduler or args.fidelity_sim == "trajectory_sched"),
+                                   use_scheduler=(args.use_scheduler or args.fidelity_sim in ("trajectory_sched", "trajectory_v2")),
                                    eta_time=args.eta_time,
                                    eta_xtalk_par=args.eta_xtalk_par,
                                    eta_idle=args.eta_idle,
                                    eta_parallel=args.eta_parallel,
-                                   xtalk_alpha=args.xtalk_alpha,
-                                    swap_duration=args.swap_duration,
-                                     init_mapping=ep_init_mapping,
+                                    xtalk_alpha=args.xtalk_alpha,
+                                     swap_duration=args.swap_duration,
+                                     swap_cost=args.swap_cost,
+                                     eta_swap_err=args.eta_swap_err,
+                                     eta_err=args.eta_err,
+                                     reward_potential=args.reward_potential,
+                                     eta_xtalk=args.eta_xtalk,
+                                     unfinished_penalty=args.unfinished_penalty,
+                                     gate_base_cx=args.gate_base_cx,
+                                     gate_base_1q=args.gate_base_1q,
+                                     shaping_gamma=args.shaping_gamma,
+                                     eta_shape=args.eta_shape,
+                                     alpha_ext=args.alpha_ext,
+                                      init_mapping=ep_init_mapping,
                                      lambda_layout=args.lambda_layout,
                                       fidelity_fn=build_fidelity_fn(
                                         args.fidelity_sim, noise_config,
@@ -1317,6 +1398,8 @@ def main():
     # --- final checkpoint ---
     last_path = os.path.join(ckpt_dir, "last.pt")
     agent.save_checkpoint(last_path, extra_state={"step": total_steps, "best_metric": best_metric})
+    # 修复：此处此前只打印不保存——metric 未超历史最优时 args.out 从未落盘
+    agent.save(args.out)
     _metrics_fh.close()
     print(f"Checkpoints in {ckpt_dir}")
     print(f"Policy saved to {args.out}")

@@ -20,6 +20,10 @@ _GATE_BASE_REWARD_DEFAULT: Dict[str, float] = {
     "swap": 0.0, "measure": 0.0, "barrier": 0.0,
 }
 
+# R2 势函数奖励标定（v2 物理单位，reward_potential=True 时启用）
+_POT_PROGRESS_B = 0.045   # 每执行门进度奖励（≈1.5×平均边噪声代价，保证完成优于 stall）
+_POT_AVG_COST = 0.01      # 平均边噪声代价（截断惩罚：按未执行门数计）
+
 
 class RoutingEnv(gym.Env):
     """电路路由环境，三阶段训练奖励模式。
@@ -49,6 +53,23 @@ class RoutingEnv(gym.Env):
         eta_xtalk: float = 0.02,
         eta_xz_step: float = 0.0,
         cnot_cost: float = 0.1,
+        # SWAP 边噪声惩罚（v2 口径）：一次 SWAP = 3×CX，按所在耦合边
+        # two_q_err 计价（eta_swap_err ≈ 3×eta_err 时完全对价）；默认 0 = 旧行为
+        eta_swap_err: float = 0.0,
+        # 势函数奖励（R2）：r = 进度奖励 − 物理噪声代价（v2 一致标定）。
+        # 取消 +2.0/门 任意完成奖励；SWAP=3×e_edge；映射期虚拟 SWAP 免费；
+        # 截断按未执行门数计惩罚（堵 stall 逃逸）。与 reward_mode=routing 组合用
+        reward_potential: bool = False,
+        # R3 势函数 shaping（objective 与 shaping 分离）：
+        #   Φ(s) = −eta_shape·(D_front + α·D_ext)/|F|,|E| 均值口径
+        #   r_shape = γ·Φ(s') − Φ(s)，γ 必须与 PPO discount 一致（策略不变性）
+        # 终态/截断 Φ=0；D_ext = front layer 之后按 DAG 序前 ext_set_size 个
+        # 2Q 门（对齐 qiskit SabreSwap 的 with_lookahead(0.5, 20)）。激活后
+        # 旧 eta_dist 相对式距离塑形停用
+        shaping_gamma: Optional[float] = None,
+        eta_shape: float = 0.3,
+        alpha_ext: float = 0.5,
+        ext_set_size: int = 20,
 
         # --- 终端奖励参数 (Stage 2 & 3) ---
         lambda_fid: float = 5.0,
@@ -96,6 +117,12 @@ class RoutingEnv(gym.Env):
         self.reward_mode = reward_mode
         self.gate_base_reward = gate_base_reward or _GATE_BASE_REWARD_DEFAULT.copy()
         self.swap_cost = swap_cost
+        self.eta_swap_err = eta_swap_err
+        self.reward_potential = reward_potential
+        self.shaping_gamma = shaping_gamma
+        self.eta_shape = eta_shape
+        self.alpha_ext = alpha_ext
+        self.ext_set_size = ext_set_size
         self.invalid_penalty = invalid_penalty
         self.eta_err = eta_err
         self.eta_xtalk = eta_xtalk
@@ -363,6 +390,40 @@ class RoutingEnv(gym.Env):
             total += self.hw.dist[pa, pb]
         return total
 
+    def _extended_set_dist(self, mapping=None):
+        """Extended set（front layer 之后按 DAG 序的前 ext_set_size 个未执行
+        2Q 门，其前驱均已执行或位于 front layer）的距离和与门数——对齐
+        qiskit SabreSwap 的 with_lookahead(W=0.5, |E|=20) 口径。"""
+        if mapping is None:
+            mapping = self.mapping
+        ready = {g.index for g in self._ready_2q_gates()}
+        dist = self.hw.dist
+        total = 0.0
+        count = 0
+        for g in self.dag.gates:
+            if count >= self.ext_set_size:
+                break
+            idx = g.index
+            if idx in self.executed or idx in ready or not g.is_two_qubit:
+                continue
+            if not all(p in self.executed or p in ready for p in g.predecessors):
+                continue
+            pa, pb = mapping[g.qubits[0]], mapping[g.qubits[1]]
+            total += float(dist[pa, pb])
+            count += 1
+        return total, count
+
+    def _phi(self) -> float:
+        """R3 势函数：Φ(s) = −eta_shape·(D_front/|F| + α·D_ext/|E|)。
+
+        均值口径天然以拓扑直径为界（跨电路尺度稳定）；终态由调用方置 0。"""
+        ready = self._ready_2q_gates()
+        n_front = max(len(ready), 1)
+        d_front = float(self._front_layer_dist()) / n_front
+        d_ext, n_ext = self._extended_set_dist()
+        d_ext_avg = (d_ext / n_ext) if n_ext else 0.0
+        return -self.eta_shape * (d_front + self.alpha_ext * d_ext_avg)
+
     def _sabre_edge_features(self):
         """为每条 coupling edge 计算 5 维 SABRE 启发式特征。
 
@@ -479,6 +540,12 @@ class RoutingEnv(gym.Env):
         new.reward_mode = self.reward_mode
         new.gate_base_reward = self.gate_base_reward
         new.swap_cost = self.swap_cost
+        new.eta_swap_err = self.eta_swap_err
+        new.reward_potential = self.reward_potential
+        new.shaping_gamma = self.shaping_gamma
+        new.eta_shape = self.eta_shape
+        new.alpha_ext = self.alpha_ext
+        new.ext_set_size = self.ext_set_size
         new.invalid_penalty = self.invalid_penalty
         new.eta_err = self.eta_err
         new.eta_xtalk = self.eta_xtalk
@@ -536,6 +603,19 @@ class RoutingEnv(gym.Env):
     def _step_reward_execute(self, success: bool, gate_idx: Optional[int]) -> float:
         if self.reward_mode == "fidelity_shaping":
             return 0.0
+        if self.reward_potential:
+            # R2 势函数：进度奖励 − 物理噪声代价（边感知，无任意完成奖励）
+            if not success:
+                return -self.invalid_penalty
+            if gate_idx is None:
+                return 0.0
+            g = self.dag.gates[gate_idx]
+            if g.is_two_qubit:
+                pa, pb = self.mapping[g.qubits[0]], self.mapping[g.qubits[1]]
+                cost = float(self.hw.two_q_err[pa, pb])
+            else:
+                cost = float(self.hw.single_q_err[self.mapping[g.qubits[0]]])
+            return _POT_PROGRESS_B - cost
         if not success:
             return -self.invalid_penalty
         if gate_idx is None:
@@ -553,10 +633,22 @@ class RoutingEnv(gym.Env):
         r -= self.eta_xtalk * self._gate_crosstalk(gate_idx)
         return r
 
-    def _step_reward_swap(self) -> float:
+    def _step_reward_swap(self, p: Optional[int] = None,
+                          q: Optional[int] = None) -> float:
         if self.reward_mode == "fidelity_shaping":
             return 0.0
-        return -self.swap_cost
+        if self.reward_potential:
+            # R2 势函数：物理 SWAP = 3×CX 边噪声；映射期虚拟 SWAP 免费
+            # （布局质量由 lambda_layout 与后续门代价体现）
+            if p is None or q is None:
+                return 0.0
+            return -3.0 * float(self.hw.two_q_err[p, q])
+        r = -self.swap_cost
+        # v2 口径：SWAP = 3×CX，按所在耦合边错误率 ×3 计价（边感知，
+        # 惩罚"在高噪声边上换位"，与 eta_err 对 2q 门的计价同构）
+        if p is not None and q is not None and self.eta_swap_err:
+            r -= self.eta_swap_err * 3.0 * float(self.hw.two_q_err[p, q])
+        return r
 
     def _update_xz_after_gate(self, gate_idx: int) -> float:
         g = self.dag.gates[gate_idx]
@@ -834,7 +926,8 @@ class RoutingEnv(gym.Env):
             return self.lambda_fid * fid
         return 0.0
 
-    def _end_step(self, reward: float, info: dict, compute_obs: bool = True):
+    def _end_step(self, reward: float, info: dict, compute_obs: bool = True,
+                  phi_before: Optional[float] = None):
         """统一收尾：done / truncated 判定与终端奖励。"""
         info["mapping_swaps"] = self._mapping_swaps
         done = len(self.executed) == self.dag.num_gates
@@ -846,6 +939,10 @@ class RoutingEnv(gym.Env):
             remaining = self.dag.num_gates - len(self.executed)
             reward += -self.unfinished_penalty * remaining
             info["truncated_remaining"] = remaining
+        if phi_before is not None:
+            # R3 势函数 shaping：r += γ·Φ(s') − Φ(s)；终态/截断 Φ(s')=0
+            phi_after = 0.0 if (done or truncated) else self._phi()
+            reward += self.shaping_gamma * phi_after - phi_before
         obs = self._obs() if compute_obs else None
         return obs, reward, done, truncated, info
 
@@ -853,6 +950,8 @@ class RoutingEnv(gym.Env):
         """映射阶段：虚拟 SWAP 重排初始布局；commit 动作（>= num_edges）结束阶段。"""
         info: dict = {}
         reward = 0.0
+        phi_before = self._phi() if self.shaping_gamma is not None else None
+        legacy_dist = self.eta_dist != 0 and self.shaping_gamma is None
         if action >= self.num_edges:
             self.mapping_phase = False
             self._effective_initial_mapping = list(self.mapping)
@@ -863,12 +962,16 @@ class RoutingEnv(gym.Env):
                 reward += -self.lambda_layout * (self._front_layer_dist() / nready)
         else:
             p, q = self.coupling_map[action]
-            dist_before = self._front_layer_dist() if self.eta_dist != 0 else 0.0
+            dist_before = self._front_layer_dist() if legacy_dist else 0.0
             self._apply_virtual_swap(p, q)
             self._mapping_swaps += 1
             self._swap_history.append(action)
-            reward += self._step_reward_swap()
-            if self.eta_dist != 0:
+            if self.shaping_gamma is None:
+                # 旧路径：虚拟 SWAP 也计 swap_cost/eta_swap_err
+                reward += self._step_reward_swap(p, q)
+            # R3：映射期虚拟 SWAP 物理免费（无噪声、零时长），
+            # 布局引导由 Φ shaping（D_front/D_ext 项）承担
+            if legacy_dist:
                 dist_after = self._front_layer_dist()
                 reward += -self.eta_dist * (dist_after - dist_before) / max(dist_before, 1e-8)
             if self._mapping_swaps >= self.mapping_budget:
@@ -879,7 +982,8 @@ class RoutingEnv(gym.Env):
                 if self.lambda_layout != 0.0:
                     nready = max(1, len(self._ready_2q_gates()))
                     reward += -self.lambda_layout * (self._front_layer_dist() / nready)
-        return self._end_step(reward, info, compute_obs=compute_obs)
+        return self._end_step(reward, info, compute_obs=compute_obs,
+                              phi_before=phi_before)
 
     # ------------------------------------------------------------------
     #  step
@@ -895,7 +999,9 @@ class RoutingEnv(gym.Env):
 
         p, q = self.coupling_map[action]
 
-        dist_before = self._front_layer_dist() if self.eta_dist != 0 else 0.0
+        legacy_dist = self.eta_dist != 0 and self.shaping_gamma is None
+        phi_before = self._phi() if self.shaping_gamma is not None else None
+        dist_before = self._front_layer_dist() if legacy_dist else 0.0
 
         self._apply_swap(p, q)
         self._swap_counter += 1
@@ -904,11 +1010,12 @@ class RoutingEnv(gym.Env):
         r_exec, r_prop = self._auto_execute_batch()
 
         reward = r_exec + r_prop
-        if self.eta_dist != 0:
+        if legacy_dist:
             dist_after = self._front_layer_dist()
             r_dist = -self.eta_dist * (dist_after - dist_before) / max(dist_before, 1e-8)
             reward += r_dist
 
-        reward += self._step_reward_swap()
+        reward += self._step_reward_swap(p, q)
 
-        return self._end_step(reward, {}, compute_obs=compute_obs)
+        return self._end_step(reward, {}, compute_obs=compute_obs,
+                              phi_before=phi_before)

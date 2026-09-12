@@ -19,7 +19,7 @@
  "num_swaps": 23,
  "mapping_swaps": 2,
  "completed": true,
- "fidelity": 0.28829925698159886,
+ "fidelity": null,
  "final_layout": {
   "0": 1,
   "1": 6,
@@ -31,7 +31,7 @@
   "7": 8,
   "8": 0
  },
- "wall_time_ms": 1086.1,
+ "wall_time_ms": 301.0,
  "from_0_19": {
   "0": "Q12",
   "1": "Q13",

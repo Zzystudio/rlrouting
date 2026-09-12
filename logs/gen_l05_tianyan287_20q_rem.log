@@ -1,0 +1,15 @@
+Topo: ../traindata/topo/tianyan287_20q.json (20 qubits, 31 edges)
+Label map: ../traindata/topo/tianyan287_20q_labels.json
+[load] missing keys (random init): ['critic_fid.0.weight', 'critic_fid.0.bias', 'critic_fid.2.weight', 'critic_fid.2.bias']
+Model: ../models/policy_tianyan20q_laymix_l05_eta05.pt (l05)
+Circuits: 4 files in /tmp/opencode/tianyan/rem_qasm
+  OK gf2^5_mult.qasm: 15q, swaps=122, map_swaps=0, fid=0.2287, 227802ms
+  OK gf2^6_mult.qasm: 18q, swaps=195, map_swaps=0, fid=0.1719, 656356ms
+  OK grover_5.qasm: 9q, swaps=149, map_swaps=0, fid=0.0001, 2147ms
+  OK hwb6.qasm: 7q, swaps=63, map_swaps=2, fid=0.1244, 676ms
+
+=== Summary (l05) ===
+Routed: 4/4
+Skipped: 0
+Fidelity: mean=0.1313, min=0.0001, max=0.2287
+SWAPs: mean=132.2, min=63, max=195

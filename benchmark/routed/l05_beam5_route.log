@@ -1,0 +1,30 @@
+Topo: ../traindata/topo/tianyan176_20q.json (20 qubits, 29 edges)
+Label map: ../traindata/topo/tianyan176_20q_labels.json
+[load] missing keys (random init): ['critic_fid.0.weight', 'critic_fid.0.bias', 'critic_fid.2.weight', 'critic_fid.2.bias']
+Model: ../models/policy_tianyan20q_laymix_l05_eta05.pt (l05_beam5)
+Circuits: 19 files in ../benchmark/nam_circs
+  OK barenco_tof_10.qasm: 19q, swaps=95, map_swaps=17, fid=--, 1848ms
+  OK barenco_tof_3.qasm: 5q, swaps=8, map_swaps=1, fid=--, 93ms
+  OK barenco_tof_4.qasm: 7q, swaps=16, map_swaps=1, fid=--, 189ms
+  OK barenco_tof_5.qasm: 9q, swaps=23, map_swaps=2, fid=--, 301ms
+  OK csla_mux_3.qasm: 15q, swaps=40, map_swaps=0, fid=--, 444ms
+  OK gf2^4_mult.qasm: 12q, swaps=47, map_swaps=3, fid=--, 603ms
+  OK gf2^5_mult.qasm: 15q, swaps=84, map_swaps=2, fid=--, 1142ms
+  OK gf2^6_mult.qasm: 18q, swaps=129, map_swaps=1, fid=--, 1845ms
+  OK grover_5.qasm: 9q, swaps=101, map_swaps=0, fid=--, 2348ms
+  OK hwb6.qasm: 7q, swaps=39, map_swaps=3, fid=--, 626ms
+  OK mod5_4.qasm: 5q, swaps=8, map_swaps=2, fid=--, 111ms
+  OK mod_mult_55.qasm: 9q, swaps=15, map_swaps=3, fid=--, 223ms
+  OK mod_red_21.qasm: 11q, swaps=43, map_swaps=0, fid=--, 654ms
+  OK rc_adder_6.qasm: 14q, swaps=33, map_swaps=0, fid=--, 442ms
+  OK tof_10.qasm: 19q, swaps=67, map_swaps=18, fid=--, 1078ms
+  OK tof_3.qasm: 5q, swaps=6, map_swaps=2, fid=--, 85ms
+  OK tof_4.qasm: 7q, swaps=9, map_swaps=0, fid=--, 104ms
+  OK tof_5.qasm: 9q, swaps=16, map_swaps=0, fid=--, 192ms
+  OK vbe_adder_3.qasm: 10q, swaps=27, map_swaps=3, fid=--, 359ms
+
+=== Summary (l05_beam5) ===
+Routed: 19/19
+Skipped: 0
+Fidelity: N/A
+SWAPs: mean=42.4, min=6, max=129

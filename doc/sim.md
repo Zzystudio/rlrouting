@@ -294,3 +294,100 @@ sim = NoiseSimulator(config)
 - 小规模 (≤5 qubits): GPU 因核启动开销而更慢，建议使用 CPU
 - 中大规模 (≥10 qubits): GPU 加速比 3~4x，推荐启用 GPU
 - 默认 `device='CPU'` 适用于本项目 RL/GNN 训练中的小规模模拟
+
+---
+
+## 事件级调度感知模拟器 v2（trajectory_sim_v2）
+
+`sim/trajectory_sim_v2.py` 提供 `EventTrajectorySimulator`：以**事件级调度**
+（每门精确 `start/end`）驱动噪声演化，修复 v1 同步波近似的三类失真。本文件
+不修改 v1 任何代码：配置以 `EventNoiseConfig(NoiseConfig)` 子类扩展，模拟器
+继承 `TrajectorySimulator` 复用全部批量 MC 内核。
+
+### 事件格式
+
+```
+Event = (start, end, op, qubits[, phys_idx])
+```
+
+- 时长 = `end - start`（µs）；`qubits[0]` 为 cx 的 control；`phys_idx` 用于
+  rz 等参数化门取旋转角
+- 双比特门支持 `cx/cz/swap`（ecr 等需先转译）；同一比特事件必须互斥
+
+### 事件来源
+
+| API | 说明 |
+|-----|------|
+| `timing_log_to_events(schedule_log, circuit=, remap=)` | 读 env 事件级调度日志（`CircuitTiming.schedule_log`，含 swap 条目，跳过 measure） |
+| `schedule_phys_circuit_events(circuit, durations=)` | 平铺电路 ASAP 回退；durations 缺省用模块内镜像表（与 `routing/timing.GATE_DURATION_TABLE` 同步） |
+| `validate_events(events, circuit)` | 事件↔电路一一对应 + 比特互斥 + op 支持校验 |
+
+### 噪声语义
+
+- **时间**：每比特独立时钟；门前空闲热弛豫（Markov 精确复合，**与事件自身
+  时长无关**——零时长事件前的等待期同样计账，避免 v1 swap 漏算同族问题）+
+  门内 `thermal(dur)` + 末尾收尾；rz（dur=0）施加酉矩阵但不施加噪声
+- **门噪声**：1q = depol1 + thermal(dur)（id 只加 thermal）；cx/cz =
+  depol2 + 静态 ZZ `θ·(dur/two_gate_time)` + thermal 双比特；swap = 酉矩阵 +
+  3×(depol2 + 静态 ZZ θ) + thermal(0.9µs)（物理等价 3×CX，v1 对 SWAP 无噪声）
+- **动态串扰**：时间重叠的不相交事件对，1-hop 相邻交叉对施加
+  `ZZ(χ_rate·ov)`，`χ_rate = θ_static / two_gate_time`（rad/µs），`ov` 为实际
+  重叠时长；含 1Q-2Q spectator 对；swap 默认不作串扰源（与 timing.py A2 口径
+  一致，`EventNoiseConfig.swap_xtalk=True` 开启）。同步纯 cx 波（ov=0.3µs）
+  下与 v1 数值一致
+- **always-on 空闲 ZZ**（`EventNoiseConfig.always_on_zz = {(q1,q2): rate}`，
+  rad/µs，默认 None=关）：耦合对「双空闲」时间段施加 `ZZ(rate·Δt)`，段边界
+  处应用（ZZ 与门不对易，不跨段合并）；显式 id/delay 事件视为空闲
+- **串扰角标定**：`crosstalk_strength`（或回退 0.1×边错误率）解释为每标称
+  CX（0.3µs）的旋转角 θ；动态/静态均由该标定派生
+
+### 快速开始
+
+```python
+from sim.sim import NoiseConfig
+from sim.trajectory_sim_v2 import (
+    EventNoiseConfig, EventTrajectorySimulator,
+    schedule_phys_circuit_events, trajectory_circuit_fidelity_events,
+)
+
+config = NoiseConfig(t1_times=[50.]*3, t2_times=[70.]*3, freq_ghz=[5.]*3,
+                     single_q_gate_error=0.001, two_q_gate_error=0.01,
+                     coupling_map=[(0,1),(1,2)])
+sim = EventTrajectorySimulator(config, num_trajectories=16, seed=0)
+
+events = schedule_phys_circuit_events(routed_circuit)   # 平铺 ASAP
+fid = sim.fidelity_events(routed_circuit, events)       # 态保真度
+
+# 或一步到位（基线评估路径）：
+fid = trajectory_circuit_fidelity_events(routed_circuit, config,
+                                         num_trajectories=16, seed=0)
+```
+
+### API 参考
+
+| API | 说明 |
+|-----|------|
+| `evolve_events(circuit, events, apply_noise=True)` | 事件级演化，返回末态状态向量 |
+| `run_trajectories_events(circuit, events, num_trajectories=None)` | 返回 `TrajectoryResult` |
+| `fidelity_events(circuit, events, ideal_sv=None, num_trajectories=None)` | 事件级平均态保真度 |
+| `run_events(circuit, events, shots=None)` | 事件级 counts（每 shot 一条独立轨迹） |
+| `trajectory_circuit_fidelity_events(phys_circuit, config, ...)` | 独立电路入口（内部平铺 ASAP + 比特子集缩减，缩减保留 always_on_zz 并重映射） |
+| `make_event_fidelity_fn(config, num_trajectories, seed, durations)` | env hook 工厂：优先 env 事件级 schedule_log，校验失败回退平铺 ASAP |
+
+训练/评估接入：`--fidelity-sim trajectory_v2`（自动启用调度器，与
+`trajectory_sched` 同一口径传递 PPO/SABRE）。
+
+### 验证
+
+`test/test_event_sim.py`（22 用例）：以 `qiskit DensityMatrix` + 解析 Kraus
+通道为精确参考对拍（端到端 |ΔF|<0.02），含解析闭式对拍（动态串扰
+cos²(χ·ov)、spectator、always-on cos²(rate·Δt)、空闲 exp(-t/T1)）、swap≈3×CX、
+rz 零时长、同步波退化下与 v1 数值一致（同种子 1e-6）等。
+
+### 与 v1 的行为差异（重要）
+
+1. SWAP 事件带真实噪声（v1 无）→ 评估保真度系统性更低、更贴近硬件；
+2. rz 不再贡献退相干（v1 按 0.1µs 计）；
+3. 动态串扰按实际重叠时长缩放，且计入 1Q spectator；
+4. 事件级 start/end 取代同步波，消费 env 事件级调度日志（v1 在
+   `get_schedule_waves` 处降级为同步波）。

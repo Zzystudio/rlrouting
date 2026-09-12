@@ -1,0 +1,25 @@
+barenco_tof_10.qasm: q=19 sab_sw=103 l05_sw=152 fid_v2 sabre=0.0181 l05=0.0331 (265s)
+barenco_tof_3.qasm: q=5 sab_sw=9 l05_sw=13 fid_v2 sabre=0.6708 l05=0.3198 (0s)
+barenco_tof_4.qasm: q=7 sab_sw=30 l05_sw=18 fid_v2 sabre=0.3623 l05=0.4819 (0s)
+barenco_tof_5.qasm: q=9 sab_sw=26 l05_sw=39 fid_v2 sabre=0.2077 l05=0.1922 (0s)
+csla_mux_3.qasm: q=15 sab_sw=39 l05_sw=53 fid_v2 sabre=0.0007 l05=0.1556 (11s)
+gf2^4_mult.qasm: q=12 sab_sw=50 l05_sw=54 fid_v2 sabre=0.1264 l05=0.0692 (4s)
+gf2^5_mult.qasm: q=15 sab_sw=72 l05_sw=91 fid_v2 sabre=0.0080 l05=0.0732 (21s)
+gf2^6_mult.qasm: q=18 sab_sw=109 l05_sw=173 fid_v2 sabre=0.0679 l05=0.0320 (282s)
+grover_5.qasm: q=9 sab_sw=119 l05_sw=145 fid_v2 sabre=0.0000 l05=0.0000 (3s)
+hwb6.qasm: q=7 sab_sw=50 l05_sw=46 fid_v2 sabre=0.0000 l05=0.0004 (0s)
+mod5_4.qasm: q=5 sab_sw=12 l05_sw=15 fid_v2 sabre=0.2632 l05=0.2887 (0s)
+mod_mult_55.qasm: q=9 sab_sw=22 l05_sw=22 fid_v2 sabre=0.0418 l05=0.0098 (0s)
+mod_red_21.qasm: q=11 sab_sw=48 l05_sw=58 fid_v2 sabre=0.1187 l05=0.0501 (4s)
+rc_adder_6.qasm: q=14 sab_sw=38 l05_sw=57 fid_v2 sabre=0.0619 l05=0.1247 (20s)
+tof_10.qasm: q=19 sab_sw=57 l05_sw=81 fid_v2 sabre=0.3556 l05=0.0935 (235s)
+tof_3.qasm: q=5 sab_sw=11 l05_sw=10 fid_v2 sabre=0.7861 l05=0.4417 (0s)
+tof_4.qasm: q=7 sab_sw=17 l05_sw=13 fid_v2 sabre=0.5202 l05=0.5116 (0s)
+tof_5.qasm: q=9 sab_sw=17 l05_sw=22 fid_v2 sabre=0.3360 l05=0.3079 (0s)
+vbe_adder_3.qasm: q=10 sab_sw=28 l05_sw=33 fid_v2 sabre=0.4267 l05=0.2757 (3s)
+=== 汇总 (trajectory_v2 x16, seed=0) ===
+SWAPs mean:  sabre=45.1  l05=57.6
+Fid mean:    sabre=0.2301  l05=0.1822
+Fid logmean: sabre=0.0395  l05=0.0611
+l05 胜 SABRE: 8/19
+ALL DONE
