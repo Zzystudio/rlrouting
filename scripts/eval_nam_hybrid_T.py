@@ -31,6 +31,11 @@ IS_SABRE = len(sys.argv) > 4 and sys.argv[4] == '--sabre'
 # --cpu 强制历史 CPU 口径（A/B 基准用）
 IS_CPU = '--cpu' in sys.argv
 SIM_BACKEND = 'cpu' if IS_CPU else 'auto'
+# --circ-dir <dir>：评估集目录（默认 benchmark/nam_circs；QUARL 第二评估集用
+# benchmark/quarl_opt_wo_rm），路由结果仍从 benchmark/routed/<MODEL_DIR>/ 读取
+CIRC_DIR = 'benchmark/nam_circs'
+if '--circ-dir' in sys.argv:
+    CIRC_DIR = sys.argv[sys.argv.index('--circ-dir') + 1]
 SEED = 42
 SWAP_DEF = 'gate swap a,b { cx a,b; cx b,a; cx a,b; }\n'
 
@@ -40,7 +45,7 @@ def T_for(q):
 
 
 config, hw, coupling_map = load_topo(f'traindata/topo/{TOPO}.json')
-NAM_DIR = 'benchmark/nam_circs'
+NAM_DIR = CIRC_DIR
 circuits = sorted(f for f in os.listdir(NAM_DIR) if f.endswith('.qasm'))
 
 # SABRE 路由一次性生成（确定性）
@@ -91,7 +96,7 @@ for fname in circuits:
         swaps = d['num_swaps']
     q = qasm2_loads(open(os.path.join(NAM_DIR, fname)).read()).num_qubits
     T = T_for(q)
-    t0 = time.time()
+    t0 = time.perf_counter()
     fid = trajectory_circuit_fidelity_events(phys, config, num_trajectories=T,
                                              seed=SEED, backend=SIM_BACKEND)
     dt = round(time.perf_counter() - t0, 1)

@@ -34,5 +34,41 @@
   "backend": "cuda",
   "fid": 0.160499,
   "sec": 0.33
+ },
+ {
+  "circuit": "gf2^6_mult",
+  "qubits": 18,
+  "swaps": 417,
+  "T": 64,
+  "backend": "cpu",
+  "fid": 0.04986,
+  "sec": 2368.03
+ },
+ {
+  "circuit": "tof_10",
+  "qubits": 19,
+  "swaps": 99,
+  "T": 128,
+  "backend": "cpu",
+  "fid": 0.133263,
+  "sec": 1655.23
+ },
+ {
+  "circuit": "tof_5",
+  "qubits": 9,
+  "swaps": 25,
+  "T": 16,
+  "backend": "cpu",
+  "fid": 0.428263,
+  "sec": 0.04
+ },
+ {
+  "circuit": "vbe_adder_3",
+  "qubits": 10,
+  "swaps": 64,
+  "T": 32,
+  "backend": "cpu",
+  "fid": 0.188355,
+  "sec": 0.21
  }
 ]

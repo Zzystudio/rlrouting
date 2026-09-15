@@ -1,0 +1,198 @@
+[
+ {
+  "method": "SABRE",
+  "circuit": "barenco_tof_10.qasm",
+  "qubits": 19,
+  "swaps": 85,
+  "T": 128,
+  "fid": 0.03144839179377527,
+  "sec": 32.8
+ },
+ {
+  "method": "p0t287",
+  "circuit": "barenco_tof_10.qasm",
+  "qubits": 19,
+  "swaps": 186,
+  "T": 128,
+  "fid": 0.046838547656701784,
+  "sec": 88.5
+ },
+ {
+  "method": "p0t287_beam5",
+  "circuit": "barenco_tof_10.qasm",
+  "qubits": 19,
+  "swaps": 982,
+  "T": 0,
+  "fid": 0.0,
+  "sec": 0.0,
+  "truncated": true
+ },
+ {
+  "method": "SABRE",
+  "circuit": "csla_mux_3.qasm",
+  "qubits": 15,
+  "swaps": 39,
+  "T": 128,
+  "fid": 0.2828688626233963,
+  "sec": 3.6
+ },
+ {
+  "method": "p0t287",
+  "circuit": "csla_mux_3.qasm",
+  "qubits": 15,
+  "swaps": 102,
+  "T": 128,
+  "fid": 0.15097916887731658,
+  "sec": 10.5
+ },
+ {
+  "method": "p0t287_beam5",
+  "circuit": "csla_mux_3.qasm",
+  "qubits": 15,
+  "swaps": 310,
+  "T": 128,
+  "fid": 0.1533540980435701,
+  "sec": 10.5
+ },
+ {
+  "method": "SABRE",
+  "circuit": "gf2^4_mult.qasm",
+  "qubits": 12,
+  "swaps": 41,
+  "T": 128,
+  "fid": 0.11178079056957907,
+  "sec": 7.4
+ },
+ {
+  "method": "p0t287",
+  "circuit": "gf2^4_mult.qasm",
+  "qubits": 12,
+  "swaps": 71,
+  "T": 128,
+  "fid": 0.10551765858239855,
+  "sec": 8.8
+ },
+ {
+  "method": "p0t287_beam5",
+  "circuit": "gf2^4_mult.qasm",
+  "qubits": 12,
+  "swaps": 989,
+  "T": 0,
+  "fid": 0.0,
+  "sec": 0.0,
+  "truncated": true
+ },
+ {
+  "method": "SABRE",
+  "circuit": "gf2^5_mult.qasm",
+  "qubits": 15,
+  "swaps": 71,
+  "T": 128,
+  "fid": 0.028581608239676363,
+  "sec": 6.6
+ },
+ {
+  "method": "p0t287",
+  "circuit": "gf2^5_mult.qasm",
+  "qubits": 15,
+  "swaps": 253,
+  "T": 128,
+  "fid": 0.03970016919844385,
+  "sec": 90.4
+ },
+ {
+  "method": "p0t287_beam5",
+  "circuit": "gf2^5_mult.qasm",
+  "qubits": 15,
+  "swaps": 986,
+  "T": 0,
+  "fid": 0.0,
+  "sec": 0.0,
+  "truncated": true
+ },
+ {
+  "method": "SABRE",
+  "circuit": "gf2^6_mult.qasm",
+  "qubits": 18,
+  "swaps": 109,
+  "T": 128,
+  "fid": 0.03437278099883836,
+  "sec": 19.0
+ },
+ {
+  "method": "p0t287",
+  "circuit": "gf2^6_mult.qasm",
+  "qubits": 18,
+  "swaps": 417,
+  "T": 128,
+  "fid": 0.04314039661516866,
+  "sec": 136.4
+ },
+ {
+  "method": "p0t287_beam5",
+  "circuit": "gf2^6_mult.qasm",
+  "qubits": 18,
+  "swaps": 983,
+  "T": 0,
+  "fid": 0.0,
+  "sec": 0.0,
+  "truncated": true
+ },
+ {
+  "method": "SABRE",
+  "circuit": "rc_adder_6.qasm",
+  "qubits": 14,
+  "swaps": 44,
+  "T": 128,
+  "fid": 0.08262796517516934,
+  "sec": 26.9
+ },
+ {
+  "method": "p0t287",
+  "circuit": "rc_adder_6.qasm",
+  "qubits": 14,
+  "swaps": 987,
+  "T": 0,
+  "fid": 0.0,
+  "sec": 0.0,
+  "truncated": true
+ },
+ {
+  "method": "p0t287_beam5",
+  "circuit": "rc_adder_6.qasm",
+  "qubits": 14,
+  "swaps": 987,
+  "T": 0,
+  "fid": 0.0,
+  "sec": 0.0,
+  "truncated": true
+ },
+ {
+  "method": "SABRE",
+  "circuit": "tof_10.qasm",
+  "qubits": 19,
+  "swaps": 49,
+  "T": 128,
+  "fid": 0.140273185901286,
+  "sec": 19.1
+ },
+ {
+  "method": "p0t287",
+  "circuit": "tof_10.qasm",
+  "qubits": 19,
+  "swaps": 99,
+  "T": 128,
+  "fid": 0.16793840675331373,
+  "sec": 48.3
+ },
+ {
+  "method": "p0t287_beam5",
+  "circuit": "tof_10.qasm",
+  "qubits": 19,
+  "swaps": 982,
+  "T": 0,
+  "fid": 0.0,
+  "sec": 0.0,
+  "truncated": true
+ }
+]

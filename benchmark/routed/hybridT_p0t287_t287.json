@@ -127,5 +127,50 @@
   "fid": 0.0,
   "sec": 0.0,
   "truncated": true
+ },
+ {
+  "model": "p0t287",
+  "circuit": "tof_10.qasm",
+  "qubits": 19,
+  "swaps": 99,
+  "T": 64,
+  "fid": 0.13277323718786244,
+  "sec": -1788442342.0
+ },
+ {
+  "model": "p0t287",
+  "circuit": "tof_3.qasm",
+  "qubits": 5,
+  "swaps": 8,
+  "T": 16,
+  "fid": 0.6536558554356522,
+  "sec": -1788442368.0
+ },
+ {
+  "model": "p0t287",
+  "circuit": "tof_4.qasm",
+  "qubits": 7,
+  "swaps": 14,
+  "T": 16,
+  "fid": 0.4383203588136967,
+  "sec": -1788442368.0
+ },
+ {
+  "model": "p0t287",
+  "circuit": "tof_5.qasm",
+  "qubits": 9,
+  "swaps": 25,
+  "T": 16,
+  "fid": 0.4282631410275582,
+  "sec": -1788442368.0
+ },
+ {
+  "model": "p0t287",
+  "circuit": "vbe_adder_3.qasm",
+  "qubits": 10,
+  "swaps": 64,
+  "T": 32,
+  "fid": 0.18835455890363295,
+  "sec": -1788442367.8
  }
 ]

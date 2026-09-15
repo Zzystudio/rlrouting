@@ -119,23 +119,6 @@ class TrajectoryResult:
         self._data = None
 
 
-# 工作集低于此值（T×2^n×16B）时 GPU kernel launch 开销主导、反而比 CPU 慢
-# （实测：9q T=16 ≈ 8 MiB → GPU 慢 5x；18q T=64 = 256 MiB → GPU 快 33.5x）
-_GPU_AUTO_MIN_WS = 1 << 27  # 128 MiB
-
-
-def auto_backend(n_qubits: int, num_trajectories: int) -> str:
-    """按工作集规模自动选后端（factory 层 backend='auto' 时调用）。
-
-    混合精度评估口径下效果：≤9q T=16（8 MiB）→ cpu；≥15q T=64
-    （480 MiB-1 GiB）→ cuda（30x+ 提速段）。
-    """
-    ws = num_trajectories * (1 << n_qubits) * 16
-    if ws >= _GPU_AUTO_MIN_WS and torch.cuda.is_available():
-        return "cuda"
-    return "cpu"
-
-
 class TrajectorySimulator:
     """
     基于轨迹采样 + 状态向量的噪声模拟器。

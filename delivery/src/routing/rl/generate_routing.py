@@ -347,10 +347,6 @@ def main():
                             mask[agent.num_edges] = env.mapping_phase
                         mask = mask.unsqueeze(0)
                     logits, _ = agent._forward_obs(obs, action_mask=mask)
-                    if mask is not None and int(mask[0].sum().item()) == 0:
-                        # 全部动作被掩码（病态状态）：安全退出而非任选动作
-                        truncated = True
-                        break
                     action = logits.argmax(-1).item()
                 obs, reward, done, truncated, info = env.step(action)
 

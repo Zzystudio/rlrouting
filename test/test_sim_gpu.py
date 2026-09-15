@@ -287,3 +287,22 @@ def test_backend_auto_returns_cpu_type():
 def test_backend_invalid_raises():
     with pytest.raises(ValueError):
         TrajectorySimulator(make_config(N_QUBITS), backend="tpu")
+
+
+def test_auto_backend_size_threshold():
+    """auto 按工作集分流：小工作集 → cpu，深电路大工作集 → cuda。"""
+    from sim.trajectory_sim import auto_backend
+    assert auto_backend(9, 16) == "cpu"      # 8 MiB
+    assert auto_backend(10, 32) == "cpu"     # 0.5 MiB
+    assert auto_backend(15, 64) == "cpu"     # 32 MiB（实测区间外，保守走 CPU）
+    assert auto_backend(18, 64) == "cuda"    # 256 MiB
+    assert auto_backend(20, 64) == "cuda"    # 1 GiB
+
+
+def test_factory_auto_small_circuit_uses_cpu():
+    """端到端 auto：9q 小电路经 factory 自动回落 CPU（启动开销免付）。"""
+    cfg = make_config(N_QUBITS)
+    qc = make_circuit(N_QUBITS)
+    f = trajectory_circuit_fidelity_events(qc, cfg, num_trajectories=16,
+                                           seed=42, backend="auto")
+    assert 0.0 < f <= 1.0

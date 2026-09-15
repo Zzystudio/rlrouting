@@ -1,0 +1,28 @@
+{
+ "completed": true,
+ "num_swaps": 3,
+ "mapping_swaps": 0,
+ "wall_time_ms": 14.3,
+ "profile": "r3b",
+ "beam_width": 0,
+ "initial_mapping": [
+  2,
+  4,
+  3,
+  0,
+  1
+ ],
+ "final_mapping": [
+  2,
+  4,
+  0,
+  3,
+  1
+ ],
+ "fidelity_v1": 0.742274,
+ "fidelity_trajectories": 16,
+ "fidelity_sec": 0.0,
+ "fidelity_sim": "v1_trajectory_sched",
+ "circuit": "ghz_5.qasm",
+ "topology": "tianyan176_20q.json"
+}

@@ -1,0 +1,108 @@
+\subsection{噪声感知路由增强战役：详细进展、问题与后续规划（2026-09-15）}
+
+本节完整记录噪声感知路由增强战役（P0 系列结构性注入 $\to$ tianyan287\_20q 重训 $\to$ NAM 全量评估）的进展、问题与规划。方法论约束为「改信号、不改价格」：单纯调奖励权重的路线已被 t287-v1 / t287-v2 / t287sh 三次失败证伪，本轮全部改动为结构性注入，并以工程闸门（G1--G6）替代经验判断。与早前摘要版相比，本版补齐了\textbf{评估定论}：argmax/beam5 各 19 条电路已全部完成，结论出现重要反转，详见第五部分。
+
+\paragraph{一、诊断与设计（S0，无训练）.}
+在 tianyan287\_20q 拓扑（20q/31 边，直径 7，双比特错误率跨度 $0.0025$--$0.0116$）上，以 SABRE 轨迹回放完成四项核算：
+\begin{itemize}
+    \item \textbf{静态几何}：噪声加权距离 $d_{\mathrm{noise}}=\mathrm{hops}+\beta\cdot path\_err$ 的保序约束为 $\beta_{\mathrm{crit}}\approx0.82$（保守界 0.62），故 $\beta$ 从设计稿的 1.0 下调至 0.5；绕路回本仅约 4.3 门（$\eta_{\mathrm{err}}=0.5$），即「为干净边多走 SWAP」的激励真实存在，SWAP 持平不能只靠价格不动。
+    \item \textbf{串扰信号}：决策点上 $xtalk\_pred$ 跨候选边标准差 0.49（现有数据）/ 0.55（并行原型），100\% 非零——串扰有信号可学，此前「方差 $\approx$ 0」的怀疑被排除；但调度串扰惩罚仅占总回报 0.02\%，调权重路线数学上不可行（提至可学习区间需 $\eta_{xtalk\_par}\approx30$，必复现 t287-v1 崩塌）。
+    \item \textbf{距离 tie-break 空间}：71.7\% 的决策步骤存在多条最短路径，等路径间平均 $\Sigma e$ 差异 0.18（归一化）——噪声加权距离有实际区分度。
+    \item \textbf{progress 奖励标定失效}：$B=0.045 <$ 平均边误差（0.130），2Q 门净奖励为 $-0.085$/门；「完成优于停摆」实际由截断罚（0.3）兜底。且 1Q 门占奖励事件流约 60\% 但策略不可控——奖励给了不可控部分，惩罚给了可控部分。
+\end{itemize}
+
+\paragraph{二、代码实施与缺陷修复.}
+\begin{itemize}
+    \item \textbf{P0-a}：per-edge 直接噪声特征 +5 维（$e_{\mathrm{edge}}$ / $zz_{\mathrm{edge}}$ / 相对均值 / SWAP 价格 $3e$ / 端点累积 XZ 误差，物理端点经映射取逻辑比特）。
+    \item \textbf{P0-b}：噪声加权距离 $d_{\mathrm{noise}}$（BFS 分层 DP 求 min-hop 路径最小 $\Sigma e$），替换环境内全部 4 处跳数距离；$\beta=0$ 时与原距离逐位一致。
+    \item \textbf{P0-c}：势函数扩展 $\Phi \mathrel{+}= -[w_{\mathrm{err}} E_{\mathrm{err}}(s) + w_{\mathrm{xt}} X(s)]$（纯状态函数，telescoping 测试通过）+ per-swap 即时串扰价 $-w\cdot xtalk\_pred(edge)$（把串扰信用钉在动作上）。
+    \item \textbf{P0-d}：$B$ 重标定至 0.20（$=1.5\times$ 平均边误差，恢复「完成优于停摆」设计意图；$B\cdot N$ 在完成策略间为常数，不改最优路由）+ 1Q/measure 门 progress 置零（消除约 60\% 不可控事件流）。
+    \item \textbf{P1-a}：SABRE SWAP 预算锚（$\delta=1.05$，超预算每颗罚 $\lambda=0.5$）+ G1 训练监控（日志 sr 字段 + metrics 列 + 1.05/1.10 分级告警）。
+    \item \textbf{存量缺陷修复（重要）}：策略网络 per-edge 特征维度硬编码 $3h{+}5$，而环境观测自 R5a 起为 $3h{+}9$——rollout 行为策略与更新策略不一致（行为策略在错位切片上采样、重要性比失真），是 R5a 系训练从未 bootstrap 的候选根因；同步修复旧 checkpoint 评估的 33.8 SWAP 假阳性、act() 确定性分支类型错误、教师加载静默形状错配。修正后维度完全条件化：$3h+5+4\cdot\mathrm{look}+5\cdot\mathrm{noise}$，新旧 checkpoint 均可精确对齐。
+    \item \textbf{S5 数据与训练基建}：噪声景观三档随机化（L0 乘性扰动 40\% / L1 异构放大 30\% / L2 位置重排 30\%，T1/T2 配对置换保持 $T_2\le T_1$）、QASM 课程限幅（修复「5q 阶段采到 20q 电路」缺口）、SABRE 预算缓存、8 族新电路生成器与覆盖审计脚本。
+\end{itemize}
+
+\paragraph{三、训练数据重规划.}
+NAM 19 条退出训练转纯 held-out（消除评估污染）；新增结构族：交互模式（QFT 蝶形 / 相位估计梯 / 随机图 Trotter（交互距离可控）/ 多控制链 / 分层 Clifford）与并行结构（不相交并行块 / 分层匹配 $w{=}1..n/2$ / 串并交替），生成 330 条（+现有 93 = 423 池），覆盖 18 族 $\times$ 规模档 $\{5,8,10,12,14,16,20\}$ 无空档；front-layer 宽度谱 $[0,2)$ 至 $[10,15)$ 全覆盖——并族系统性补宽了 v1 族（串行链/算术塔）缺失的并发结构（串扰信号方差的来源）。
+
+\paragraph{四、训练过程（policy\_p0\_t287，200k 步，从零）.}
+课程 = 坡道（stage1$\to$n8$\to$n10$\to$n12）+ 尾段混合；奖励 = R3b 经济账 + P0 四项注入（noise-ramp 渐入）。逐段轨迹：rew $-140\to-50\sim-70$、trunc $20.3\%\to11.0\%$（与历史最优 R3b 的 11\% 相当）、ent $2.97\to1.8\text{--}2.4$、sr（SWAP/SABRE）$8.1\times\to1.9\text{--}2.8\times$。全程无冻结退化——在从零训练约 50--60\% 失稳率的历史背景下为一次健康 run。尾段有一次 kl=inf 尖峰（step 195.6k，策略瞬时塌缩后恢复）与 SWAP 回升（46.9$\to$89.3）。KL 教师未启用：换拓扑 + 换观测的从零训练无可对齐维度的教师，P1-b 路径留给本次产物作教师。
+
+\paragraph{五、评估定论（NAM 19 条 $\times$ tianyan287\_20q，v2 混合精度 T=64/32/16，seed=42）.}
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{l|ccc|ccc}
+\hline
+ & mean & logmean & SWAPs & 5--9q & 10--14q & 15--19q \\
+\hline
+SABRE & \textbf{0.2461} & \textbf{0.0863} & \textbf{43.5} & \textbf{0.3691} & \textbf{0.1088} & \textbf{0.1097} \\
+PPO argmax & 0.2237 & 0.0061 & 236.8 & 0.3522 & 0.0779 & 0.0833 \\
+PPO beam5 & 0.1508 & 0.0001 & 420.9 & 0.2640 & 0.0139 & 0.0340 \\
+\hline
+\end{tabular}
+\end{table}
+逐电路（SABRE / argmax / beam5 保真度，SWAP 数；加粗为该电路最优）：
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{lrr|rrr|rrr}
+\hline
+电路 & q & \multicolumn{1}{c|}{S sw} & \multicolumn{1}{c|}{S fid} & \multicolumn{1}{c|}{A sw} & \multicolumn{1}{c|}{A fid} & \multicolumn{1}{c|}{B sw} & \multicolumn{1}{c|}{B fid} & 优 \\
+\hline
+barenco\_tof\_10 & 19 & 85 & 0.0209 & 186 & \textbf{0.0336} & 982 & 0 & A \\
+barenco\_tof\_3 & 5 & 5 & 0.7373 & 14 & \textbf{0.7701} & 10 & 0.4301 & A \\
+barenco\_tof\_4 & 7 & 21 & 0.3893 & 20 & \textbf{0.4976} & 40 & 0.3267 & A \\
+barenco\_tof\_5 & 9 & 34 & 0.1839 & 35 & \textbf{0.2198} & 39 & 0.2085 & A \\
+csla\_mux\_3 & 15 & 39 & \textbf{0.2811} & 102 & 0.1566 & 310 & 0.1699 & S \\
+gf2\^{}4\_mult & 12 & 41 & \textbf{0.1259} & 71 & 0.1234 & 989 & 0 & S \\
+gf2\^{}5\_mult & 15 & 71 & 0.0254 & 253 & \textbf{0.0435} & 986 & 0 & A \\
+gf2\^{}6\_mult & 18 & 109 & 0.0291 & 417 & \textbf{0.0499} & 983 & 0 & A \\
+grover\_5 & 9 & 129 & \textbf{0.0004} & 171 & 0.0002 & 174 & 0.0001 & S \\
+hwb6 & 7 & 47 & \textbf{0.0005} & 994 & 0 & 148 & 0 & S \\
+mod5\_4 & 5 & 11 & \textbf{0.6115} & 16 & 0.4883 & 30 & 0.3808 & S \\
+mod\_mult\_55 & 9 & 25 & \textbf{0.2178} & 33 & 0.0259 & 71 & 0.0373 & S \\
+mod\_red\_21 & 11 & 46 & \textbf{0.0579} & 990 & 0 & 990 & 0 & S \\
+rc\_adder\_6 & 14 & 44 & \textbf{0.0302} & 987 & 0 & 987 & 0 & S \\
+tof\_10 & 19 & 49 & \textbf{0.1921} & 99 & 0.1328 & 982 & 0 & S \\
+tof\_3 & 5 & 8 & \textbf{0.7300} & 8 & 0.6537 & 42 & 0.4897 & S \\
+tof\_4 & 7 & 14 & 0.4567 & 14 & 0.4383 & 41 & \textbf{0.4659} & B \\
+tof\_5 & 9 & 21 & 0.3642 & 25 & \textbf{0.4283} & 72 & 0.3012 & A \\
+vbe\_adder\_3 & 10 & 28 & \textbf{0.2210} & 64 & 0.1884 & 122 & 0.0558 & S \\
+\hline
+胜局 & & \multicolumn{2}{c|}{\textbf{SABRE 11}} & \multicolumn{2}{c|}{argmax 7} & \multicolumn{2}{c}{beam5 1} & \\
+\hline
+\end{tabular}
+\end{table}
+
+四点定论：
+\begin{itemize}
+    \item \textbf{总体未达持平}：argmax mean 0.2237 vs SABRE 0.2461（$-9.1\%$），SWAP $5.4\times$；G2 闸门（SWAP $\le1.05\times$SABRE）未通过。即便剔除 3 条截断电路，completed-only 口径 argmax 0.2657 vs SABRE 同集 0.2867（$-7.3\%$），结论不变。
+    \item \textbf{噪声感知价值在深算术电路真实存在}：gf2\^{}5 / gf2\^{}6 / barenco\_tof\_10 在 $2.2$--$3.8\times$ SWAP 下保真度 $+61\%$ 至 $+71\%$——低错误率边放置的收益确实能超过换位开销，且恰好落在 SABRE 换位密度最高的电路上。
+    \item \textbf{失败集中于两类}：（i）3 条截断（hwb6 / mod\_red\_21 / rc\_adder\_6，执行 66--90\% 后陷阱游走）；（ii）中浅电路的放置质量与换位开销失衡（mod\_mult\_55 仅 $1.3\times$ SWAP 却 $-88\%$；csla $-44\%$；tof\_10 $-31\%$）。
+    \item \textbf{beam5 反转了此前预期}：修复 $\Phi$ shaping 口径后 beam5 仍 7 条截断、mean 0.1508（completed-only 0.2388 vs SABRE 同集 0.3495）——「argmax 短视、beam 能逃逸」假说被证伪；问题指向价值头 $V(s')$ 在分布外深电路状态上的系统性高估，beam 的 1 步前瞻反而放大游走。
+\end{itemize}
+
+\paragraph{六、交付与文档.}
+交付包（1.3 MB）：最佳模型 policy\_r3b.pt + 推理 CLI（模型特征维度自动识别：149/153/158 对应 R3b/R5a/P0 配置）+ v1 模拟器（按要求仅保留第一版）+ toy/NAM 测试电路 + pytest 冒烟测试 + README（含使用说明、模型卡片、已知限制）；已实测 ghz\_5（3 SWAP、v1 保真度 0.742）与 random\_6q（12 SWAP、0.628）。文档侧：doc/train.md 三篇战役记录、doc/20260915训练方案.md（含 S0 诊断与参数修正）、挑战杯评估章节新增信号侧分析小节。
+
+\paragraph{七、问题清单（含状态）.}
+\begin{enumerate}
+    \item \textbf{SWAP 通胀（未解决，主矛盾）}：训练分布 sr 稳定 2--2.8$\times$；NAM argmax $5.4\times$（深电路 2--4$\times$）。预算锚把随机初始化的 $21\times$ 压到 $2\times$ 量级但未钉住 1.05——单靠「超预算罚」不足以对抗「低错误率边的绕路收益」，且 $\lambda_{\mathrm{budget}}$ 过强会先压垮 bootstrap。
+    \item \textbf{3 条电路截断（未解决）}：执行 66--90\% 后陷阱游走。归因：分布外（训练池无 hwb 长程重排 / mod\_red 模归约链类似族）+ 死锁掩码窗口不足（周期 $\geq7$ 可绕过）+ 深游走无逃逸监督（训练期 200 步即截断）。
+    \item \textbf{beam5 在新拓扑不可用（新确认）}：7/19 截断、mean 反低于 argmax。$\Phi$ shaping 口径修复不足以解决，指向 $V(s')$ 对 OOD 状态的高估；beam 的价值-奖励混合打分在此分布上是负资产。
+    \item \textbf{中浅电路放置质量异常（新发现）}：mod\_mult\_55 仅 $1.3\times$ SWAP 但保真度 $-88\%$——边选择在该电路模式上有系统性错误， worth 逐电路归因。
+    \item \textbf{跨拓扑泛化（未解决）}：R3b（t176）迁移 t287 大面积截断；模型与训练拓扑强耦合。
+    \item \textbf{可复现性（未解决）}：从零失稳率 50--60\%（种子级）；本次健康 run 的配方含 6 项同时上线的改动，未做单变量消融。
+    \item \textbf{评估方法论}：SWAP 通胀使深电路膨胀至 2000--3000 门，模拟成本线性放大；TRUNC 跳过 + 断点续传已缓解，但「截断记 0」口径对 PPO 均值偏严，报告时须同时给出 completed-only。
+\end{enumerate}
+
+\paragraph{八、后续规划（按优先级）.}
+\begin{enumerate}
+    \item \textbf{P0 —— beam5 价值头诊断}：当前最反直觉的结果。对比 argmax/beam 在同一状态的价值估计与实际回报（校准曲线）；试验 beam 打分退化为 argmax logits（去 $V(s')$ 项）与纯策略打分两种消融，定位 $V(s')$ 高估的来源（训练分布外状态 vs 双头混叠）。
+    \item \textbf{P0 —— 截断电路针对性修复}：评估侧调大掩码窗口（max\_cycle $6\to20$、stall\_window $6\to20$）与无进展回退（logit 噪声重试 / 贪心兜底）；预期 hwb6 / mod\_red\_21 / rc\_adder\_6 可完成，量化对 mean 的影响（argmax completed-only 已达 0.2657，补上 3 条若达 SABRE 水平即可反超）。
+    \item \textbf{P1 —— SWAP 治理实验}：$\lambda_{\mathrm{budget}}$ 上调（0.5$\to$1.0）与 $\delta$ 下调（1.05$\to$1.0）的小矩阵扫描，观察 sr 与 bootstrap 的权衡边界；同时做 mod\_mult\_55 / csla 类电路的逐电路边误差归因，确认「通胀之外」是否存在放置质量回归。
+    \item \textbf{P1 —— 下一轮训练配方}：no-progress 截断 200$\to$50--100；生成器补 hwb（长程重排）/ mod\_red（模归约链）两族；其余沿用本次配方（已验证可 bootstrap）。
+    \item \textbf{P2 —— KL 锚定微调}：以 policy\_p0\_t287 为教师，在补全分布后的数据上做约束微调——从零失稳率高的背景下，这是把本次健康 run 沉淀为可复现资产的主要路径。
+    \item \textbf{P2 —— 交付与论文}：交付包 pytest 全量验证 + v1/v2 双口径声明；论文编译时间小节补充硬件配置（2$\times$ Xeon Gold 6348、251\,GB、CPU 推理口径）；评估结论章节需如实呈现「选择性优势 + 总体未持平」的双面结果。
+\end{enumerate}

@@ -661,6 +661,9 @@ def trajectory_circuit_fidelity_events(phys_circuit: QuantumCircuit,
     """
     rc, rconfig, _remap = _reduce_phys_circuit_for_fidelity_v2(
         phys_circuit, config)
+    from sim.trajectory_sim import auto_backend
+    if backend == "auto":
+        backend = auto_backend(len(rconfig.t1_times), num_trajectories)
     sim = EventTrajectorySimulator(rconfig, num_trajectories=num_trajectories,
                                    seed=seed, backend=backend)
     events = schedule_phys_circuit_events(rc, durations)
@@ -686,9 +689,12 @@ def make_event_fidelity_fn(config: NoiseConfig,
     def event_fidelity(env) -> float:
         rc, rconfig, remap = _reduce_phys_circuit_for_fidelity_v2(
             env._phys_circuit, config)
+        from sim.trajectory_sim import auto_backend
+        _backend = auto_backend(len(rconfig.t1_times),
+                                num_trajectories) if backend == "auto" else backend
         sim = EventTrajectorySimulator(rconfig,
                                        num_trajectories=num_trajectories,
-                                       seed=seed, backend=backend)
+                                       seed=seed, backend=_backend)
         timing = getattr(env, "timing", None)
         log = getattr(timing, "schedule_log", None) if timing is not None else None
         events = None
