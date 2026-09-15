@@ -1,7 +1,7 @@
 \newpage
 \section{映射与路由框架设计}
 
-本节阐述量子比特映射与路由模块的系统框架设计，包括噪声建模、调度感知保真度评估、强化学习训练策略等核心设计决策。
+本节阐述量子比特映射与路由模块的系统框架设计，包括系统组件总览与强化学习训练策略等核心设计决策。噪声模拟器与保真度评估的完整设计见「量子比特路由与映射联合优化」一章「噪声模拟器设计」小节。
 
 \subsection{系统架构总览}
 
@@ -20,108 +20,9 @@
 
 系统的工作流程为：给定逻辑线路和物理拓扑，RoutingEnv 维护当前映射状态，PPOAgent 通过 GNN 编码观测并选择 SWAP 动作，环境执行动作后更新物理线路和调度时序，直到所有门执行完毕。终端保真度通过噪声模拟器评估并反馈给智能体。
 
-\subsection{噪声模型设计}
+\subsection{噪声模拟器与保真度评估}
 
-\subsubsection{物理噪声来源}
-
-NISQ 设备的门操作存在以下四类基本噪声：
-
-\paragraph{退极化（Depolarizing）。} 每次门操作后，量子态有概率 $p$ 被随机施加一个 Pauli 矩阵。单比特门的恒等概率为 $1-3p/4$，X/Y/Z 各 $p/4$；双比特门的恒等概率为 $1-15p/16$，15 个非单位 Pauli 组合各 $p/16$。这建模了门操作的随机性错误。
-
-\paragraph{热弛豫（Thermal Relaxation）。} 量子比特的 $|1\rangle$ 态会自发衰减到 $|0\rangle$ 态（T1 弛豫），概率为 $p_{\text{reset}} = 1 - e^{-t/T_1}$；叠加态的相对相位会随机漂移（T2 退相干），概率为 $p_z = 1 - e^{t/T_1 - 2t/T_2}$。这是时间依赖的噪声——比特空闲越久，衰减越严重。
-
-\paragraph{ZZ 串扰（Crosstalk）。} 当两个物理比特在耦合图上相邻时，存在残余 ZZ 耦合 $H_{ZZ} = \theta \cdot Z \otimes Z$。当两对不相交的双比特门同时执行且其交叉比特相邻时，产生额外的相干错误。
-
-\paragraph{读出错误。} 测量时比特状态翻转的概率，建模为对称错误矩阵。
-
-\subsubsection{噪声模型参数化}
-
-噪声配置通过 \texttt{NoiseConfig} 数据类参数化：
-
-\begin{itemize}
-  \item \texttt{t1\_times} / \texttt{t2\_times}：每个物理比特的 T1/T2 弛豫时间（$\mu$s）
-  \item \texttt{single\_q\_gate\_error}：单比特门错误率（标量或逐比特列表）
-  \item \texttt{two\_q\_gate\_error}：双比特门错误率（标量或逐边字典）
-  \item \texttt{crosstalk\_strength}：ZZ 串扰强度（逐边字典，缺省为 $0.1 \times$ 双比特门错误率）
-  \item \texttt{single\_gate\_time} / \texttt{two\_gate\_time}：门执行时间（$\mu$s）
-\end{itemize}
-
-训练过程中，每个 episode 的噪声参数在标称值附近随机扰动（$\pm 20\%$），以增强策略对噪声变化的鲁棒性。
-
-\subsection{调度感知保真度评估}
-
-\subsubsection{为什么调度影响保真度}
-
-相同的量子线路，不同的门执行顺序和并行方式会产生不同的保真度。原因有三：
-
-\paragraph{空闲退相干。} 比特在两次门操作之间的空闲期间持续经历 T1/T2 衰减。更好的调度将门排列得更紧凑，减少空闲时间，从而降低退相干累积。例如，串行调度中比特可能空闲数十微秒，而并行调度中空闲时间可降至门时长量级。
-
-\paragraph{动态串扰。} 当两对不相交的双比特门在相邻耦合边上同时执行时，其交叉比特承受额外 ZZ 串扰。调度的并行度越高，串扰风险越大。这是并行度与保真度的 trade-off。
-
-\paragraph{门时长差异。} 不同门的时长不同（CX 0.3$\mu$s，SWAP 0.9$\mu$s，rz 0$\mu$s）。长门执行期间，其他比特在空闲中累积退相干。
-
-\subsubsection{事件级 ASAP 调度器}
-
-系统采用事件级 ASAP（As Soon As Possible）贪心调度器（\texttt{routing/timing.py}），替代传统的锁步轮调度。每门的开始时间为：
-
-\begin{equation}
-\text{start} = \max(\text{前驱门结束时刻}, \text{本比特上次空闲时刻})
-\end{equation}
-
-调度优先级综合考虑三个因素：
-
-\begin{equation}
-\text{priority} = \text{criticality} + W_{\text{dur}} \cdot \frac{\text{dur}}{\text{max\_dur}} - W_{\text{xtalk}} \cdot \text{xtalk\_cost}
-\end{equation}
-
-其中 criticality 为关键路径深度比（靠近线路终点的门优先），$W_{\text{dur}} \cdot \text{dur}/\text{max\_dur}$ 为最长处理时间优先（LPT），$\text{xtalk\_cost}$ 为与同批其他门在相邻耦合对上的串扰代价。事件级调度使得不相关比特上的门可以跨步重叠，真实反映硬件并行性。
-
-\subsubsection{轨迹采样保真度}
-
-精确的保真度评估通过蒙特卡洛轨迹采样实现。对路由后的物理线路，执行 $T$ 条独立噪声轨迹，每条轨迹对每个噪声通道做 Kraus 采样：
-
-\begin{equation}
-F = \frac{1}{T} \sum_{t=1}^{T} \left| \langle \psi_{\text{ideal}} | \psi_t \rangle \right|^2
-\end{equation}
-
-其中 $|\psi_t\rangle$ 为第 $t$ 条噪声轨迹的末态，$|\psi_{\text{ideal}}\rangle$ 为无噪声理想态。
-
-轨迹采样的内存需求为 $O(2^n)$（纯态向量），相比密度矩阵的 $O(4^n)$ 大幅降低。20 量子比特时，密度矩阵需 16TB 内存，而轨迹采样仅需约 1KB。
-
-\subsubsection{调度感知演化}
-
-在调度感知模式下，轨迹模拟器按波次（wave）推进线路执行：
-
-\begin{enumerate}
-  \item 维护每比特的「上次门结束时刻」$t_{\text{last\_end}}[q]$
-  \item 每个门执行前，对该比特的空闲区间 $[t_{\text{last\_end}}[q], t_{\text{current}}]$ 施加热弛豫
-  \item 执行门后施加退极化和串扰噪声
-  \item 同波内检测不相交双比特门的动态串扰对，施加额外 ZZ 耦合
-  \item 线路结束时，对仍空闲的比特补上末尾退相干
-\end{enumerate}
-
-这确保了保真度评估忠实反映调度对噪声的影响：更好的调度产生更紧凑的门排列，减少空闲退相干，从而获得更高的保真度。
-
-\subsubsection{物理比特截断优化}
-
-路由后的物理线路可能仅使用了后端拓扑的部分量子比特。系统自动检测实际使用的量子比特子集，将线路和噪声参数裁剪到 $k$ 个比特（$k \leq n$），使状态向量模拟仅在 $2^k$ 空间上进行。在退极化 + 热弛豫 + ZZ 串扰模型下，未被作用的量子比特恒为 $|0\rangle$（$|0\rangle$ 是热弛豫的不动点），因此该裁剪对保真度精确等价，不引入近似。
-
-\subsection{解析保真度代理}
-
-为支持大规模线路（$\geq 16$ 量子比特）的训练，系统实现了 $O(G)$ 复杂度的解析保真度代理（$G$ 为门数），替代 $O(T \cdot G \cdot 2^n)$ 的轨迹采样：
-
-\begin{equation}
-\log F \approx \sum_{g \in C} \log(1 - \varepsilon_g)
-\end{equation}
-
-其中 $\varepsilon_g$ 为每条门的错误贡献，包括：
-\begin{itemize}
-  \item 退极化错误：$\varepsilon_{\text{depol}} = p$（门错误率）
-  \item 热弛豫（可选）：$\varepsilon_{\text{th}} = \frac{t}{T_1} \cdot \frac{1}{2} + \frac{t}{T_2} \cdot \frac{1}{2}$
-  \item ZZ 串扰（可选）：$\varepsilon_{\text{xtalk}} = \theta^2$（二阶近似）
-\end{itemize}
-
-该代理是一阶错误累积近似，忽略了门间错误的相干效应和调度差异，但保留了噪声参数的逐比特/逐边异质性。实测表明，对 19 量子比特线路，解析代理较轨迹采样（$T=16$）加速约 8000 倍（35.7s $\to$ 4.6ms），同时保真度相关性保持在合理范围。
+噪声模型（退极化、热弛豫、ZZ 串扰、读出错误及其 \texttt{NoiseConfig} 参数化）与三级保真度求解器（Aer 密度矩阵、调度感知轨迹采样、解析保真度代理）的完整设计见「量子比特路由与映射联合优化」一章「噪声模拟器设计」小节（第~\ref{sec:noise-simulator}~节）。系统架构总览中的 \texttt{NoiseConfig} / \texttt{NoiseSimulator} / \texttt{TrajectorySimulator} 组件即对应该小节；事件级 ASAP 门调度算法见同章「门调度算法」小节（第~\ref{sec:gate-scheduling}~节）。
 
 \subsection{两阶段课程训练}
 

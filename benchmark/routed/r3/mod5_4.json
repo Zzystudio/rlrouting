@@ -1,0 +1,49 @@
+{
+ "circuit": "mod5_4.qasm",
+ "model": "r3",
+ "num_logical_qubits": 5,
+ "num_physical_qubits": 20,
+ "topology": "tianyan176_20q",
+ "initial_layout": {
+  "0": 4,
+  "1": 1,
+  "2": 3,
+  "3": 0,
+  "4": 2
+ },
+ "routed_qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[20];\nx q[2];\nh q[2];\nswap q[2],q[19];\nswap q[1],q[19];\nswap q[1],q[18];\ncx q[0],q[18];\nrz(-pi/4) q[18];\nswap q[1],q[18];\ncx q[4],q[1];\nrz(pi/4) q[1];\nswap q[0],q[18];\ncx q[18],q[1];\nrz(-pi/4) q[1];\ncx q[4],q[1];\nrz(pi/4) q[1];\nswap q[1],q[18];\ncx q[4],q[1];\nrz(-pi/4) q[1];\ncx q[4],q[1];\nrz(pi/4) q[4];\nrz(pi/4) q[1];\ncx q[1],q[18];\nrz(pi/4) q[18];\nswap q[1],q[18];\ncx q[3],q[1];\nrz(-pi/4) q[1];\ncx q[18],q[1];\nrz(pi/4) q[1];\ncx q[3],q[1];\nrz(-pi/4) q[1];\nh q[1];\nswap q[3],q[0];\ncx q[0],q[18];\nrz(pi/4) q[18];\ncx q[0],q[18];\nrz(-pi/4) q[0];\nrz(-pi/4) q[18];\ncx q[18],q[1];\nh q[1];\nswap q[1],q[18];\ncx q[0],q[18];\nrz(-pi/4) q[18];\nswap q[1],q[19];\ncx q[1],q[18];\nrz(pi/4) q[18];\ncx q[0],q[18];\nrz(-pi/4) q[18];\ncx q[1],q[18];\nrz(pi/4) q[18];\nh q[18];\nswap q[0],q[18];\ncx q[1],q[18];\nrz(-pi/4) q[18];\ncx q[1],q[18];\nrz(pi/4) q[1];\nrz(pi/4) q[18];\ncx q[18],q[0];\nh q[0];\nswap q[0],q[18];\ncx q[1],q[18];\nrz(pi/4) q[18];\nswap q[1],q[18];\ncx q[4],q[1];\nrz(-pi/4) q[1];\ncx q[18],q[1];\nrz(pi/4) q[1];\ncx q[4],q[1];\nrz(-pi/4) q[1];\nh q[1];\nswap q[1],q[18];\ncx q[4],q[1];\nrz(pi/4) q[1];\ncx q[4],q[1];\nrz(-pi/4) q[4];\nrz(-pi/4) q[1];\ncx q[1],q[18];\nswap q[4],q[1];\ncx q[1],q[18];",
+ "num_swaps": 15,
+ "mapping_swaps": 4,
+ "completed": true,
+ "fidelity": null,
+ "final_layout": {
+  "0": 1,
+  "1": 4,
+  "2": 0,
+  "3": 19,
+  "4": 18
+ },
+ "wall_time_ms": 52.0,
+ "from_0_19": {
+  "0": "Q12",
+  "1": "Q13",
+  "2": "Q14",
+  "3": "Q19",
+  "4": "Q20",
+  "5": "Q25",
+  "6": "Q26",
+  "7": "Q31",
+  "8": "Q32",
+  "9": "Q33",
+  "10": "Q36",
+  "11": "Q37",
+  "12": "Q38",
+  "13": "Q43",
+  "14": "Q44",
+  "15": "Q49",
+  "16": "Q50",
+  "17": "Q56",
+  "18": "Q7",
+  "19": "Q8"
+ }
+}

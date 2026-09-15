@@ -1,0 +1,67 @@
+模型加载 OK: models/policy_r2b.pt
+电路按门数升序: tof_3.qasm:45, barenco_tof_3.qasm:58, mod5_4.qasm:63, tof_4.qasm:75 ...
+断点续跑: 36 个已完成试验
+  tof_3.qasm trial 0 [cache] fid=0.3196
+  tof_3.qasm trial 1000 [cache] fid=0.5144
+  tof_3.qasm trial 2000 [cache] fid=0.6722
+  tof_3.qasm trial 3000 [cache] fid=0.7154
+tof_3.qasm: trials=['0.3196', '0.5144', '0.6722', '0.7154'] best=0.7154 indep_check=0.7154 SABRE=0.7861
+  barenco_tof_3.qasm trial 0 [cache] fid=0.5091
+  barenco_tof_3.qasm trial 1000 [cache] fid=0.4018
+  barenco_tof_3.qasm trial 2000 [cache] fid=0.5486
+  barenco_tof_3.qasm trial 3000 [cache] fid=0.6409
+barenco_tof_3.qasm: trials=['0.5091', '0.4018', '0.5486', '0.6409'] best=0.6409 indep_check=0.6409 SABRE=0.6708
+  mod5_4.qasm trial 0 [cache] fid=0.3646
+  mod5_4.qasm trial 1000 [cache] fid=0.5783
+  mod5_4.qasm trial 2000 [cache] fid=0.3528
+  mod5_4.qasm trial 3000 [cache] fid=0.2862
+mod5_4.qasm: trials=['0.3646', '0.5783', '0.3528', '0.2862'] best=0.5783 indep_check=0.5783 SABRE=0.2632
+  tof_4.qasm trial 0 [cache] fid=0.0673
+  tof_4.qasm trial 1000 [cache] fid=0.2931
+  tof_4.qasm trial 2000 [cache] fid=0.4728
+  tof_4.qasm trial 3000 [cache] fid=0.2876
+tof_4.qasm: trials=['0.0673', '0.2931', '0.4728', '0.2876'] best=0.4728 indep_check=0.4728 SABRE=0.5202
+  tof_5.qasm trial 0 [cache] fid=0.0000
+  tof_5.qasm trial 1000 [cache] fid=0.2585
+  tof_5.qasm trial 2000 [cache] fid=0.1225
+  tof_5.qasm trial 3000 [cache] fid=0.3350
+tof_5.qasm: trials=['0.0000', '0.2585', '0.1225', '0.3350'] best=0.3350 indep_check=0.3350 SABRE=0.3360
+  barenco_tof_4.qasm trial 0 [cache] fid=0.2526
+  barenco_tof_4.qasm trial 1000 [cache] fid=0.1989
+  barenco_tof_4.qasm trial 2000 [cache] fid=0.2982
+  barenco_tof_4.qasm trial 3000 [cache] fid=0.3744
+barenco_tof_4.qasm: trials=['0.2526', '0.1989', '0.2982', '0.3744'] best=0.3744 indep_check=0.3744 SABRE=0.3623
+  mod_mult_55.qasm trial 0 [cache] fid=0.0000
+  mod_mult_55.qasm trial 1000 [cache] fid=0.0343
+  mod_mult_55.qasm trial 2000 [cache] fid=0.0004
+  mod_mult_55.qasm trial 3000 [cache] fid=0.0036
+mod_mult_55.qasm: trials=['0.0000', '0.0343', '0.0004', '0.0036'] best=0.0343 indep_check=0.0343 SABRE=0.0418
+  vbe_adder_3.qasm trial 0 [cache] fid=0.1907
+  vbe_adder_3.qasm trial 1000 [cache] fid=0.0534
+  vbe_adder_3.qasm trial 2000 [cache] fid=0.1204
+  vbe_adder_3.qasm trial 3000 [cache] fid=0.2614
+vbe_adder_3.qasm: trials=['0.1907', '0.0534', '0.1204', '0.2614'] best=0.2614 indep_check=0.2614 SABRE=0.4267
+  barenco_tof_5.qasm trial 0 [cache] fid=0.0781
+  barenco_tof_5.qasm trial 1000 [cache] fid=0.1007
+  barenco_tof_5.qasm trial 2000 [cache] fid=0.2359
+  barenco_tof_5.qasm trial 3000 [cache] fid=0.1135
+barenco_tof_5.qasm: trials=['0.0781', '0.1007', '0.2359', '0.1135'] best=0.2359 indep_check=0.2359 SABRE=0.2077
+  csla_mux_3.qasm trial seed=0 sigma=0.0 开始...
+  csla_mux_3.qasm trial seed=1000 sigma=0.5 开始...
+  csla_mux_3.qasm trial seed=2000 sigma=0.5 开始...
+  csla_mux_3.qasm trial seed=3000 sigma=0.5 开始...
+csla_mux_3.qasm: trials=['0.0469', '0.1510', '0.0725', '0.0738'] best=0.1510 indep_check=0.1510 SABRE=0.0007
+  rc_adder_6.qasm trial seed=0 sigma=0.0 开始...
+  rc_adder_6.qasm trial seed=1000 sigma=1.0 开始...
+  rc_adder_6.qasm trial seed=2000 sigma=1.0 开始...
+  rc_adder_6.qasm trial seed=3000 sigma=1.0 开始...
+rc_adder_6.qasm: trials=['0.0000', '0.0000', '0.0000', '0.1491'] best=0.1491 indep_check=0.1491 SABRE=0.0619
+  gf2^4_mult.qasm trial seed=0 sigma=0.0 开始...
+  gf2^4_mult.qasm trial seed=1000 sigma=1.0 开始...
+  gf2^4_mult.qasm trial seed=2000 sigma=1.0 开始...
+  gf2^4_mult.qasm trial seed=3000 sigma=1.0 开始...
+gf2^4_mult.qasm: trials=['0.0234', '0.0598', '0.1112', '0.0534'] best=0.1112 indep_check=0.1112 SABRE=0.1264
+  tof_10.qasm trial seed=0 sigma=0.0 开始...
+  tof_10.qasm trial seed=1000 sigma=0.5 开始...
+  tof_10.qasm trial seed=2000 sigma=0.5 开始...
+  tof_10.qasm trial seed=3000 sigma=0.5 开始...

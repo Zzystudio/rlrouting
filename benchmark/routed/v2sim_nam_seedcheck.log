@@ -1,0 +1,16 @@
+seed=0 r3b_beam5: mean=0.2366
+seed=0 SABRE: mean=0.2301
+seed=0: Δmean=+0.0065 Δlogmean=+88.71% wins=11/19
+seed=1 r3b_beam5: mean=0.2266
+seed=1 SABRE: mean=0.2116
+seed=1: Δmean=+0.0150 Δlogmean=-26.39% wins=9/19
+seed=2 r3b_beam5: mean=0.1962
+seed=2 SABRE: mean=0.2116
+seed=2: Δmean=-0.0154 Δlogmean=-21.40% wins=9/19
+
+=== 稳健性结论（3 种子 × T=16）===
+Δmean 逐种子: ['+0.0065', '+0.0150', '-0.0154']
+Δmean 均值: +0.0020  极差: 0.0304
+符号一致: 不一致！
+Δlogmean 逐种子: ['+88.71%', '-26.39%', '-21.40%']
+ALL DONE

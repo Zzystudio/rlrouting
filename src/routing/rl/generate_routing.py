@@ -121,6 +121,31 @@ def main():
                         help="Crosstalk penalty weight (match training: ph2v4=0.05)")
     parser.add_argument("--lambda-fid-max", type=float, default=5.0,
                         help="Terminal fidelity reward weight (match training)")
+    parser.add_argument("--lookahead-features", action=argparse.BooleanOptionalAction,
+                        default=None,
+                        help="R5a look4 特征开关（旧模型评估须 --no-lookahead-features）")
+    parser.add_argument("--edge-noise-features", action="store_true", default=False,
+                        help="P0-a per-edge 噪声特征（须与训练一致）")
+    parser.add_argument("--beta-noise", type=float, default=0.0,
+                        help="P0-b 噪声加权距离 β（须与训练一致）")
+    parser.add_argument("--w-err", type=float, default=0.0,
+                        help="P0-c Φ E_err 权重（beam 打分用，须与训练一致）")
+    parser.add_argument("--w-xt", type=float, default=0.0,
+                        help="P0-c Φ X(s) 权重（beam 打分用）")
+    parser.add_argument("--w-xt-swap", type=float, default=0.0,
+                        help="P0-c per-swap 串扰价权重（beam 打分用）")
+    parser.add_argument("--pot-progress-b", type=float, default=0.045,
+                        help="P0-d progress 奖励 B（beam 打分用）")
+    parser.add_argument("--pot-1q-reward", dest="pot_1q_reward",
+                        action="store_false", default=True,
+                        help="P0-d 1Q/measure 门 progress 置零（beam 打分用）")
+    parser.add_argument("--reward-potential", action="store_true", default=False,
+                        help="potential 模式奖励（beam 打分用，须与训练一致）")
+    parser.add_argument("--shaping-gamma", type=float, default=None,
+                        help="R3 Φ shaping γ（beam 打分 reward_c 需与训练同构——"
+                             "V(s') 学到的价值含 shaping 流，缺失会带偏 beam 搜索）")
+    parser.add_argument("--eta-shape", type=float, default=0.3)
+    parser.add_argument("--alpha-ext", type=float, default=0.5)
     args = parser.parse_args()
 
     # 小图推理：限制 torch CPU 线程数，避免多线程同步开销主导（实测 2x+）
@@ -153,6 +178,10 @@ def main():
         gnn=shared_gnn, use_gnn=use_gnn,
         max_num_qubits=args.max_num_qubits,
         max_num_edges=args.max_num_edges,
+        lookahead_features=(True if args.lookahead_features is None
+                            else args.lookahead_features),
+        edge_noise_features=args.edge_noise_features,
+        beta_noise=args.beta_noise,
     )
     n_edges = args.max_num_edges or len(coupling_map)
     agent = PPOAgent(
@@ -164,6 +193,8 @@ def main():
         num_edges=n_edges,
         coupling_map=coupling_map,
         with_commit=True,
+        edge_feat_dim=(getattr(dummy_env, "_edge_feat_dim", None)
+                       if use_gnn else None),
     )
     agent.load(args.model)
     agent.ac.eval()
@@ -220,6 +251,15 @@ def main():
             swap_cost=args.swap_cost,
             eta_xtalk_par=args.eta_xtalk_par,
             lambda_fid=args.lambda_fid_max if args.reward_mode != 'routing' else 0.0,
+            lookahead_features=(True if args.lookahead_features is None
+                                else args.lookahead_features),
+            edge_noise_features=args.edge_noise_features,
+            beta_noise=args.beta_noise,
+            w_err=args.w_err, w_xt=args.w_xt, w_xt_swap=args.w_xt_swap,
+            pot_progress_b=args.pot_progress_b, pot_1q_reward=args.pot_1q_reward,
+            reward_potential=args.reward_potential,
+            shaping_gamma=args.shaping_gamma,
+            eta_shape=args.eta_shape, alpha_ext=args.alpha_ext,
         )
         obs, _ = env.reset()
 

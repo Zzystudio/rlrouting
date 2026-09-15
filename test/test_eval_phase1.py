@@ -124,6 +124,11 @@ def model_and_agent():
         gnn=gnn, use_gnn=True,
         max_num_edges=max_edges,
         mapping_phase=False,
+        # 旧 checkpoint（policy_phase1_noiseaware.pt）为 pre-R5a 149 维布局，
+        # 须关闭 look/noise 特征块使 env 维度与之一致（此前 33.8 swaps 假阳性
+        # 正是 153 维 env obs 与 149 维 checkpoint 错配所致）
+        lookahead_features=False,
+        edge_noise_features=False,
     )
     agent = PPOAgent(
         obs_dim=int(np.prod(env.observation_space.shape)),
@@ -160,6 +165,8 @@ def evaluate_ppo(dag, hw, coupling_map, config, agent, seed, max_num_edges) -> R
         noise_config=config,
         max_num_edges=max_num_edges,
         mapping_phase=False,
+        lookahead_features=False,
+        edge_noise_features=False,
     )
     obs, _ = env.reset()
     t0 = time.perf_counter()

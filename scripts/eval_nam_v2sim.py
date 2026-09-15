@@ -9,7 +9,7 @@ trajectory×16, seed=0，仅保真度模拟器从 v1 同步波（trajectory_sche
 结果缓存（OUT_JSON）：SABRE 与模型结果分行存储（model_dir='SABRE' / <model_dir>），
 已计算的条目自动跳过，支持增量补跑。
 
-用法: python3 scripts/eval_nam_v2sim.py [num_trajectories=16] [model_dir=l05_nam]
+用法: python3 scripts/eval_nam_v2sim.py [num_trajectories=16] [model_dir=l05_nam] [topo=tianyan176_20q] [out_json=v2sim_nam_fidelity.json]
 """
 import json
 import math
@@ -26,17 +26,19 @@ from sim.trajectory_sim_v2 import trajectory_circuit_fidelity_events
 from routing.routing import sabre_route
 from routing.rl.eval_policy import load_topo
 
-config, hw, coupling_map = load_topo('traindata/topo/tianyan176_20q.json')
+TOPO_NAME = sys.argv[3] if len(sys.argv) > 3 else 'tianyan176_20q'
+config, hw, coupling_map = load_topo(f'traindata/topo/{TOPO_NAME}.json')
 SWAP_DEF = 'gate swap a,b { cx a,b; cx b,a; cx a,b; }\n'
 NAM_DIR = 'benchmark/nam_circs'
-OUT_JSON = 'benchmark/routed/v2sim_nam_fidelity.json'
+OUT_JSON = (sys.argv[4] if len(sys.argv) > 4
+            else f'benchmark/routed/v2sim_nam_fidelity_{TOPO_NAME}.json')
 NTRAJ = int(sys.argv[1]) if len(sys.argv) > 1 else 16
 MODEL_DIR = sys.argv[2] if len(sys.argv) > 2 else 'l05_nam'
 SEED = 0
 SAB_KEY = 'fid_v2_sabre'
 MOD_KEY = f'fid_v2_{MODEL_DIR}'
 
-# 缓存：{(model_dir, circuit): row}
+# 缓存：{(model_dir, circuit): row}（SABRE 行按拓扑隔离，避免跨拓扑污染）
 cache = {}
 if os.path.exists(OUT_JSON):
     for r in json.load(open(OUT_JSON)):
@@ -49,7 +51,7 @@ for fname in circuits:
     row = {'model_dir': MODEL_DIR, 'circuit': fname}
 
     # --- SABRE 侧（模型无关，命中缓存即复用） ---
-    sab = cache.get(('SABRE', fname))
+    sab = cache.get(('SABRE@' + TOPO_NAME, fname))
     if sab is None:
         qc_raw = qasm2_loads(open(os.path.join(NAM_DIR, fname)).read())
         phys, info = sabre_route(qc_raw, config, seed=SEED)
@@ -57,7 +59,7 @@ for fname in circuits:
         fid_sab = trajectory_circuit_fidelity_events(
             phys, config, num_trajectories=NTRAJ, seed=SEED)
         dt = round(time.perf_counter() - t0, 1)
-        sab = {'model_dir': 'SABRE', 'circuit': fname,
+        sab = {'model_dir': 'SABRE@' + TOPO_NAME, 'circuit': fname,
                'qubits': qc_raw.num_qubits, 'swaps': info['num_swaps'],
                SAB_KEY: fid_sab, 'sec': dt}
         cache[('SABRE', fname)] = sab

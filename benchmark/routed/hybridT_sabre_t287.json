@@ -1,0 +1,173 @@
+[
+ {
+  "model": "SABRE",
+  "circuit": "barenco_tof_10.qasm",
+  "qubits": 19,
+  "swaps": 85,
+  "T": 64,
+  "fid": 0.020923020947103774,
+  "sec": -1788441906.5
+ },
+ {
+  "model": "SABRE",
+  "circuit": "barenco_tof_3.qasm",
+  "qubits": 5,
+  "swaps": 5,
+  "T": 16,
+  "fid": 0.7373320713990889,
+  "sec": -1788442368.0
+ },
+ {
+  "model": "SABRE",
+  "circuit": "barenco_tof_4.qasm",
+  "qubits": 7,
+  "swaps": 21,
+  "T": 16,
+  "fid": 0.38925428178144994,
+  "sec": -1788442368.0
+ },
+ {
+  "model": "SABRE",
+  "circuit": "barenco_tof_5.qasm",
+  "qubits": 9,
+  "swaps": 34,
+  "T": 16,
+  "fid": 0.18386712837945257,
+  "sec": -1788442367.7
+ },
+ {
+  "model": "SABRE",
+  "circuit": "csla_mux_3.qasm",
+  "qubits": 15,
+  "swaps": 39,
+  "T": 64,
+  "fid": 0.28108394388110447,
+  "sec": -1788442321.5
+ },
+ {
+  "model": "SABRE",
+  "circuit": "gf2^4_mult.qasm",
+  "qubits": 12,
+  "swaps": 41,
+  "T": 32,
+  "fid": 0.12589894246987116,
+  "sec": -1788442366.3
+ },
+ {
+  "model": "SABRE",
+  "circuit": "gf2^5_mult.qasm",
+  "qubits": 15,
+  "swaps": 71,
+  "T": 64,
+  "fid": 0.025369830280434262,
+  "sec": -1788442278.5
+ },
+ {
+  "model": "SABRE",
+  "circuit": "gf2^6_mult.qasm",
+  "qubits": 18,
+  "swaps": 109,
+  "T": 64,
+  "fid": 0.02907504568730834,
+  "sec": -1788442100.8
+ },
+ {
+  "model": "SABRE",
+  "circuit": "grover_5.qasm",
+  "qubits": 9,
+  "swaps": 129,
+  "T": 16,
+  "fid": 0.0003923925631388322,
+  "sec": -1788442367.6
+ },
+ {
+  "model": "SABRE",
+  "circuit": "hwb6.qasm",
+  "qubits": 7,
+  "swaps": 47,
+  "T": 16,
+  "fid": 0.00045146341411987504,
+  "sec": -1788442367.9
+ },
+ {
+  "model": "SABRE",
+  "circuit": "mod5_4.qasm",
+  "qubits": 5,
+  "swaps": 11,
+  "T": 16,
+  "fid": 0.6115015709421601,
+  "sec": -1788442368.0
+ },
+ {
+  "model": "SABRE",
+  "circuit": "mod_mult_55.qasm",
+  "qubits": 9,
+  "swaps": 25,
+  "T": 16,
+  "fid": 0.2177816720158423,
+  "sec": -1788442367.9
+ },
+ {
+  "model": "SABRE",
+  "circuit": "mod_red_21.qasm",
+  "qubits": 11,
+  "swaps": 46,
+  "T": 32,
+  "fid": 0.05789371124110566,
+  "sec": -1788442363.6
+ },
+ {
+  "model": "SABRE",
+  "circuit": "rc_adder_6.qasm",
+  "qubits": 14,
+  "swaps": 44,
+  "T": 32,
+  "fid": 0.030239496068927667,
+  "sec": -1788442361.5
+ },
+ {
+  "model": "SABRE",
+  "circuit": "tof_10.qasm",
+  "qubits": 19,
+  "swaps": 49,
+  "T": 64,
+  "fid": 0.19206504702581725,
+  "sec": -1788442113.9
+ },
+ {
+  "model": "SABRE",
+  "circuit": "tof_3.qasm",
+  "qubits": 5,
+  "swaps": 8,
+  "T": 16,
+  "fid": 0.7299668294138384,
+  "sec": -1788442368.0
+ },
+ {
+  "model": "SABRE",
+  "circuit": "tof_4.qasm",
+  "qubits": 7,
+  "swaps": 14,
+  "T": 16,
+  "fid": 0.45667828391958976,
+  "sec": -1788442368.0
+ },
+ {
+  "model": "SABRE",
+  "circuit": "tof_5.qasm",
+  "qubits": 9,
+  "swaps": 21,
+  "T": 16,
+  "fid": 0.3642007216704395,
+  "sec": -1788442368.0
+ },
+ {
+  "model": "SABRE",
+  "circuit": "vbe_adder_3.qasm",
+  "qubits": 10,
+  "swaps": 28,
+  "T": 32,
+  "fid": 0.22098802828342468,
+  "sec": -1788442366.9
+ }
+]

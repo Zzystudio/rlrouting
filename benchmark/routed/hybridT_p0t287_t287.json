@@ -1,0 +1,131 @@
+[
+ {
+  "model": "p0t287",
+  "circuit": "barenco_tof_10.qasm",
+  "qubits": 19,
+  "swaps": 186,
+  "T": 64,
+  "fid": 0.03360509020423369,
+  "sec": -1788440817.6
+ },
+ {
+  "model": "p0t287",
+  "circuit": "barenco_tof_3.qasm",
+  "qubits": 5,
+  "swaps": 14,
+  "T": 16,
+  "fid": 0.7701067930053869,
+  "sec": -1788442368.0
+ },
+ {
+  "model": "p0t287",
+  "circuit": "barenco_tof_4.qasm",
+  "qubits": 7,
+  "swaps": 20,
+  "T": 16,
+  "fid": 0.4976494907646567,
+  "sec": -1788442368.0
+ },
+ {
+  "model": "p0t287",
+  "circuit": "barenco_tof_5.qasm",
+  "qubits": 9,
+  "swaps": 35,
+  "T": 16,
+  "fid": 0.2198176512222469,
+  "sec": -1788442367.9
+ },
+ {
+  "model": "p0t287",
+  "circuit": "csla_mux_3.qasm",
+  "qubits": 15,
+  "swaps": 102,
+  "T": 64,
+  "fid": 0.15657937080349685,
+  "sec": -1788442217.6
+ },
+ {
+  "model": "p0t287",
+  "circuit": "gf2^4_mult.qasm",
+  "qubits": 12,
+  "swaps": 71,
+  "T": 32,
+  "fid": 0.12339164183789325,
+  "sec": -1788442366.0
+ },
+ {
+  "model": "p0t287",
+  "circuit": "gf2^5_mult.qasm",
+  "qubits": 15,
+  "swaps": 253,
+  "T": 64,
+  "fid": 0.04346876389373698,
+  "sec": -1788440756.0
+ },
+ {
+  "model": "p0t287",
+  "circuit": "gf2^6_mult.qasm",
+  "qubits": 18,
+  "swaps": 417,
+  "T": 64,
+  "fid": 0.04985968788093378,
+  "sec": -1788439923.8
+ },
+ {
+  "model": "p0t287",
+  "circuit": "grover_5.qasm",
+  "qubits": 9,
+  "swaps": 171,
+  "T": 16,
+  "fid": 0.0001944662800154723,
+  "sec": -1788442367.5
+ },
+ {
+  "model": "p0t287",
+  "circuit": "hwb6.qasm",
+  "qubits": 7,
+  "swaps": 994,
+  "T": 0,
+  "fid": 0.0,
+  "sec": 0.0,
+  "truncated": true
+ },
+ {
+  "model": "p0t287",
+  "circuit": "mod5_4.qasm",
+  "qubits": 5,
+  "swaps": 16,
+  "T": 16,
+  "fid": 0.48825956117359787,
+  "sec": -1788442368.0
+ },
+ {
+  "model": "p0t287",
+  "circuit": "mod_mult_55.qasm",
+  "qubits": 9,
+  "swaps": 33,
+  "T": 16,
+  "fid": 0.025949613152361453,
+  "sec": -1788442368.0
+ },
+ {
+  "model": "p0t287",
+  "circuit": "mod_red_21.qasm",
+  "qubits": 11,
+  "swaps": 990,
+  "T": 0,
+  "fid": 0.0,
+  "sec": 0.0,
+  "truncated": true
+ },
+ {
+  "model": "p0t287",
+  "circuit": "rc_adder_6.qasm",
+  "qubits": 14,
+  "swaps": 987,
+  "T": 0,
+  "fid": 0.0,
+  "sec": 0.0,
+  "truncated": true
+ }
+]

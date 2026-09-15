@@ -1,0 +1,22 @@
+barenco_tof_10.qasm [l05] q=19 T=64 sw=189 fid=0.0363 (-1788440316s)
+barenco_tof_3.qasm [l05] q=5 T=16 sw=15 fid=0.4232 (-1788442368s)
+barenco_tof_4.qasm [l05] q=7 T=16 sw=23 fid=0.1743 (-1788442368s)
+barenco_tof_5.qasm [l05] q=9 T=16 sw=41 fid=0.2059 (-1788442368s)
+csla_mux_3.qasm [l05] q=15 T=64 sw=54 fid=0.0695 (-1788442355s)
+gf2^4_mult.qasm [l05] q=12 T=32 sw=57 fid=0.0421 (-1788442360s)
+gf2^5_mult.qasm [l05] q=15 T=64 sw=103 fid=0.0534 (-1788442320s)
+gf2^6_mult.qasm [l05] q=18 T=64 sw=163 fid=0.0284 (-1788441737s)
+grover_5.qasm [l05] q=9 T=16 sw=149 fid=0.0001 (-1788442367s)
+hwb6.qasm [l05] q=7 T=16 sw=57 fid=0.0001 (-1788442368s)
+mod5_4.qasm [l05] q=5 T=16 sw=15 fid=0.2650 (-1788442368s)
+mod_mult_55.qasm [l05] q=9 T=16 sw=30 fid=0.0000 (-1788442368s)
+mod_red_21.qasm [l05] q=11 T=32 sw=72 fid=0.0979 (-1788442350s)
+rc_adder_6.qasm [l05] q=14 T=32 sw=68 fid=0.0194 (-1788442354s)
+tof_10.qasm [l05] q=19 T=64 sw=109 fid=0.0991 (-1788442046s)
+tof_3.qasm [l05] q=5 T=16 sw=11 fid=0.4985 (-1788442368s)
+tof_4.qasm [l05] q=7 T=16 sw=19 fid=0.4914 (-1788442368s)
+tof_5.qasm [l05] q=9 T=16 sw=25 fid=0.2413 (-1788442368s)
+vbe_adder_3.qasm [l05] q=10 T=32 sw=48 fid=0.1117 (-1788442367s)
+=== l05 汇总（混合精度 T, seed=42）===
+Fid mean: 0.1504  logmean: 0.0202  SWAPs: 65.7
+ALL DONE

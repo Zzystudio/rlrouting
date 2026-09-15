@@ -168,13 +168,13 @@ def pick_circuit_with_path(data_dir: str, split_name: str, seed: Optional[int] =
         rng = np.random.default_rng(seed)
         param_dict = {p: rng.uniform(0, 2 * np.pi) for p in qc.parameters}
         qc = qc.assign_parameters(param_dict)
-    return CircuitDAG.from_circuit(qc), path
+    return CircuitDAG.from_circuit(qc), path, qc
 
 
 def load_nam_circuits(nam_dir: str, max_qubits: int = 20):
     """加载目录下所有 QASM 文件为 CircuitDAG 列表（过滤 > max_qubits 的电路）。
 
-    返回 [(dag, name), ...]，name 为不带扩展名的文件名。
+    返回 [(dag, name, qc), ...]，name 为不带扩展名的文件名。
     """
     from qiskit.qasm2 import load as qasm2_load
     dags = []
@@ -190,28 +190,33 @@ def load_nam_circuits(nam_dir: str, max_qubits: int = 20):
                 continue
             dag = CircuitDAG.from_circuit(qc)
             name = fname.removesuffix(".qasm")
-            dags.append((dag, name))
+            dags.append((dag, name, qc))
         except Exception as e:
             print(f"[nam-circuits] 跳过 {fname}: {e}")
     return dags
 
 
 def pick_circuit_with_nam(args, split_key, split_prefix, split_map, total_steps, topo_qubits, topo_idx,
-                          nam_circuits, nam_prob):
+                          nam_circuits, nam_prob, stage_cap=None):
     """带 NAM 电路混入的电路采样器。
 
     以 nam_prob 概率从 nam_circuits 中均匀选择，否则走原 pick_circuit_with_path。
     NAM 电路取不超过当前拓扑容量者（额外受 nam_max_q 上限约束，保证 ≤16q 训练
     时不用 trajectory_sched 跑大电路）。
+    stage_cap：S5 课程限幅——QASM 电路在当前课程阶段不超过该量子比特数
+    （修复「5q 阶段采到 20q QASM」的缺口）。
+    返回 (dag, path, qc)（qc 供 SABRE SWAP 预算缓存用；pkl 分支同样返回）。
     """
     if nam_circuits and random.random() < nam_prob:
         nam_max_q = args.nam_max_qubits or args.max_num_qubits or topo_qubits[topo_idx]
         cap = min(topo_qubits[topo_idx], nam_max_q)
+        if stage_cap is not None:
+            cap = min(cap, stage_cap)
         # 从 NAM 电路中均匀选择，找到能放进当前拓扑的
-        candidates = [(d, n) for d, n in nam_circuits if d.num_logical_qubits <= cap]
+        candidates = [(d, n, q) for d, n, q in nam_circuits if d.num_logical_qubits <= cap]
         if candidates:
-            dag, name = random.choice(candidates)
-            return dag, f"nam/{name}"
+            dag, name, qc = random.choice(candidates)
+            return dag, f"nam/{name}", qc
     return pick_circuit_with_path(args.data_dir, split_key, seed=args.seed + total_steps,
                                   split_prefix=split_prefix, split_map=split_map,
                                   max_qubits=topo_qubits[topo_idx])
@@ -422,7 +427,7 @@ def _parse_sabre_fid_map(spec: Optional[str]) -> dict:
     return out
 
 
-def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_init, seed, gnn=None, use_gnn=True, max_num_edges=None, max_num_qubits=None, noise_config=None, lambda_fid=None, eta_dist=None, mapping_budget=None, mapping_phase=True, fidelity_fn=None, use_scheduler=None, eta_time=None, eta_xtalk_par=None, eta_idle=None, eta_parallel=None, xtalk_alpha=None, swap_duration=None, swap_cost=None, eta_swap_err=None, eta_err=None, reward_potential=None, eta_xtalk=None, unfinished_penalty=None, gate_base_cx=None, gate_base_1q=None, shaping_gamma=None, eta_shape=None, alpha_ext=None, init_mapping=None, lambda_layout=None, sabre_fid_map=None, sref_override=None):
+def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_init, seed, gnn=None, use_gnn=True, max_num_edges=None, max_num_qubits=None, noise_config=None, lambda_fid=None, eta_dist=None, mapping_budget=None, mapping_phase=True, fidelity_fn=None, use_scheduler=None, eta_time=None, eta_xtalk_par=None, eta_idle=None, eta_parallel=None, xtalk_alpha=None, swap_duration=None, swap_cost=None, eta_swap_err=None, eta_err=None, reward_potential=None, eta_xtalk=None, unfinished_penalty=None, gate_base_cx=None, gate_base_1q=None, shaping_gamma=None, eta_shape=None, alpha_ext=None, no_progress_limit=None, lookahead_features=None, init_mapping=None, lambda_layout=None, sabre_fid_map=None, sref_override=None, edge_noise_features=None, beta_noise=None, w_err=None, w_xt=None, w_xt_swap=None, pot_progress_b=None, pot_1q_reward=None, lambda_budget=None, budget_delta=None, sabre_swap_budget=None):
     kw = dict(
         dag=dag, hw=hw, coupling_map=coupling_map,
         reward_mode=reward_mode,
@@ -489,6 +494,10 @@ def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_ini
         kw["eta_shape"] = eta_shape
     if alpha_ext is not None:
         kw["alpha_ext"] = alpha_ext
+    if no_progress_limit is not None:
+        kw["no_progress_limit"] = no_progress_limit
+    if lookahead_features is not None:
+        kw["lookahead_features"] = lookahead_features
     if init_mapping is not None:
         kw["init_mapping"] = init_mapping
     if lambda_layout is not None:
@@ -497,29 +506,51 @@ def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_ini
         kw["sabre_fid_map"] = sabre_fid_map
     if sref_override is not None:
         kw["sref_override"] = sref_override
+    if edge_noise_features is not None:
+        kw["edge_noise_features"] = edge_noise_features
+    if beta_noise is not None:
+        kw["beta_noise"] = beta_noise
+    if w_err is not None:
+        kw["w_err"] = w_err
+    if w_xt is not None:
+        kw["w_xt"] = w_xt
+    if w_xt_swap is not None:
+        kw["w_xt_swap"] = w_xt_swap
+    if pot_progress_b is not None:
+        kw["pot_progress_b"] = pot_progress_b
+    if pot_1q_reward is not None:
+        kw["pot_1q_reward"] = pot_1q_reward
+    if lambda_budget is not None:
+        kw["lambda_budget"] = lambda_budget
+    if sabre_swap_budget is not None:
+        kw["sabre_swap_budget"] = sabre_swap_budget
     kw["mapping_phase"] = mapping_phase
     return RoutingEnv(**kw)
 
 
 def build_fidelity_fn(fidelity_sim: str, noise_config, num_trajectories: int = 64, seed=None,
-                      analytic_thermal: bool = True, analytic_crosstalk: bool = False):
+                      analytic_thermal: bool = True, analytic_crosstalk: bool = False,
+                      backend: str = "cpu"):
     """按 --fidelity-sim 构造 env 终端保真度函数；routing 模式或 aer 模式返回 None。
 
     aer: 使用 env 内置 NoiseSimulator（density_matrix + counts overlap，n<=12）。
     trajectory: 使用轨迹状态向量模拟器（O(2^n) 内存，20q+ 可用）。
     analytic: 解析错误累积代理（O(门数)，无指数，适用于 16q+ 大电路训练）。
+    backend: 轨迹模拟器后端（cpu/cuda/cuda:N/auto），仅 trajectory/trajectory_v2 生效；
+             训练默认 cpu（历史口径），v3 噪声训练可 --sim-device cuda 提速。
     """
     if fidelity_sim == "trajectory":
         from sim.trajectory_sim import make_trajectory_fidelity_fn
-        return make_trajectory_fidelity_fn(noise_config, num_trajectories=num_trajectories, seed=seed)
+        return make_trajectory_fidelity_fn(noise_config, num_trajectories=num_trajectories, seed=seed,
+                                           backend=backend)
     if fidelity_sim == "trajectory_sched":
         from sim.trajectory_sim import make_trajectory_fidelity_fn
         return make_trajectory_fidelity_fn(noise_config, num_trajectories=num_trajectories,
-                                           seed=seed, scheduled=True)
+                                           seed=seed, scheduled=True, backend=backend)
     if fidelity_sim == "trajectory_v2":
         from sim.trajectory_sim_v2 import make_event_fidelity_fn
         return make_event_fidelity_fn(noise_config, num_trajectories=num_trajectories,
-                                      seed=seed)
+                                      seed=seed, backend=backend)
     if fidelity_sim == "analytic":
         from sim.trajectory_sim import make_analytic_fidelity_fn
         return make_analytic_fidelity_fn(noise_config, include_thermal=analytic_thermal,
@@ -568,6 +599,70 @@ def perturb_noise_config(
     cs = cfg.crosstalk_strength
     if isinstance(cs, dict):
         cfg.crosstalk_strength = {k: _p(v, frac_gate) for k, v in cs.items()}
+    return cfg
+
+
+def _parse_noise_hetero(spec: str):
+    """解析 "0:0.4,1:0.3,2:0.3" → (levels, probs)（归一化）。"""
+    levels, probs = [], []
+    for part in spec.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        k, v = part.split(":")
+        levels.append(int(k))
+        probs.append(float(v))
+    s = sum(probs)
+    probs = [p / s for p in probs]
+    return levels, probs
+
+
+def randomize_noise_landscape(config: NoiseConfig, level: int, rng) -> NoiseConfig:
+    """P2-b/S5 噪声景观三档随机化（在 L0 乘性扰动之后叠加）：
+
+    - L1 异构放大：new = mean + amp·(orig−mean)，amp∈{2,3} 随机，
+      边错误 clip [0.001, 0.1]（与 stronghetero 构造同式）；
+    - L2 位置重排：边错误/ZZ 值在耦合边集上随机置换 + T1/T2（同置换保
+      T2≤T1 配对）/readout/1q 在比特上置换（边际分布不变、位置随机）。
+    """
+    cfg = copy.deepcopy(config)
+    if level <= 0:
+        return cfg
+
+    tqe = cfg.two_q_gate_error
+    if isinstance(tqe, dict) and tqe:
+        keys = list(tqe.keys())
+        vals = np.array([float(tqe[k]) for k in keys])
+        if level == 1:
+            amp = float(rng.choice([2.0, 3.0]))
+            new = np.clip(vals.mean() + amp * (vals - vals.mean()), 0.001, 0.1)
+        else:
+            new = vals[rng.permutation(len(vals))]
+        cfg.two_q_gate_error = {k: float(v) for k, v in zip(keys, new)}
+
+    cs = cfg.crosstalk_strength
+    if isinstance(cs, dict) and cs:
+        keys = list(cs.keys())
+        vals = np.array([float(cs[k]) for k in keys])
+        if level == 1:
+            amp = float(rng.choice([2.0, 3.0]))
+            hi = max(0.1, float(vals.max()) * 3.0)
+            new = np.clip(vals.mean() + amp * (vals - vals.mean()), 0.0, hi)
+        else:
+            new = vals[rng.permutation(len(vals))]
+        cfg.crosstalk_strength = {k: float(v) for k, v in zip(keys, new)}
+
+    if level >= 2:
+        n = len(cfg.t1_times)
+        if n > 1:
+            perm = rng.permutation(n)
+            cfg.t1_times = [float(cfg.t1_times[j]) for j in perm]
+            cfg.t2_times = [float(cfg.t2_times[j]) for j in perm]
+            if cfg.readout_error:
+                cfg.readout_error = [float(cfg.readout_error[j]) for j in perm]
+            if isinstance(cfg.single_q_gate_error, (list, tuple)):
+                cfg.single_q_gate_error = [float(cfg.single_q_gate_error[j])
+                                           for j in perm]
     return cfg
 
 
@@ -692,6 +787,49 @@ def main():
                         help="R3 势函数尺度（env 默认 0.3）")
     parser.add_argument("--alpha-ext", type=float, default=None,
                         help="R3 extended-set 前瞻权重 α（env 默认 0.5，对齐 SabreSwap W）")
+    parser.add_argument("--no-progress-limit", type=int, default=None,
+                        help="R3b 反游走：routing 阶段连续 N 步无门执行则提前截断"
+                             "（按 unfinished_penalty 计；env 默认 0=关闭，建议 200）")
+    parser.add_argument("--noise-ramp", type=float, default=0.0,
+                        help="噪声项渐入比例（占训练进度；0=立即满值）。两阶段奖励课程："
+                             "progress 达该比例前 swap_cost/eta_swap_err/eta_err/"
+                             "eta_xtalk_par 从 0 线性升至目标值——先路由能力后噪声感知")
+    parser.add_argument("--lookahead-features", action=argparse.BooleanOptionalAction,
+                        default=None,
+                        help="R5a 并发/前瞻观测特征开关（默认 None=开启；"
+                             "消融用 --no-lookahead-features 置零 4 维特征，obs_dim 不变）")
+    parser.add_argument("--edge-noise-features", action=argparse.BooleanOptionalAction,
+                        default=False,
+                        help="P0-a per-edge 直接噪声特征（+5 维 e_edge/zz_edge/e_rel/"
+                             "swap_price/cum_xz；关闭时 5 维置零、obs_dim 不变）")
+    parser.add_argument("--beta-noise", type=float, default=0.0,
+                        help="P0-b 噪声加权距离 β（0=纯跳数；t287 推荐 0.5，"
+                             "须满足保序 β·k_max·e_max<1）")
+    parser.add_argument("--w-err", type=float, default=0.0,
+                        help="P0-c 势函数 E_err 项权重（t287 建议 0.02）")
+    parser.add_argument("--w-xt", type=float, default=0.0,
+                        help="P0-c 势函数 X(s) 串扰项权重（t287 建议 0.01）")
+    parser.add_argument("--w-xt-swap", type=float, default=0.0,
+                        help="P0-c per-swap 即时串扰价权重（t287 建议 0.02）")
+    parser.add_argument("--pot-progress-b", type=float, default=None,
+                        help="P0-d potential 模式进度奖励 B（None=env 默认 0.045；"
+                             "t287 建议 0.20 = 1.5×mean(e_norm)）")
+    parser.add_argument("--pot-1q-reward", action=argparse.BooleanOptionalAction,
+                        default=None,
+                        help="P0-d 1Q/measure 门是否发 progress 奖励"
+                             "（None=env 默认 True；--no-pot-1q-reward 置零，"
+                             "消除 ~60%% 策略不可控事件流）")
+    parser.add_argument("--lambda-budget", type=float, default=0.0,
+                        help="P1-a SABRE SWAP 预算锚：超出预算后每颗额外 SWAP 罚"
+                             "（0=关；建议 0.5）")
+    parser.add_argument("--budget-delta", type=float, default=1.05,
+                        help="P1-a 预算膨胀系数 δ（budget=ceil(δ×SABRE swaps)）")
+    parser.add_argument("--noise-hetero", type=str, default=None,
+                        help="S5 噪声景观三档随机化 \"0:0.4,1:0.3,2:0.3\""
+                             "（默认关=仅 L0 乘性扰动；L1 异构放大 / L2 位置重排）")
+    parser.add_argument("--qasm-stage-cap", type=str, default=None,
+                        help="S5 课程限幅 \"stage1:6,large_n8:10,...\"：QASM 混训"
+                             "电路在当前课程阶段不超过该 qubit 数（默认关）")
     parser.add_argument("--layout-mix", type=str, default=None,
                         help="布局混合比例 恒等/随机/SABRE，逗号分隔如 0.3,0.3,0.4（None=关，即现行为）")
     parser.add_argument("--lambda-layout", type=float, default=0.0,
@@ -736,6 +874,9 @@ def main():
                         help="轨迹模拟器采样条数（越大方差越小，训练越慢）")
     parser.add_argument("--traj-seed", type=int, default=None,
                         help="轨迹模拟器随机种子（默认 None=不可复现）")
+    parser.add_argument("--sim-device", type=str, default="cpu",
+                        help="轨迹模拟器后端（cpu/cuda/cuda:N/auto；默认 cpu=历史口径）。"
+                             "v3 噪声训练建议 --sim-device cuda（20q fidelity 提速 ~10-50x）")
     parser.add_argument("--analytic-thermal", action="store_true", default=True,
                         help="解析保真度代理包含热弛豫（idle 退相干）项")
     parser.add_argument("--no-analytic-thermal", dest="analytic_thermal", action="store_false",
@@ -896,9 +1037,9 @@ def main():
                       mapping_phase=args.mapping_phase,
                        use_scheduler=(args.use_scheduler or args.fidelity_sim in ("trajectory_sched", "trajectory_v2")),
                        eta_time=args.eta_time,
-                       eta_xtalk_par=args.eta_xtalk_par,
-                       eta_idle=args.eta_idle,
-                       eta_parallel=args.eta_parallel,
+                                    eta_xtalk_par=args.eta_xtalk_par,
+                                    eta_idle=args.eta_idle,
+                                    eta_parallel=args.eta_parallel,
                                      xtalk_alpha=args.xtalk_alpha,
                                       swap_duration=args.swap_duration,
                                       swap_cost=args.swap_cost,
@@ -912,6 +1053,16 @@ def main():
                                       shaping_gamma=args.shaping_gamma,
                                       eta_shape=args.eta_shape,
                                       alpha_ext=args.alpha_ext,
+                                      no_progress_limit=args.no_progress_limit,
+                                      lookahead_features=args.lookahead_features,
+                                      edge_noise_features=args.edge_noise_features,
+                                      beta_noise=args.beta_noise,
+                                      w_err=args.w_err,
+                                      w_xt=args.w_xt,
+                                      w_xt_swap=args.w_xt_swap,
+                                      pot_progress_b=args.pot_progress_b,
+                                      pot_1q_reward=args.pot_1q_reward,
+                                      lambda_budget=args.lambda_budget,
                                       init_mapping=None,
                                       lambda_layout=args.lambda_layout,
                          fidelity_fn=build_fidelity_fn(
@@ -919,6 +1070,7 @@ def main():
                           num_trajectories=args.traj_trajectories, seed=args.traj_seed,
                           analytic_thermal=args.analytic_thermal,
                           analytic_crosstalk=args.analytic_crosstalk,
+                          backend=args.sim_device,
                       ) if args.reward_mode != "routing" else None)
 
     agent_n_qubits = args.max_num_qubits or sample_dag.num_logical_qubits
@@ -935,6 +1087,7 @@ def main():
         vf_coef=args.vf_coef,
         with_commit=args.mapping_phase,
         lambda_v_fid=args.lambda_v_fid,
+        edge_feat_dim=(getattr(env, "_edge_feat_dim", None) if use_gnn else None),
     )
     if args.load:
         state = agent.load_checkpoint(args.load)
@@ -975,7 +1128,7 @@ def main():
     ckpt_dir = args.checkpoint_dir or os.path.join(os.path.dirname(args.out) or ".", "ckpts")
     os.makedirs(ckpt_dir, exist_ok=True)
     _metrics_path = os.path.join(ckpt_dir, "metrics.csv")
-    _metrics_fields = ["step", "reward", "swaps", "map_swaps", "trunc_pct", "pl", "vl", "vfl", "klp1", "ent", "kl", "grad", "fid", "time_us", "xtalk", "idle", "par"]
+    _metrics_fields = ["step", "reward", "swaps", "map_swaps", "trunc_pct", "pl", "vl", "vfl", "klp1", "ent", "kl", "grad", "fid", "time_us", "xtalk", "idle", "par", "swap_ratio"]
     # 续训时追加而非覆盖；已有行丢到 resume_step 为止，避免旧行与新续训混合
     if resume_step > 0 and os.path.exists(_metrics_path):
         _metrics_fh = open(_metrics_path, "r", newline="")
@@ -983,18 +1136,19 @@ def main():
         _metrics_fh.close()
         kept = [r for r in _rows if int(r["step"] or 0) < resume_step]
         _metrics_fh = open(_metrics_path, "w", newline="")
-        _metrics_writer = csv.DictWriter(_metrics_fh, fieldnames=_metrics_fields)
+        _metrics_writer = csv.DictWriter(_metrics_fh, fieldnames=_metrics_fields, restval="")
         _metrics_writer.writeheader()
         _metrics_writer.writerows(kept)
         _metrics_fh.flush()
     else:
         _metrics_fh = open(_metrics_path, "w", newline="")
-        _metrics_writer = csv.DictWriter(_metrics_fh, fieldnames=_metrics_fields)
+        _metrics_writer = csv.DictWriter(_metrics_fh, fieldnames=_metrics_fields, restval="")
         _metrics_writer.writeheader()
 
     obs, _ = env.reset()
     ep_buffer = {"act": [], "logp": [], "val": [], "val_route": [], "val_fid": [],
                  "rew": [], "term_rew": [], "done": []}
+    look_on = args.lookahead_features is not False
     if use_gnn:
         ep_buffer["graph_data"] = []
         ep_buffer["map_vec"] = []
@@ -1002,6 +1156,10 @@ def main():
         ep_buffer["phase"] = []
         ep_buffer["coupling_map"] = []
         ep_buffer["sabre_feats"] = []
+        if look_on:
+            ep_buffer["look_feats"] = []
+        if args.edge_noise_features:
+            ep_buffer["noise_feats"] = []
     else:
         ep_buffer["obs"] = []
     ep_total_reward = 0.0
@@ -1029,11 +1187,30 @@ def main():
     sabre_fid_map = _parse_sabre_fid_map(args.sabre_fid_map)
     sabre_fid_map_nam = _parse_sabre_fid_map(args.sabre_fid_map_nam) if args.sabre_fid_map_nam else None
 
+    # S5/P1-a 初始化
+    qasm_stage_cap = {}
+    if args.qasm_stage_cap:
+        for part in args.qasm_stage_cap.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            k, v = part.split(":")
+            qasm_stage_cap[k.strip()] = int(v)
+    het_spec = _parse_noise_hetero(args.noise_hetero) if args.noise_hetero else None
+    if args.noise_hetero:
+        lv, pr = het_spec
+        print(f"[noise-hetero] 档位 {lv} 概率 {np.round(pr, 3).tolist()}")
+    if qasm_stage_cap:
+        print(f"[qasm-stage-cap] {qasm_stage_cap}")
+    sabre_swap_cache = {}
+    ep_swap_ratio_log = []
+
     total_steps = resume_step
     best_metric = resume_best if resume_best > -1.0 else -1.0
     best_ema_metric = -1.0
     best_ema_step = 0
     cycle_idx = 0
+    circuit_path = None  # 当前 episode 的电路路径（首个 episode 为 sample 电路）
 
     while total_steps < args.timesteps:
         for _ in range(args.rollout_steps):
@@ -1044,6 +1221,10 @@ def main():
                 ep_buffer["phase"].append(1.0 if env.mapping_phase else 0.0)
                 ep_buffer["coupling_map"].append(coupling_map)
                 ep_buffer["sabre_feats"].append(env._last_sabre_feats.flatten())
+                if look_on:
+                    ep_buffer["look_feats"].append(env._last_look_feats.flatten())
+                if args.edge_noise_features:
+                    ep_buffer["noise_feats"].append(env._last_noise_feats.flatten())
             else:
                 ep_buffer["obs"].append(obs)
 
@@ -1082,6 +1263,11 @@ def main():
                     ep_fids.append(info["fidelity"])
                 ep_swaps_log.append(info.get("num_swaps", 0))
                 ep_map_swaps_log.append(info.get("mapping_swaps", 0))
+                if args.lambda_budget > 0 and circuit_path is not None:
+                    s_sw = sabre_swap_cache.get((topo_idx, circuit_path))
+                    if s_sw:
+                        ep_swap_ratio_log.append(
+                            info.get("num_swaps", 0) / max(1, s_sw))
                 if env.timing is not None:
                     ep_time_log.append(env.timing.total_time)
                     ep_xtalk_log.append(env.timing.crosstalk_events)
@@ -1112,9 +1298,10 @@ def main():
                         topo_idx = random.choices(range(num_topos), weights=w, k=1)[0]
                     else:
                         topo_idx = random.randrange(num_topos)
-                new_dag, circuit_path = pick_circuit_with_nam(
+                new_dag, circuit_path, ep_qc = pick_circuit_with_nam(
                     args, split_key, split_prefix, split_map, total_steps, topo_qubits, topo_idx,
-                    nam_circuits, args.nam_circuit_prob)
+                    nam_circuits, args.nam_circuit_prob,
+                    stage_cap=qasm_stage_cap.get(split_key))
                 noise_config, coupling_map = topo_list[topo_idx]
                 if args.noise_perturb > 0 or args.noise_perturb_t1t2 > 0:
                     noise_config = perturb_noise_config(
@@ -1123,8 +1310,30 @@ def main():
                         frac_gate=args.noise_perturb,
                         frac_other=args.noise_perturb_other,
                     )
+                if args.noise_hetero:
+                    rng_h = np.random.default_rng((args.seed * 1000003 + total_steps) % (2**31))
+                    het_levels, het_probs = het_spec
+                    het_level = int(rng_h.choice(het_levels, p=het_probs))
+                    noise_config = randomize_noise_landscape(noise_config, het_level, rng_h)
                 hw = HardwareFeatures.from_noise_config(noise_config)
                 agent.coupling_map = coupling_map
+
+                # P1-a：SABRE SWAP 预算缓存（SABRE 噪声盲，跨 episode 稳定）
+                ep_swap_budget = None
+                if args.lambda_budget > 0:
+                    bkey = (topo_idx, circuit_path)
+                    if bkey not in sabre_swap_cache:
+                        try:
+                            from routing.routing import sabre_route
+                            _, sinfo = sabre_route(ep_qc, noise_config,
+                                                   swap_trials=20, seed=args.seed)
+                            sabre_swap_cache[bkey] = int(sinfo.get("num_swaps", 0) or 0)
+                        except Exception as _e:
+                            print(f"[budget] SABRE 路由失败 {circuit_path}: {_e}")
+                            sabre_swap_cache[bkey] = None
+                    s_swaps = sabre_swap_cache[bkey]
+                    if s_swaps is not None and s_swaps > 0:
+                        ep_swap_budget = int(np.ceil(args.budget_delta * s_swaps))
 
                 # 布局混合：按 mix 比例选 恒等/随机/SABRE 初始布局
                 ep_random_init = args.random_init
@@ -1145,6 +1354,13 @@ def main():
                     progress, args.lambda_fid_warmup,
                     adaptive_lambda_fid_max(progress, args.lambda_fid_max_schedule, args.lambda_fid_max)
                 ) if args.reward_mode != "routing" else None
+                # 噪声项渐入（两阶段奖励课程）：progress 达 noise_ramp 前按比例
+                # 线性爬升（0→1），使 swap_cost/eta_swap_err/eta_err/eta_xtalk_par
+                # 从 0 平滑升至目标值——先学路由能力，再渐入噪声感知
+                noise_f = 1.0
+                if args.noise_ramp:
+                    _nr = max(args.noise_ramp, 1e-9)
+                    noise_f = min(1.0, progress / _nr)
                 # 方案1：NAM 电路若有 per-circuit SABRE 参考（nam_sref_map）则用它做 log-相对
                 # 分母（sref_override 优先于按 num_qubits 共享的 sabre_fid_map_nam），避免
                 # 深电路因共享同尺寸 sref 而 log(F/sref) 爆炸成极端负奖励。
@@ -1165,20 +1381,24 @@ def main():
                                  max_num_edges=max_edges,
                                  max_num_qubits=args.max_num_qubits,
                                  noise_config=noise_config if args.reward_mode != "routing" else None,
-                                  lambda_fid=cur_lambda_fid,
-                                  eta_dist=args.eta_dist,
-                                  mapping_budget=args.mapping_budget,
-                                  mapping_phase=args.mapping_phase,
-                                   use_scheduler=(args.use_scheduler or args.fidelity_sim in ("trajectory_sched", "trajectory_v2")),
-                                   eta_time=args.eta_time,
-                                   eta_xtalk_par=args.eta_xtalk_par,
+                                   lambda_fid=cur_lambda_fid,
+                                   eta_dist=args.eta_dist,
+                                   mapping_budget=args.mapping_budget,
+                                   mapping_phase=args.mapping_phase,
+                                    use_scheduler=(args.use_scheduler or args.fidelity_sim in ("trajectory_sched", "trajectory_v2")),
+                                    eta_time=args.eta_time,
+                                    eta_xtalk_par=(args.eta_xtalk_par * noise_f
+                                                  if args.eta_xtalk_par is not None else None),
                                    eta_idle=args.eta_idle,
                                    eta_parallel=args.eta_parallel,
                                     xtalk_alpha=args.xtalk_alpha,
                                      swap_duration=args.swap_duration,
-                                     swap_cost=args.swap_cost,
-                                     eta_swap_err=args.eta_swap_err,
-                                     eta_err=args.eta_err,
+                                     swap_cost=(args.swap_cost * noise_f
+                                               if args.swap_cost is not None else None),
+                                     eta_swap_err=(args.eta_swap_err * noise_f
+                                                  if args.eta_swap_err is not None else None),
+                                     eta_err=(args.eta_err * noise_f
+                                             if args.eta_err is not None else None),
                                      reward_potential=args.reward_potential,
                                      eta_xtalk=args.eta_xtalk,
                                      unfinished_penalty=args.unfinished_penalty,
@@ -1187,6 +1407,8 @@ def main():
                                      shaping_gamma=args.shaping_gamma,
                                      eta_shape=args.eta_shape,
                                      alpha_ext=args.alpha_ext,
+                                     no_progress_limit=args.no_progress_limit,
+                                     lookahead_features=args.lookahead_features,
                                       init_mapping=ep_init_mapping,
                                      lambda_layout=args.lambda_layout,
                                       fidelity_fn=build_fidelity_fn(
@@ -1195,9 +1417,19 @@ def main():
                                         seed=args.traj_seed,
                                         analytic_thermal=args.analytic_thermal,
                                         analytic_crosstalk=args.analytic_crosstalk,
+                                        backend=args.sim_device,
                                      ) if args.reward_mode != "routing" else None,
                                      sabre_fid_map=ep_sabre_map,
-                                     sref_override=ep_sref_override)
+                                     sref_override=ep_sref_override,
+                                     edge_noise_features=args.edge_noise_features,
+                                     beta_noise=args.beta_noise,
+                                     w_err=args.w_err,
+                                     w_xt=args.w_xt,
+                                     w_xt_swap=args.w_xt_swap,
+                                     pot_progress_b=args.pot_progress_b,
+                                     pot_1q_reward=args.pot_1q_reward,
+                                     lambda_budget=args.lambda_budget,
+                                     sabre_swap_budget=ep_swap_budget)
                 obs, _ = env.reset()
                 ep_total_reward = 0.0
 
@@ -1278,6 +1510,10 @@ def main():
             if "coupling_map" in ep_buffer and len(ep_buffer["coupling_map"]) > 0:
                 train_batch["coupling_map"] = ep_buffer["coupling_map"]
             train_batch["sabre_feats"] = ep_buffer["sabre_feats"]
+            if look_on and "look_feats" in ep_buffer:
+                train_batch["look_feats"] = ep_buffer["look_feats"]
+            if args.edge_noise_features and "noise_feats" in ep_buffer:
+                train_batch["noise_feats"] = ep_buffer["noise_feats"]
         else:
             train_batch["obs"] = ep_buffer["obs"]
         if use_gnn:
@@ -1317,6 +1553,13 @@ def main():
         if env.use_scheduler and ep_time_log:
             parts.append(f"time={np.mean(ep_time_log[-20:]):.1f}us")
             parts.append(f"xtalk={np.mean(ep_xtalk_log[-20:]):.3f}")
+        if args.lambda_budget > 0 and ep_swap_ratio_log:
+            swap_ratio = float(np.mean(ep_swap_ratio_log[-20:]))
+            parts.append(f"sr={swap_ratio:.2f}")
+            if swap_ratio > 1.10:
+                print(f"  [G1 ALERT] swaps/SABRE={swap_ratio:.3f} > 1.10 —— 立即回滚检查！")
+            elif swap_ratio > 1.05:
+                print(f"  [G1 warn] swaps/SABRE={swap_ratio:.3f} > 1.05")
         print("  ".join(parts))
 
         if num_topos > 1:
@@ -1357,6 +1600,8 @@ def main():
             "xtalk": avg_xtalk,
             "idle": avg_idle,
             "par": avg_par,
+            "swap_ratio": (float(np.mean(ep_swap_ratio_log[-20:]))
+                           if ep_swap_ratio_log else ""),
         }
         _metrics_writer.writerow(row)
         _metrics_fh.flush()

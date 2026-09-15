@@ -252,6 +252,11 @@ class EventTrajectorySimulator(TrajectorySimulator):
     # ---------------- 基础内核补充 ----------------
     def _apply_cz_batch(self, svs: np.ndarray, a: int, b: int) -> np.ndarray:
         """批量 CZ（对角门）：两比特均为 |1> 的基态幅乘 -1。"""
+        if self._use_gpu:
+            idx = self._bitmask_indices_t(a, b, both=True)
+            if idx.numel():
+                svs[:, idx] = svs[:, idx] * complex(-1.0)
+            return svs
         if self._all is None:
             self._all = np.arange(2 ** self.n_qubits)
         mask = (((self._all >> a) & 1) & ((self._all >> b) & 1)).astype(bool)
@@ -265,6 +270,11 @@ class EventTrajectorySimulator(TrajectorySimulator):
         """批量 ZZ 相干旋转 U = exp(-i·θ·Z⊗Z)（与 v1 _crosstalk_batch 同构，
         角度由调用方给定：静态串扰按门时长缩放，动态串扰按重叠时长缩放）。"""
         if theta == 0.0:
+            return svs
+        if self._use_gpu:
+            svs.mul_(complex(np.exp(-1j * theta)))
+            idx = self._bitmask_indices_t(q1, q2)
+            svs[:, idx] = svs[:, idx] * complex(np.exp(2j * theta))
             return svs
         svs *= np.exp(-1j * theta)
         svs[:, self._zz_xor_indices(q1, q2)] *= np.exp(2j * theta)
@@ -452,19 +462,22 @@ class EventTrajectorySimulator(TrajectorySimulator):
 
         工作集超限时按块分批（保持批量内核的缓存局部性），语义与一次性
         批量演化完全一致（同一 rng 流顺序推进）。
+        CPU 上限为 8 MiB（L3 缓存）；GPU 上限为空闲 VRAM 的 25%，
+        状态常驻显存、整块演化后一次性取回（doc/模拟器加速.md §3.2）。
         """
         actions, total = self._prepare_events(circuit, events)
         ws_traj = (1 << self.n_qubits) * 16  # complex128 字节 / 轨迹
-        chunk = max(1, self._BATCH_WS_LIMIT // ws_traj)
+        if self._use_gpu:
+            chunk = min(num_trajectories, self._gpu_chunk_size(ws_traj))
+        else:
+            chunk = max(1, self._BATCH_WS_LIMIT // ws_traj)
         outs: List[np.ndarray] = []
         done = 0
         while done < num_trajectories:
             t = min(chunk, num_trajectories - done)
-            svs = np.tile(self._initial_state(), (t, 1))
-            if circuit.global_phase:
-                svs = svs * np.exp(1j * float(circuit.global_phase))
+            svs = self._init_batch_state(t, circuit)
             svs = self._run_actions(svs, actions, total, apply_noise)
-            outs.append(svs)
+            outs.append(self._to_numpy(svs))
             done += t
         return outs[0] if len(outs) == 1 else np.vstack(outs)
 
@@ -515,11 +528,9 @@ class EventTrajectorySimulator(TrajectorySimulator):
         actions, total = self._prepare_events(circuit, events)
         counts: Dict[str, int] = {}
         for _ in range(shots):
-            svs = np.tile(self._initial_state(), (1, 1))
-            if circuit.global_phase:
-                svs = svs * np.exp(1j * float(circuit.global_phase))
+            svs = self._init_batch_state(1, circuit)
             svs = self._run_actions(svs, actions, total, True)
-            outcome = self._sample(svs[0], measured)
+            outcome = self._sample(self._to_numpy(svs)[0], measured)
             counts[outcome] = counts.get(outcome, 0) + 1
         return counts
 
@@ -638,6 +649,7 @@ def trajectory_circuit_fidelity_events(phys_circuit: QuantumCircuit,
                                        num_trajectories: int = 16,
                                        seed: Optional[int] = None,
                                        durations: Optional[Dict[str, float]] = None,
+                                       backend: str = "auto",
                                        ) -> float:
     """对一条物理电路按事件级 ASAP 调度计算轨迹平均态保真度。
 
@@ -645,11 +657,12 @@ def trajectory_circuit_fidelity_events(phys_circuit: QuantumCircuit,
     时长（durations 表，缺省镜像 GATE_DURATION_TABLE）、串扰按重叠时长缩放、
     无需 transpile（swap 原生支持且带 3×CX 等价噪声）。
     用于 SABRE 等基线在公平条件下的调度感知保真度评估。
+    backend: 'auto'（默认，CUDA 可用时走 GPU，噪声 MC 统计等价）| 'cpu' | 'cuda:N'。
     """
     rc, rconfig, _remap = _reduce_phys_circuit_for_fidelity_v2(
         phys_circuit, config)
     sim = EventTrajectorySimulator(rconfig, num_trajectories=num_trajectories,
-                                   seed=seed)
+                                   seed=seed, backend=backend)
     events = schedule_phys_circuit_events(rc, durations)
     return sim.fidelity_events(rc, events)
 
@@ -657,7 +670,8 @@ def trajectory_circuit_fidelity_events(phys_circuit: QuantumCircuit,
 def make_event_fidelity_fn(config: NoiseConfig,
                            num_trajectories: int = 16,
                            seed: Optional[int] = None,
-                           durations: Optional[Dict[str, float]] = None):
+                           durations: Optional[Dict[str, float]] = None,
+                           backend: str = "auto"):
     """构造 RoutingEnv 的 fidelity_fn hook（事件级调度感知）。
 
     返回 fn(env) -> float：
@@ -667,13 +681,14 @@ def make_event_fidelity_fn(config: NoiseConfig,
        （schedule_phys_circuit_events）。
 
     训练侧每个 episode 的噪声配置会被扰动，需按 episode 重新构造此函数。
+    backend: 'auto'（默认）| 'cpu' | 'cuda'/'cuda:N'（doc/模拟器加速.md）。
     """
     def event_fidelity(env) -> float:
         rc, rconfig, remap = _reduce_phys_circuit_for_fidelity_v2(
             env._phys_circuit, config)
         sim = EventTrajectorySimulator(rconfig,
                                        num_trajectories=num_trajectories,
-                                       seed=seed)
+                                       seed=seed, backend=backend)
         timing = getattr(env, "timing", None)
         log = getattr(timing, "schedule_log", None) if timing is not None else None
         events = None

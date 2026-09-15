@@ -191,19 +191,24 @@ def load_qc(data_dir: str, rel_path: str, seed: int = 0):
 def compute_fidelity(qc, config, mapping, executed) -> Optional[float]:
     return None
 
+def build_fidelity_fn(fidelity_sim: str, config, num_trajectories: int = 64, seed: Optional[int] = None,
+                      backend: str = "auto"):
+    """构造 RoutingEnv 的 fidelity_fn（--fidelity-sim trajectory/trajectory_sched/analytic 时启用）。
 
-def build_fidelity_fn(fidelity_sim: str, config, num_trajectories: int = 64, seed: Optional[int] = None):
-    """构造 RoutingEnv 的 fidelity_fn（--fidelity-sim trajectory/trajectory_sched/analytic 时启用）。"""
+    backend: 轨迹模拟器后端（auto/cpu/cuda/cuda:N；默认 auto=CUDA 可用即走 GPU）。
+    """
     if fidelity_sim == "trajectory":
         from sim.trajectory_sim import make_trajectory_fidelity_fn
-        return make_trajectory_fidelity_fn(config, num_trajectories=num_trajectories, seed=seed)
+        return make_trajectory_fidelity_fn(config, num_trajectories=num_trajectories, seed=seed,
+                                           backend=backend)
     if fidelity_sim == "trajectory_sched":
         from sim.trajectory_sim import make_trajectory_fidelity_fn
         return make_trajectory_fidelity_fn(config, num_trajectories=num_trajectories,
-                                           seed=seed, scheduled=True)
+                                           seed=seed, scheduled=True, backend=backend)
     if fidelity_sim == "trajectory_v2":
         from sim.trajectory_sim_v2 import make_event_fidelity_fn
-        return make_event_fidelity_fn(config, num_trajectories=num_trajectories, seed=seed)
+        return make_event_fidelity_fn(config, num_trajectories=num_trajectories,
+                                      seed=seed, backend=backend)
     if fidelity_sim == "analytic":
         from sim.trajectory_sim import make_analytic_fidelity_fn
         return make_analytic_fidelity_fn(config)
@@ -278,6 +283,13 @@ def evaluate_circuit(
     fidelity_sim: str = 'aer',
     num_trajectories: int = 16,
     traj_seed: int = 0,
+    edge_noise_features: bool = False,
+    beta_noise: float = 0.0,
+    w_err: float = 0.0,
+    w_xt: float = 0.0,
+    w_xt_swap: float = 0.0,
+    pot_progress_b: float = 0.045,
+    pot_1q_reward: bool = True,
 ) -> CircuitMetrics:
     import torch
     env = RoutingEnv(
@@ -291,6 +303,10 @@ def evaluate_circuit(
         mapping_phase=agent.with_commit,
         init_mapping=init_mapping,
         fidelity_fn=fidelity_fn,
+        edge_noise_features=edge_noise_features,
+        beta_noise=beta_noise,
+        w_err=w_err, w_xt=w_xt, w_xt_swap=w_xt_swap,
+        pot_progress_b=pot_progress_b, pot_1q_reward=pot_1q_reward,
         use_scheduler=use_scheduler,
         eta_time=eta_time, eta_xtalk_par=eta_xtalk_par, eta_idle=eta_idle,
         eta_parallel=eta_parallel, xtalk_alpha=xtalk_alpha, swap_duration_us=swap_duration,
@@ -413,6 +429,17 @@ def evaluate_circuit_beam(
     fidelity_sim: str = 'aer',
     num_trajectories: int = 16,
     traj_seed: int = 0,
+    lookahead_features: bool = True,
+    logit_noise_std: float = 0.0,
+    logit_noise_seed: Optional[int] = None,
+    no_progress_limit: int = 0,
+    edge_noise_features: bool = False,
+    beta_noise: float = 0.0,
+    w_err: float = 0.0,
+    w_xt: float = 0.0,
+    w_xt_swap: float = 0.0,
+    pot_progress_b: float = 0.045,
+    pot_1q_reward: bool = True,
 ) -> CircuitMetrics:
     import torch
     env = RoutingEnv(
@@ -426,6 +453,12 @@ def evaluate_circuit_beam(
         mapping_phase=agent.with_commit,
         init_mapping=init_mapping,
         fidelity_fn=fidelity_fn,
+        lookahead_features=lookahead_features,
+        edge_noise_features=edge_noise_features,
+        beta_noise=beta_noise,
+        w_err=w_err, w_xt=w_xt, w_xt_swap=w_xt_swap,
+        pot_progress_b=pot_progress_b, pot_1q_reward=pot_1q_reward,
+        no_progress_limit=no_progress_limit,
         use_scheduler=use_scheduler,
         eta_time=eta_time, eta_xtalk_par=eta_xtalk_par, eta_idle=eta_idle,
         eta_parallel=eta_parallel, xtalk_alpha=xtalk_alpha, swap_duration_us=swap_duration,
@@ -443,6 +476,11 @@ def evaluate_circuit_beam(
 
     done, truncated = False, False
     step = 0
+    # R3b 多试验 beam：logit ε-扰动（每步从固定种子的 generator 采样，
+    # 不同 seed 的试验探索不同分支——SABRE ε-random tie-break 的 RL 版）
+    noise_gen = None
+    if logit_noise_std > 0 and logit_noise_seed is not None:
+        noise_gen = torch.Generator(device='cpu').manual_seed(logit_noise_seed)
     while not done and not truncated:
         with torch.no_grad():
             # Build base action mask (valid edges + deadlock + commit)
@@ -461,6 +499,9 @@ def evaluate_circuit_beam(
 
             logits, _ = agent._forward_obs(obs, action_mask=mask)
             masked_logits = logits[0].clone()
+            if noise_gen is not None:
+                masked_logits += logit_noise_std * torch.randn(
+                    masked_logits.shape, generator=noise_gen)
             masked_logits[~mask[0]] = -1e9
             k = min(beam_width, (mask[0].sum().item()))
             topk_scores, topk_indices = masked_logits.topk(k)
@@ -884,6 +925,24 @@ def main():
                         help='轨迹模拟器采样条数')
     parser.add_argument('--traj-seed', type=int, default=None,
                         help='轨迹模拟器随机种子')
+    parser.add_argument('--sim-device', type=str, default='auto',
+                        help='轨迹模拟器后端（auto/cpu/cuda/cuda:N；默认 auto=CUDA 可用即 GPU，'
+                             '噪声 MC 与 CPU 统计等价；--sim-device cpu 强制历史口径）')
+    parser.add_argument('--edge-noise-features', action='store_true', default=False,
+                        help='P0-a per-edge 噪声特征（须与训练时一致）')
+    parser.add_argument('--beta-noise', type=float, default=0.0,
+                        help='P0-b 噪声加权距离 β（须与训练时一致）')
+    parser.add_argument('--w-err', type=float, default=0.0,
+                        help='P0-c 势函数 E_err 权重（须与训练时一致）')
+    parser.add_argument('--w-xt', type=float, default=0.0,
+                        help='P0-c 势函数 X(s) 权重（须与训练时一致）')
+    parser.add_argument('--w-xt-swap', type=float, default=0.0,
+                        help='P0-c per-swap 串扰价权重（须与训练时一致）')
+    parser.add_argument('--pot-progress-b', type=float, default=0.045,
+                        help='P0-d progress 奖励 B（须与训练时一致）')
+    parser.add_argument('--no-pot-1q-reward', dest='pot_1q_reward',
+                        action='store_false', default=True,
+                        help='P0-d 1Q/measure 门 progress 奖励置零（须与训练时一致）')
     parser.add_argument('--out', type=str, default=None,
                         help='save per-circuit results as JSON')
     args = parser.parse_args()
@@ -929,6 +988,8 @@ def main():
         gnn=shared_gnn, use_gnn=use_gnn,
         max_num_edges=args.max_num_edges,
         max_num_qubits=args.max_num_qubits,
+        edge_noise_features=args.edge_noise_features,
+        beta_noise=args.beta_noise,
     )
 
     agent_n_qubits = args.max_num_qubits or sample_dag.num_logical_qubits
@@ -942,6 +1003,7 @@ def main():
         num_edges=agent_n_edges,
         coupling_map=coupling_map,
         with_commit=args.mapping_phase,
+        edge_feat_dim=(getattr(sample_env, '_edge_feat_dim', None) if use_gnn else None),
     )
     agent.load(args.model)
     agent.ac.eval()
@@ -955,7 +1017,8 @@ def main():
 
     label = f'PPO_beam{args.beam_width}' if args.beam_width > 0 else 'PPO'
     traj_seed = args.traj_seed if args.traj_seed is not None else args.seed
-    fid_fn = build_fidelity_fn(args.fidelity_sim, config, args.traj_trajectories, traj_seed) \
+    fid_fn = build_fidelity_fn(args.fidelity_sim, config, args.traj_trajectories, traj_seed,
+                               backend=args.sim_device) \
         if args.reward_mode != 'routing' else None
 
     def evaluate_agent_on_circuits():
@@ -997,6 +1060,11 @@ def main():
                     fidelity_sim=args.fidelity_sim,
                     num_trajectories=args.traj_trajectories,
                     traj_seed=traj_seed,
+                    edge_noise_features=args.edge_noise_features,
+                    beta_noise=args.beta_noise,
+                    w_err=args.w_err, w_xt=args.w_xt, w_xt_swap=args.w_xt_swap,
+                    pot_progress_b=args.pot_progress_b,
+                    pot_1q_reward=args.pot_1q_reward,
                 )
             else:
                 m = evaluate_circuit(
@@ -1023,6 +1091,11 @@ def main():
                     fidelity_sim=args.fidelity_sim,
                     num_trajectories=args.traj_trajectories,
                     traj_seed=traj_seed,
+                    edge_noise_features=args.edge_noise_features,
+                    beta_noise=args.beta_noise,
+                    w_err=args.w_err, w_xt=args.w_xt, w_xt_swap=args.w_xt_swap,
+                    pot_progress_b=args.pot_progress_b,
+                    pot_1q_reward=args.pot_1q_reward,
                 )
             m.circuit_path = rel_path
             if args.verbose:

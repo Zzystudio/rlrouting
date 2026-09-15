@@ -26,6 +26,7 @@ import math
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+import torch
 
 from qiskit import QuantumCircuit, transpile
 
@@ -133,14 +134,44 @@ class TrajectorySimulator:
     """
 
     def __init__(self, config: NoiseConfig, num_trajectories: int = 16,
-                 seed: Optional[int] = None):
+                 seed: Optional[int] = None, backend: str = "cpu"):
+        """
+        backend : 'cpu'（默认，NumPy 路径逐位不变）| 'cuda'/'cuda:N' | 'auto'
+            'auto' = CUDA 可用时走 GPU（torch 内核，噪声 MC 采样与 CPU 统计等价
+            而非逐位一致，见 doc/模拟器加速.md §3.3）。
+        """
         self.config = config
         self.num_trajectories = num_trajectories
         self.seed = seed
         self.rng = np.random.default_rng(seed)
         self.n_qubits = len(config.t1_times)
         self._all = None  # 惰性分配：crosstalk 相位索引用的全比特基态数组
+        self.backend = backend
+        self._use_gpu, self._dev = self._resolve_backend(backend)
+        self._all_t = None   # GPU：全比特基态索引（设备驻留，惰性分配）
+        self._gen = None     # GPU：torch 随机数生成器（与 numpy rng 流独立）
+        if self._use_gpu:
+            self._gen = torch.Generator(device=self._dev)
+            self._gen.manual_seed(int(seed) % (2 ** 63 - 1)
+                                  if seed is not None
+                                  else torch.default_generator.seed())
         self._validate_config()
+
+    @staticmethod
+    def _resolve_backend(backend: str) -> tuple:
+        """解析 backend → (use_gpu, device or None)。"""
+        if backend == "cpu":
+            return False, None
+        if backend == "auto":
+            if torch.cuda.is_available():
+                return True, torch.device("cuda")
+            return False, None
+        if backend == "cuda" or backend.startswith("cuda:"):
+            if not torch.cuda.is_available():
+                raise RuntimeError(f"backend='{backend}' 但 torch.cuda 不可用")
+            dev = torch.device(backend)
+            return True, dev if dev.index is not None else torch.device("cuda:0")
+        raise ValueError(f"未知 backend: {backend!r}（可选 auto/cpu/cuda/cuda:N）")
 
     # ------------------------------------------------------------------ #
     # 配置校验
@@ -176,6 +207,50 @@ class TrajectorySimulator:
         """qiskit 用 little-endian（qubit 0 为最低位）；
         numpy reshape 后 axis 0 是最高位，故 qubit q -> axis n-1-q。"""
         return n - 1 - q
+
+    # ------------------------------------------------------------------ #
+    # GPU（torch CUDA）后端基础设施：状态常驻显存，批量内核逐个分派；
+    # CPU NumPy 路径完全不动（见 doc/模拟器加速.md §3）
+    # ------------------------------------------------------------------ #
+    def _init_batch_state(self, t: int, circuit: QuantumCircuit,
+                          apply_global_phase: bool = True):
+        """(t, 2^n) 批量初态（后端感知）。"""
+        if self._use_gpu:
+            base = torch.zeros(1 << self.n_qubits, dtype=torch.complex128,
+                               device=self._dev)
+            base[0] = 1.0
+            svs = base.repeat(t, 1)
+            if apply_global_phase and circuit.global_phase:
+                svs = svs * complex(np.exp(1j * float(circuit.global_phase)))
+            return svs
+        svs = np.tile(self._initial_state(), (t, 1))
+        if apply_global_phase and circuit.global_phase:
+            svs = svs * np.exp(1j * float(circuit.global_phase))
+        return svs
+
+    def _gpu_chunk_size(self, ws_traj: int) -> int:
+        """VRAM 驱动的批量轨迹数（空闲显存 25%；cx clone 峰值 ~2x 仍安全）。"""
+        free, _total = torch.cuda.mem_get_info(self._dev)
+        return max(1, int(0.25 * free) // ws_traj)
+
+    def _to_numpy(self, svs):
+        """演化结束把 GPU 状态取回 host（fidelity 在 CPU 端计算，量级 ~ms）。"""
+        if self._use_gpu:
+            return svs.cpu().numpy()
+        return svs
+
+    def _bitmask_indices_t(self, q1: int, q2: int, both: bool = False):
+        """GPU 版基态索引：both=True 取 (q1,q2) 全 1 子集（CZ），
+        否则取 q1⊕q2=1 子集（ZZ 旋转）。"""
+        if self._all_t is None:
+            self._all_t = torch.arange(1 << self.n_qubits, device=self._dev)
+        b1 = (self._all_t >> q1) & 1
+        b2 = (self._all_t >> q2) & 1
+        mask = (b1 & b2).bool() if both else b1 != b2
+        return torch.nonzero(mask, as_tuple=True)[0]
+
+    def _zz_xor_indices_t(self, q1: int, q2: int):
+        return self._bitmask_indices_t(q1, q2, both=False)
 
     def _transpile(self, circuit: QuantumCircuit) -> QuantumCircuit:
         """转译到基础门（包含 'id'，以便插入空闲时间）。"""
@@ -217,6 +292,16 @@ class TrajectorySimulator:
         """
         T = svs.shape[0]
         nq = self.n_qubits
+        if self._use_gpu:
+            m00, m01 = complex(mat[0, 0]), complex(mat[0, 1])
+            m10, m11 = complex(mat[1, 0]), complex(mat[1, 1])
+            s = svs.view(T, 1 << (nq - 1 - q), 2, 1 << q)
+            a0 = s[:, :, 0, :]
+            a1 = s[:, :, 1, :]
+            tmp = m00 * a0 + m01 * a1
+            a1.copy_(m10 * a0 + m11 * a1)
+            a0.copy_(tmp)
+            return svs
         s = svs.reshape(T, 1 << (nq - 1 - q), 2, 1 << q)  # 零拷贝视图
         a0 = s[:, :, 0, :]
         a1 = s[:, :, 1, :]
@@ -260,6 +345,22 @@ class TrajectorySimulator:
         """
         T = svs.shape[0]
         nq = self.n_qubits
+        if self._use_gpu:
+            pc = max(ctl, tgt)
+            pt = min(ctl, tgt)
+            ctl_high = ctl > tgt
+            A = 1 << (nq - 1 - pc)
+            B = 1 << (pc - pt - 1)
+            C = 1 << pt
+            m = svs.view(T, A, 2, B, 2, C)
+            out = m.clone()
+            if ctl_high:
+                out[:, :, 1, :, 0, :] = m[:, :, 1, :, 1, :]
+                out[:, :, 1, :, 1, :] = m[:, :, 1, :, 0, :]
+            else:
+                out[:, :, 0, :, 1, :] = m[:, :, 1, :, 1, :]
+                out[:, :, 1, :, 1, :] = m[:, :, 0, :, 1, :]
+            return out.reshape(T, -1)
         pc = max(ctl, tgt)  # 高位比特位置
         pt = min(ctl, tgt)  # 低位比特位置
         ctl_high = ctl > tgt  # 控制位是否在高位（轴 2）
@@ -285,6 +386,11 @@ class TrajectorySimulator:
 
     def _apply_swap_batch(self, svs: np.ndarray, a: int, b: int) -> np.ndarray:
         T = svs.shape[0]
+        if self._use_gpu:
+            s = svs.view(T, *([2] * self.n_qubits))
+            s = torch.swapaxes(s, self._axis(a, self.n_qubits) + 1,
+                               self._axis(b, self.n_qubits) + 1)
+            return s.reshape(T, -1)  # 非连续 reshape → 拷贝（与 numpy 语义一致）
         s = svs.reshape(T, *((2,) * self.n_qubits))
         s = np.swapaxes(s, self._axis(a, self.n_qubits) + 1,
                         self._axis(b, self.n_qubits) + 1)
@@ -361,6 +467,33 @@ class TrajectorySimulator:
         p_reset = 1.0 - np.exp(-time_us / t1)
         p_z = 1.0 - np.exp(time_us / t1 - 2.0 * time_us / t2)  # t2<=2t1 非负
         nq = self.n_qubits
+        if self._use_gpu:
+            # 无同步 branchless 实现：GPU 上 jump.any()/布尔索引会强制
+            # device 同步，改用 where 掩码全数组运算（语义逐行对应 numpy 版）
+            s = svs.view(T, 1 << (nq - 1 - q), 2, 1 << q)
+            a0 = s[:, :, 0, :]
+            a1 = s[:, :, 1, :]
+            # --- 振幅阻尼 ---
+            p1 = a1.abs().pow(2).sum(dim=(1, 2))
+            r = torch.rand(T, device=self._dev, generator=self._gen,
+                           dtype=torch.float64)
+            jbool = r < p_reset * p1
+            jf = jbool.to(torch.float64).view(T, 1, 1)
+            a0.copy_(jf * a1 + (1.0 - jf) * a0)
+            a1.copy_((1.0 - jf) * a1 * math.sqrt(max(1.0 - p_reset, 0.0)))
+            n2 = torch.where(jbool, p1, 1.0 - p1 * p_reset)
+            s.mul_(torch.sqrt(1.0 / torch.clamp(n2, min=1e-30)).view(T, 1, 1, 1))
+            # --- 相位阻尼 ---
+            p1 = a1.abs().pow(2).sum(dim=(1, 2))
+            r = torch.rand(T, device=self._dev, generator=self._gen,
+                           dtype=torch.float64)
+            jbool = r < p_z * p1
+            jf = jbool.to(torch.float64).view(T, 1, 1)
+            a0.copy_((1.0 - jf) * a0)
+            a1.copy_(jf * a1 + (1.0 - jf) * a1 * math.sqrt(max(1.0 - p_z, 0.0)))
+            n2 = torch.where(jbool, p1, 1.0 - p1 * p_z)
+            s.mul_(torch.sqrt(1.0 / torch.clamp(n2, min=1e-30)).view(T, 1, 1, 1))
+            return svs
         # 比特 q 置于中间轴的 strided 视图（无拷贝、无 gather）
         s = svs.reshape(T, 1 << (nq - 1 - q), 2, 1 << q)
         a0 = s[:, :, 0, :]
@@ -410,6 +543,19 @@ class TrajectorySimulator:
     def _depol1_batch(self, svs: np.ndarray, q: int, p: float) -> np.ndarray:
         """批量单比特退极化：逐轨迹独立采样 X/Y/Z。"""
         T = svs.shape[0]
+        if self._use_gpu:
+            if p > 0:
+                r = torch.rand(T, device=self._dev, generator=self._gen,
+                               dtype=torch.float64)
+                idx = torch.nonzero(r < 0.75 * p, as_tuple=True)[0]
+                if idx.numel():
+                    kinds = torch.randint(3, (idx.numel(),), device=self._dev,
+                                          generator=self._gen)
+                    for kind, name in enumerate(("X", "Y", "Z")):
+                        sel = idx[kinds == kind]
+                        if sel.numel():
+                            svs[sel] = self._apply_pauli1_batch(svs[sel], q, name)
+            return svs
         if p > 0:
             jump = self.rng.random(T) < 0.75 * p
             idx = np.where(jump)[0]
@@ -442,6 +588,24 @@ class TrajectorySimulator:
                       p: float) -> np.ndarray:
         """批量双比特退极化：逐轨迹独立采样 15 个 Pauli 组合。"""
         T = svs.shape[0]
+        if self._use_gpu:
+            if p > 0:
+                r = torch.rand(T, device=self._dev, generator=self._gen,
+                               dtype=torch.float64)
+                idx = torch.nonzero(r < 15.0 / 16.0 * p, as_tuple=True)[0]
+                if idx.numel():
+                    kinds = torch.randint(15, (idx.numel(),), device=self._dev,
+                                          generator=self._gen)
+                    for k, (pa, pb) in enumerate(_TWOQ_PAULIS):
+                        sel = idx[kinds == k]
+                        if sel.numel():
+                            sub = svs[sel]
+                            if pa != "I":
+                                sub = self._apply_pauli1_batch(sub, q1, pa)
+                            if pb != "I":
+                                sub = self._apply_pauli1_batch(sub, q2, pb)
+                            svs[sel] = sub
+            return svs
         if p > 0:
             jump = self.rng.random(T) < 15 / 16.0 * p
             idx = np.where(jump)[0]
@@ -491,6 +655,11 @@ class TrajectorySimulator:
         """批量相干 ZZ 串扰（svs 形状 (T, 2^n)，按比特轴共享的 xor 索引一次性作用）。"""
         theta = self._crosstalk_theta(q1, q2)
         if theta != 0.0:
+            if self._use_gpu:
+                svs.mul_(complex(np.exp(-1j * theta)))
+                idx = self._bitmask_indices_t(q1, q2)
+                svs[:, idx] = svs[:, idx] * complex(np.exp(2j * theta))
+                return svs
             svs *= np.exp(-1j * theta)
             svs[:, self._zz_xor_indices(q1, q2)] *= np.exp(2j * theta)
         return svs
@@ -562,9 +731,7 @@ class TrajectorySimulator:
         消除了逐轨迹 Python 循环（P0 向量化优化，20q 下 ~8x 提速）。
         语义与 _evolve 完全一致（噪声 MC 采样逐轨迹独立）。
         """
-        svs = np.tile(self._initial_state(), (num_trajectories, 1))
-        if circuit.global_phase:
-            svs *= np.exp(1j * float(circuit.global_phase))
+        svs = self._init_batch_state(num_trajectories, circuit)
         single_time = self.config.single_gate_time
         idle_time = self.config.idle_time
 
@@ -795,6 +962,21 @@ class TrajectorySimulator:
         """采样 num_trajectories 条调度感知噪声轨迹。"""
         if num_trajectories is None:
             num_trajectories = self.num_trajectories
+        if self._use_gpu:
+            # GPU：与 CPU 路径同语义（此路径不施加 global phase），VRAM 切块
+            ws_traj = (1 << self.n_qubits) * 16
+            chunk = min(num_trajectories, self._gpu_chunk_size(ws_traj))
+            outs = []
+            done = 0
+            while done < num_trajectories:
+                t = min(chunk, num_trajectories - done)
+                svs = self._init_batch_state(t, circuit, apply_global_phase=False)
+                svs = self.evolve_scheduled_batch(svs, circuit, waves,
+                                                  apply_noise=True)
+                outs.append(self._to_numpy(svs))
+                done += t
+            svs = outs[0] if len(outs) == 1 else np.vstack(outs)
+            return TrajectoryResult(svs)
         svs = np.array([self._initial_state() for _ in range(num_trajectories)])
         svs = self.evolve_scheduled_batch(svs, circuit, waves, apply_noise=True)
         return TrajectoryResult(svs)
@@ -843,11 +1025,26 @@ class TrajectorySimulator:
         小工作集（n 或 T 较小）用向量化批量演化（(T, 2^n) 单数组，
         消除 Python 循环开销）；大工作集（如 20q × T=16）退回逐轨迹
         循环以保持 L3 缓存局部性（实测批量反而慢 ~2x）。
+        GPU 后端：工作集上限为空闲 VRAM 的 25%，恒走批量内核并按
+        VRAM 切块（doc/模拟器加速.md §3.2）。
         """
         if num_trajectories is None:
             num_trajectories = self.num_trajectories
         if not skip_transpile:
             circuit = self._transpile(circuit)
+        if self._use_gpu:
+            ws_traj = (1 << self.n_qubits) * 16
+            chunk = min(num_trajectories, self._gpu_chunk_size(ws_traj))
+            outs = []
+            done = 0
+            while done < num_trajectories:
+                t = min(chunk, num_trajectories - done)
+                outs.append(self._to_numpy(
+                    self._evolve_batch(circuit, apply_noise=True,
+                                       num_trajectories=t)))
+                done += t
+            svs = outs[0] if len(outs) == 1 else np.vstack(outs)
+            return TrajectoryResult(svs)
         ws = num_trajectories * (1 << self.n_qubits) * 16  # complex128 字节
         if ws <= self._BATCH_WS_LIMIT:
             svs = self._evolve_batch(circuit, apply_noise=True,
@@ -1031,7 +1228,8 @@ def trajectory_circuit_fidelity(phys_circuit: QuantumCircuit,
                                 config: NoiseConfig,
                                 num_trajectories: int = 16,
                                 seed: Optional[int] = None,
-                                scheduled: bool = False) -> float:
+                                scheduled: bool = False,
+                                backend: str = "cpu") -> float:
     """对一条物理电路计算轨迹平均态保真度 F = mean_t |<psi_ideal|psi_t>|^2。
 
     Parameters
@@ -1047,9 +1245,12 @@ def trajectory_circuit_fidelity(phys_circuit: QuantumCircuit,
     scheduled : bool
         若为 True，对电路做贪心波次编排（同波内比特不冲突），按调度感知
         演化估算保真度（空闲退相干更少 + 同波相邻双比特门动态串扰）。
+    backend : str
+        模拟器后端（cpu/cuda/cuda:N/auto）；默认 cpu 保持历史口径逐位一致。
     """
     rc, rconfig = _reduce_phys_circuit_for_fidelity(phys_circuit, config)
-    sim = TrajectorySimulator(rconfig, num_trajectories=num_trajectories, seed=seed)
+    sim = TrajectorySimulator(rconfig, num_trajectories=num_trajectories,
+                              seed=seed, backend=backend)
     meas = rc.copy()
     meas.measure_all()
     ideal_sv = sim._evolve(meas, apply_noise=False)
@@ -1098,7 +1299,8 @@ def schedule_phys_circuit(phys_circuit: QuantumCircuit, single_time: float, two_
 def make_trajectory_fidelity_fn(config: NoiseConfig,
                                 num_trajectories: int = 16,
                                 seed: Optional[int] = None,
-                                scheduled: bool = False):
+                                scheduled: bool = False,
+                                backend: str = "cpu"):
     """构造 RoutingEnv 的 fidelity_fn hook（闭包捕获当前噪声配置与模拟器）。
 
     返回 fn(env) -> float：取 env._phys_circuit 计算轨迹平均态保真度。
@@ -1106,11 +1308,12 @@ def make_trajectory_fidelity_fn(config: NoiseConfig,
 
     scheduled=True 时使用调度感知演化（env 须开启 use_scheduler）；若 env
     未提供调度波形（非调度模式），自动回退到串行演化。
+    backend: 'cpu'（默认，历史口径）| 'cuda'/'cuda:N'/'auto'。
     """
     def trajectory_fidelity(env) -> float:
         rc, rconfig = _reduce_phys_circuit_for_fidelity(env._phys_circuit, config)
         sim = TrajectorySimulator(rconfig, num_trajectories=num_trajectories,
-                                  seed=seed)
+                                  seed=seed, backend=backend)
         meas = rc.copy()
         meas.measure_all()
         if scheduled:

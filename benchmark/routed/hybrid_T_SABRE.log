@@ -1,0 +1,22 @@
+barenco_tof_10.qasm [SABRE] q=19 T=64 sw=103 fid=0.0257 (-1788441727s)
+barenco_tof_3.qasm [SABRE] q=5 T=16 sw=9 fid=0.6717 (-1788442368s)
+barenco_tof_4.qasm [SABRE] q=7 T=16 sw=30 fid=0.3386 (-1788442368s)
+barenco_tof_5.qasm [SABRE] q=9 T=16 sw=26 fid=0.2511 (-1788442368s)
+csla_mux_3.qasm [SABRE] q=15 T=64 sw=39 fid=0.1822 (-1788442340s)
+gf2^4_mult.qasm [SABRE] q=12 T=32 sw=50 fid=0.1062 (-1788442367s)
+gf2^5_mult.qasm [SABRE] q=15 T=64 sw=72 fid=0.0528 (-1788442315s)
+gf2^6_mult.qasm [SABRE] q=18 T=64 sw=109 fid=0.0366 (-1788441738s)
+grover_5.qasm [SABRE] q=9 T=16 sw=119 fid=0.0003 (-1788442366s)
+hwb6.qasm [SABRE] q=7 T=16 sw=50 fid=0.1249 (-1788442368s)
+mod5_4.qasm [SABRE] q=5 T=16 sw=12 fid=0.3495 (-1788442368s)
+mod_mult_55.qasm [SABRE] q=9 T=16 sw=22 fid=0.0790 (-1788442368s)
+mod_red_21.qasm [SABRE] q=11 T=32 sw=48 fid=0.1197 (-1788442364s)
+rc_adder_6.qasm [SABRE] q=14 T=32 sw=38 fid=0.0529 (-1788442340s)
+tof_10.qasm [SABRE] q=19 T=64 sw=57 fid=0.2411 (-1788441652s)
+tof_3.qasm [SABRE] q=5 T=16 sw=11 fid=0.4367 (-1788442368s)
+tof_4.qasm [SABRE] q=7 T=16 sw=17 fid=0.4565 (-1788442368s)
+tof_5.qasm [SABRE] q=9 T=16 sw=17 fid=0.3074 (-1788442368s)
+vbe_adder_3.qasm [SABRE] q=10 T=32 sw=28 fid=0.1754 (-1788442363s)
+=== SABRE 汇总（混合精度 T, seed=42）===
+Fid mean: 0.2110  logmean: 0.1117  SWAPs: 45.1
+ALL DONE

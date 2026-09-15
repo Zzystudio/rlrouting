@@ -45,6 +45,7 @@ class HardwareFeatures:
     adj: np.ndarray             # (Q, Q) 0/1 邻接矩阵
     zz: np.ndarray              # (Q, Q) 归一化 ZZ 串扰强度
     dist: np.ndarray            # (Q, Q) 最短路径距离（归一化）
+    path_err: np.ndarray        # (Q, Q) 最短跳数路径上的最小 Σ e_edge（归一化边误差）
     qubit_template: np.ndarray  # (Q, 32) 硬件不变的 qubit 特征模板
     coupling_index: np.ndarray  # (2, 2*|E|) 双向耦合边索引
     coupling_template: np.ndarray  # (2*|E|, 16) 硬件不变的耦合边特征模板
@@ -84,6 +85,7 @@ class HardwareFeatures:
             tqe[q2, q1] = err / _ERROR_SCALE
 
         dist = _shortest_path(adj, n)
+        hops, path_err = _min_hop_path_err(adj, tqe, n)
         coupling_list = list(config.coupling_map)
         qubit_template = _build_qubit_template(n, t1, t2, freq, readout, sqe, tqe, adj, zz)
         coupling_index, coupling_template = _build_coupling_template(
@@ -99,10 +101,30 @@ class HardwareFeatures:
             adj=adj,
             zz=zz,
             dist=dist / max(1, n),
+            path_err=path_err,
             qubit_template=qubit_template,
             coupling_index=coupling_index,
             coupling_template=coupling_template,
         )
+
+    def dist_noise(self, beta: float) -> np.ndarray:
+        """P0-b 噪声加权距离：d_noise = (hops + β·path_err) / max(1, n)。
+
+        - path_err = 最短跳数路径上的最小 Σ e_edge（归一化边误差）；
+        - β 满足保序条件 β·k_max·e_max < 1 时，k+1 跳距离严格大于 k 跳，
+          噪声只在等跳数路径间做 tie-break；
+        - β=0 时与 self.dist 完全一致（向后兼容）。
+        """
+        key = round(float(beta), 6)
+        cache = getattr(self, "_dist_noise_cache", None)
+        if cache is None:
+            cache = {}
+            self._dist_noise_cache = cache
+        if key not in cache:
+            scale = max(1, self.num_qubits)
+            hops = self.dist * scale
+            cache[key] = (hops + float(beta) * self.path_err) / scale
+        return cache[key]
 
 
 def _crosstalk_strength(config, q1: int, q2: int) -> float:
@@ -129,6 +151,39 @@ def _shortest_path(adj: np.ndarray, n: int) -> np.ndarray:
                     dist[s, v] = dist[s, u] + 1
                     queue.append(v)
     return dist
+
+
+def _min_hop_path_err(adj: np.ndarray, e_edge: np.ndarray, n: int):
+    """每对 (s,t)：最短跳数距离 + 最短跳数路径上的最小 Σ e_edge。
+
+    BFS 分层 + 层内 DP（按跳数非降序处理节点，同层父节点全部处理完后
+    子节点的 path_err 才定型）。图不连通时 hops 停留在 n（与 _shortest_path
+    的哨兵一致），path_err 保持 inf。
+    """
+    INF_H = n
+    hops = np.full((n, n), INF_H, dtype=float)
+    perr = np.full((n, n), np.inf, dtype=float)
+    for s in range(n):
+        hops[s, s] = 0.0
+        perr[s, s] = 0.0
+        queue = [s]
+        head = 0
+        while head < len(queue):
+            u = queue[head]
+            head += 1
+            hu = hops[s, u]
+            pu = perr[s, u]
+            for v in range(n):
+                if adj[u, v] <= 0:
+                    continue
+                alt = pu + float(e_edge[u, v])
+                if hops[s, v] > hu + 1:
+                    hops[s, v] = hu + 1
+                    perr[s, v] = alt
+                    queue.append(v)
+                elif hops[s, v] == hu + 1 and alt < perr[s, v]:
+                    perr[s, v] = alt
+    return hops, perr
 
 
 # ---------------------------------------------------------------------------

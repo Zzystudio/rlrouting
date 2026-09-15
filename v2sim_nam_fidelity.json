@@ -1,0 +1,458 @@
+[
+ {
+  "model_dir": "SABRE@tianyan176_20q",
+  "circuit": "barenco_tof_10.qasm",
+  "qubits": 19,
+  "swaps": 103,
+  "fid_v2_sabre": 0.018115499760065434,
+  "sec": 145.3
+ },
+ {
+  "model_dir": "r3b_ft",
+  "circuit": "barenco_tof_10.qasm",
+  "qubits": 20,
+  "swaps": 982,
+  "fid_v2_r3b_ft": 0.18749999861302677,
+  "sec": 2.4
+ },
+ {
+  "model_dir": "SABRE@tianyan176_20q",
+  "circuit": "barenco_tof_3.qasm",
+  "qubits": 5,
+  "swaps": 9,
+  "fid_v2_sabre": 0.6708367203359213,
+  "sec": 0.0
+ },
+ {
+  "model_dir": "r3b_ft",
+  "circuit": "barenco_tof_3.qasm",
+  "qubits": 20,
+  "swaps": 58,
+  "fid_v2_r3b_ft": 0.3734037029385515,
+  "sec": 0.0
+ },
+ {
+  "model_dir": "SABRE@tianyan176_20q",
+  "circuit": "barenco_tof_4.qasm",
+  "qubits": 7,
+  "swaps": 30,
+  "fid_v2_sabre": 0.362337379357809,
+  "sec": 0.0
+ },
+ {
+  "model_dir": "r3b_ft",
+  "circuit": "barenco_tof_4.qasm",
+  "qubits": 20,
+  "swaps": 994,
+  "fid_v2_r3b_ft": 0.12499999999999963,
+  "sec": 228.3
+ },
+ {
+  "model_dir": "SABRE@tianyan176_20q",
+  "circuit": "barenco_tof_5.qasm",
+  "qubits": 9,
+  "swaps": 26,
+  "fid_v2_sabre": 0.20770385045568968,
+  "sec": 0.2
+ },
+ {
+  "model_dir": "r3b_ft",
+  "circuit": "barenco_tof_5.qasm",
+  "qubits": 20,
+  "swaps": 992,
+  "fid_v2_r3b_ft": 0.3749999999999414,
+  "sec": 225.9
+ },
+ {
+  "model_dir": "SABRE@tianyan176_20q",
+  "circuit": "csla_mux_3.qasm",
+  "qubits": 15,
+  "swaps": 39,
+  "fid_v2_sabre": 0.0007492760898767422,
+  "sec": 5.8
+ },
+ {
+  "model_dir": "r3b_ft",
+  "circuit": "csla_mux_3.qasm",
+  "qubits": 20,
+  "swaps": 986,
+  "fid_v2_r3b_ft": 0.01171875045121726,
+  "sec": 861.4
+ },
+ {
+  "model_dir": "SABRE@tianyan176_20q",
+  "circuit": "gf2^4_mult.qasm",
+  "qubits": 12,
+  "swaps": 50,
+  "fid_v2_sabre": 0.12640859094886717,
+  "sec": 0.5
+ },
+ {
+  "model_dir": "r3b_ft",
+  "circuit": "gf2^4_mult.qasm",
+  "qubits": 20,
+  "swaps": 989,
+  "fid_v2_r3b_ft": 0.062499933143418965,
+  "sec": 212.3
+ },
+ {
+  "model_dir": "SABRE@tianyan176_20q",
+  "circuit": "gf2^5_mult.qasm",
+  "qubits": 15,
+  "swaps": 72,
+  "fid_v2_sabre": 0.00798177935238929,
+  "sec": 10.3
+ },
+ {
+  "model_dir": "r3b_ft",
+  "circuit": "gf2^5_mult.qasm",
+  "qubits": 20,
+  "swaps": 986,
+  "fid_v2_r3b_ft": 0.027343748353053893,
+  "sec": 86.3
+ },
+ {
+  "model_dir": "SABRE@tianyan176_20q",
+  "circuit": "gf2^6_mult.qasm",
+  "qubits": 18,
+  "swaps": 109,
+  "fid_v2_sabre": 0.06793651251663842,
+  "sec": 132.2
+ },
+ {
+  "model_dir": "r3b_ft",
+  "circuit": "gf2^6_mult.qasm",
+  "qubits": 20,
+  "swaps": 983,
+  "fid_v2_r3b_ft": 0.01565418847510361,
+  "sec": 35.0
+ },
+ {
+  "model_dir": "SABRE@tianyan176_20q",
+  "circuit": "grover_5.qasm",
+  "qubits": 9,
+  "swaps": 119,
+  "fid_v2_sabre": 1.9189142637567097e-05,
+  "sec": 1.7
+ },
+ {
+  "model_dir": "r3b_ft",
+  "circuit": "grover_5.qasm",
+  "qubits": 20,
+  "swaps": 1654,
+  "fid_v2_r3b_ft": 0.0009765624999999998,
+  "sec": 328.2
+ },
+ {
+  "model_dir": "SABRE@tianyan176_20q",
+  "circuit": "hwb6.qasm",
+  "qubits": 7,
+  "swaps": 50,
+  "fid_v2_sabre": 1.4496004721659461e-06,
+  "sec": 0.1
+ },
+ {
+  "model_dir": "r3b_ft",
+  "circuit": "hwb6.qasm",
+  "qubits": 20,
+  "swaps": 994,
+  "fid_v2_r3b_ft": 1.2037062152420216e-34,
+  "sec": 226.7
+ },
+ {
+  "model_dir": "SABRE@tianyan176_20q",
+  "circuit": "mod5_4.qasm",
+  "qubits": 5,
+  "swaps": 12,
+  "fid_v2_sabre": 0.2632375360521715,
+  "sec": 0.0
+ },
+ {
+  "model_dir": "r3b_ft",
+  "circuit": "mod5_4.qasm",
+  "qubits": 20,
+  "swaps": 389,
+  "fid_v2_r3b_ft": 0.0633978541639269,
+  "sec": 389.3
+ },
+ {
+  "model_dir": "SABRE@tianyan176_20q",
+  "circuit": "mod_mult_55.qasm",
+  "qubits": 9,
+  "swaps": 22,
+  "fid_v2_sabre": 0.041755427961668576,
+  "sec": 0.1
+ },
+ {
+  "model_dir": "r3b_ft",
+  "circuit": "mod_mult_55.qasm",
+  "qubits": 20,
+  "swaps": 992,
+  "fid_v2_r3b_ft": 0.0,
+  "sec": 953.3
+ },
+ {
+  "model_dir": "SABRE@tianyan176_20q",
+  "circuit": "mod_red_21.qasm",
+  "qubits": 11,
+  "swaps": 48,
+  "fid_v2_sabre": 0.11871881131686324,
+  "sec": 2.2
+ },
+ {
+  "model_dir": "r3b_ft",
+  "circuit": "mod_red_21.qasm",
+  "qubits": 20,
+  "swaps": 990,
+  "fid_v2_r3b_ft": 0.0078124947896573765,
+  "sec": 410.0
+ },
+ {
+  "model_dir": "SABRE@tianyan176_20q",
+  "circuit": "rc_adder_6.qasm",
+  "qubits": 14,
+  "swaps": 38,
+  "fid_v2_sabre": 0.061947017465162776,
+  "sec": 13.7
+ },
+ {
+  "model_dir": "r3b_ft",
+  "circuit": "rc_adder_6.qasm",
+  "qubits": 20,
+  "swaps": 987,
+  "fid_v2_r3b_ft": 0.12498768008665972,
+  "sec": 228.6
+ },
+ {
+  "model_dir": "SABRE@tianyan176_20q",
+  "circuit": "tof_10.qasm",
+  "qubits": 19,
+  "swaps": 57,
+  "fid_v2_sabre": 0.3555806018384549,
+  "sec": 166.9
+ },
+ {
+  "model_dir": "r3b_ft",
+  "circuit": "tof_10.qasm",
+  "qubits": 20,
+  "swaps": 982,
+  "fid_v2_r3b_ft": 0.0010988836966523367,
+  "sec": 197.4
+ },
+ {
+  "model_dir": "SABRE@tianyan176_20q",
+  "circuit": "tof_3.qasm",
+  "qubits": 5,
+  "swaps": 11,
+  "fid_v2_sabre": 0.786132503549413,
+  "sec": 0.0
+ },
+ {
+  "model_dir": "r3b_ft",
+  "circuit": "tof_3.qasm",
+  "qubits": 20,
+  "swaps": 82,
+  "fid_v2_r3b_ft": 0.461905113090432,
+  "sec": 22.6
+ },
+ {
+  "model_dir": "SABRE@tianyan176_20q",
+  "circuit": "tof_4.qasm",
+  "qubits": 7,
+  "swaps": 17,
+  "fid_v2_sabre": 0.5202147352469092,
+  "sec": 0.0
+ },
+ {
+  "model_dir": "r3b_ft",
+  "circuit": "tof_4.qasm",
+  "qubits": 20,
+  "swaps": 994,
+  "fid_v2_r3b_ft": 0.2500000000122602,
+  "sec": 228.3
+ },
+ {
+  "model_dir": "SABRE@tianyan176_20q",
+  "circuit": "tof_5.qasm",
+  "qubits": 9,
+  "swaps": 17,
+  "fid_v2_sabre": 0.33602779373849906,
+  "sec": 0.1
+ },
+ {
+  "model_dir": "r3b_ft",
+  "circuit": "tof_5.qasm",
+  "qubits": 20,
+  "swaps": 992,
+  "fid_v2_r3b_ft": 0.04687499999999772,
+  "sec": 916.8
+ },
+ {
+  "model_dir": "SABRE@tianyan176_20q",
+  "circuit": "vbe_adder_3.qasm",
+  "qubits": 10,
+  "swaps": 28,
+  "fid_v2_sabre": 0.426721323415362,
+  "sec": 2.4
+ },
+ {
+  "model_dir": "r3b_ft",
+  "circuit": "vbe_adder_3.qasm",
+  "qubits": 20,
+  "swaps": 991,
+  "fid_v2_r3b_ft": 0.022398375906208162,
+  "sec": 864.4
+ },
+ {
+  "model_dir": "r3b_ft_beam5",
+  "circuit": "barenco_tof_10.qasm",
+  "qubits": 20,
+  "swaps": 982,
+  "fid_v2_r3b_ft_beam5": 0.031249999999999993,
+  "sec": 183.4
+ },
+ {
+  "model_dir": "r3b_ft_beam5",
+  "circuit": "barenco_tof_3.qasm",
+  "qubits": 20,
+  "swaps": 15,
+  "fid_v2_r3b_ft_beam5": 0.4957812165610519,
+  "sec": 0.0
+ },
+ {
+  "model_dir": "r3b_ft_beam5",
+  "circuit": "barenco_tof_4.qasm",
+  "qubits": 20,
+  "swaps": 68,
+  "fid_v2_r3b_ft_beam5": 0.1608048138942258,
+  "sec": 0.1
+ },
+ {
+  "model_dir": "r3b_ft_beam5",
+  "circuit": "barenco_tof_5.qasm",
+  "qubits": 20,
+  "swaps": 992,
+  "fid_v2_r3b_ft_beam5": 0.18750000033584163,
+  "sec": 21.9
+ },
+ {
+  "model_dir": "r3b_ft_beam5",
+  "circuit": "csla_mux_3.qasm",
+  "qubits": 20,
+  "swaps": 986,
+  "fid_v2_r3b_ft_beam5": 0.027343706257151944,
+  "sec": 218.6
+ },
+ {
+  "model_dir": "r3b_ft_beam5",
+  "circuit": "gf2^4_mult.qasm",
+  "qubits": 20,
+  "swaps": 989,
+  "fid_v2_r3b_ft_beam5": 0.14062500531414796,
+  "sec": 20.5
+ },
+ {
+  "model_dir": "r3b_ft_beam5",
+  "circuit": "gf2^5_mult.qasm",
+  "qubits": 20,
+  "swaps": 986,
+  "fid_v2_r3b_ft_beam5": 0.0273438324211228,
+  "sec": 209.5
+ },
+ {
+  "model_dir": "r3b_ft_beam5",
+  "circuit": "gf2^6_mult.qasm",
+  "qubits": 20,
+  "swaps": 983,
+  "fid_v2_r3b_ft_beam5": 0.009766723795501387,
+  "sec": 839.4
+ },
+ {
+  "model_dir": "r3b_ft_beam5",
+  "circuit": "grover_5.qasm",
+  "qubits": 20,
+  "swaps": 1654,
+  "fid_v2_r3b_ft_beam5": 0.00024414062496603027,
+  "sec": 169.5
+ },
+ {
+  "model_dir": "r3b_ft_beam5",
+  "circuit": "hwb6.qasm",
+  "qubits": 20,
+  "swaps": 326,
+  "fid_v2_r3b_ft_beam5": 1.8209844267773807e-11,
+  "sec": 20.3
+ },
+ {
+  "model_dir": "r3b_ft_beam5",
+  "circuit": "mod5_4.qasm",
+  "qubits": 20,
+  "swaps": 13,
+  "fid_v2_r3b_ft_beam5": 0.4558313802813613,
+  "sec": 0.0
+ },
+ {
+  "model_dir": "r3b_ft_beam5",
+  "circuit": "mod_mult_55.qasm",
+  "qubits": 20,
+  "swaps": 308,
+  "fid_v2_r3b_ft_beam5": 1.0128491578974854e-35,
+  "sec": 8.1
+ },
+ {
+  "model_dir": "r3b_ft_beam5",
+  "circuit": "mod_red_21.qasm",
+  "qubits": 20,
+  "swaps": 662,
+  "fid_v2_r3b_ft_beam5": 0.24786111577703415,
+  "sec": 170.1
+ },
+ {
+  "model_dir": "r3b_ft_beam5",
+  "circuit": "rc_adder_6.qasm",
+  "qubits": 20,
+  "swaps": 987,
+  "fid_v2_r3b_ft_beam5": 0.0,
+  "sec": 43.1
+ },
+ {
+  "model_dir": "r3b_ft_beam5",
+  "circuit": "tof_10.qasm",
+  "qubits": 20,
+  "swaps": 982,
+  "fid_v2_r3b_ft_beam5": 0.001220706993658693,
+  "sec": 373.4
+ },
+ {
+  "model_dir": "r3b_ft_beam5",
+  "circuit": "tof_3.qasm",
+  "qubits": 20,
+  "swaps": 6,
+  "fid_v2_r3b_ft_beam5": 0.6354568025950447,
+  "sec": 0.0
+ },
+ {
+  "model_dir": "r3b_ft_beam5",
+  "circuit": "tof_4.qasm",
+  "qubits": 20,
+  "swaps": 22,
+  "fid_v2_r3b_ft_beam5": 0.33397511435068533,
+  "sec": 0.0
+ },
+ {
+  "model_dir": "r3b_ft_beam5",
+  "circuit": "tof_5.qasm",
+  "qubits": 20,
+  "swaps": 235,
+  "fid_v2_r3b_ft_beam5": 0.16601227272029062,
+  "sec": 6.5
+ },
+ {
+  "model_dir": "r3b_ft_beam5",
+  "circuit": "vbe_adder_3.qasm",
+  "qubits": 20,
+  "swaps": 319,
+  "fid_v2_r3b_ft_beam5": 0.1514977854259102,
+  "sec": 16.7
+ }
+]

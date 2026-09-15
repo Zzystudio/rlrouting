@@ -1,0 +1,22 @@
+barenco_tof_10.qasm [r3b_ft] q=19 T=64 sw=982 fid=0.3359 (-1788442358s)
+barenco_tof_3.qasm [r3b_ft] q=5 T=16 sw=58 fid=0.1901 (-1788442368s)
+barenco_tof_4.qasm [r3b_ft] q=7 T=16 sw=994 fid=0.0625 (-1788442095s)
+barenco_tof_5.qasm [r3b_ft] q=9 T=16 sw=992 fid=0.3125 (-1788442115s)
+csla_mux_3.qasm [r3b_ft] q=15 T=64 sw=986 fid=0.0234 (-1788438329s)
+gf2^4_mult.qasm [r3b_ft] q=12 T=32 sw=989 fid=0.0625 (-1788441943s)
+gf2^5_mult.qasm [r3b_ft] q=15 T=64 sw=986 fid=0.0166 (-1788442026s)
+gf2^6_mult.qasm [r3b_ft] q=18 T=64 sw=983 fid=0.0181 (-1788442229s)
+grover_5.qasm [r3b_ft] q=9 T=16 sw=1654 fid=0.0015 (-1788442043s)
+hwb6.qasm [r3b_ft] q=7 T=16 sw=994 fid=0.0156 (-1788442154s)
+mod5_4.qasm [r3b_ft] q=5 T=16 sw=389 fid=0.1254 (-1788441774s)
+mod_mult_55.qasm [r3b_ft] q=9 T=16 sw=992 fid=0.0000 (-1788440909s)
+mod_red_21.qasm [r3b_ft] q=11 T=32 sw=990 fid=0.0176 (-1788441554s)
+rc_adder_6.qasm [r3b_ft] q=14 T=32 sw=987 fid=0.1562 (-1788441921s)
+tof_10.qasm [r3b_ft] q=19 T=64 sw=982 fid=0.0011 (-1788441613s)
+tof_3.qasm [r3b_ft] q=5 T=16 sw=82 fid=0.2928 (-1788442347s)
+tof_4.qasm [r3b_ft] q=7 T=16 sw=994 fid=0.2812 (-1788442148s)
+tof_5.qasm [r3b_ft] q=9 T=16 sw=992 fid=0.0156 (-1788441231s)
+vbe_adder_3.qasm [r3b_ft] q=10 T=32 sw=991 fid=0.0302 (-1788440301s)
+=== r3b_ft 汇总（混合精度 T, seed=42）===
+Fid mean: 0.1031  logmean: 0.0168  SWAPs: 895.6
+ALL DONE

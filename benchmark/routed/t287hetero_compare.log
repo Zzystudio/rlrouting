@@ -1,0 +1,27 @@
+R3b 模型加载 OK (edges=29)
+barenco_tof_10.qasm: q=19 S_sw=96 B_sw=201 fid SABRE=0.0745 B5=0.3950 (213s)
+barenco_tof_3.qasm: q=5 S_sw=4 B_sw=16 fid SABRE=0.8206 B5=0.7789 (0s)
+barenco_tof_4.qasm: q=7 S_sw=15 B_sw=120 fid SABRE=0.8114 B5=0.3810 (0s)
+barenco_tof_5.qasm: q=9 S_sw=20 B_sw=224 fid SABRE=0.5737 B5=0.2047 (0s)
+csla_mux_3.qasm: q=15 S_sw=43 B_sw=486 fid SABRE=0.3444 B5=0.1648 (18s)
+gf2^4_mult.qasm: q=12 S_sw=44 B_sw=214 fid SABRE=0.2445 B5=0.3499 (0s)
+gf2^5_mult.qasm: q=15 S_sw=83 B_sw=334 fid SABRE=0.1301 B5=0.3456 (19s)
+gf2^6_mult.qasm: q=18 S_sw=113 B_sw=253 fid SABRE=0.1154 B5=0.0514 (229s)
+grover_5.qasm: q=9 S_sw=98 B_sw=635 fid SABRE=0.0007 B5=0.0001 (1s)
+hwb6.qasm: q=7 S_sw=39 B_sw=216 fid SABRE=0.0601 B5=0.0000 (0s)
+mod5_4.qasm: q=5 S_sw=9 B_sw=16 fid SABRE=0.8343 B5=0.7405 (0s)
+mod_mult_55.qasm: q=9 S_sw=28 B_sw=153 fid SABRE=0.0262 B5=0.0000 (0s)
+mod_red_21.qasm: q=11 S_sw=49 B_sw=268 fid SABRE=0.1658 B5=0.0000 (1s)
+rc_adder_6.qasm: q=14 S_sw=34 B_sw=487 fid SABRE=0.2273 B5=0.0000 (10s)
+tof_10.qasm: q=19 S_sw=56 B_sw=205 fid SABRE=0.2855 B5=0.0099 (116s)
+tof_3.qasm: q=5 S_sw=6 B_sw=29 fid SABRE=0.9087 B5=0.6726 (0s)
+tof_4.qasm: q=7 S_sw=13 B_sw=66 fid SABRE=0.7964 B5=0.6059 (0s)
+tof_5.qasm: q=9 S_sw=15 B_sw=298 fid SABRE=0.7997 B5=0.6117 (0s)
+vbe_adder_3.qasm: q=10 S_sw=30 B_sw=395 fid SABRE=0.6158 B5=0.3183 (1s)
+
+=== tianyan287_stronghetero 汇总（trajectory_v2 ×16, seed=42）===
+SWAPs mean:  SABRE=41.8  B5=242.9
+Fid mean:    SABRE=0.4124  B5=0.2963
+Fid logmean: SABRE=0.2087  B5=0.0039
+beam5 胜 SABRE: 3/19
+ALL DONE

@@ -1,0 +1,87 @@
+R3b_beam5 模型加载 OK
+跳过 adder_8_cost701.qasm: 24q > 20q
+跳过 csum_mux_9_cost358.qasm: 30q > 20q
+跳过 gf2_10_mult_cost1269.qasm: 30q > 20q
+跳过 gf2_7_mult_cost615.qasm: 21q > 20q
+跳过 gf2_8_mult_cost857.qasm: 24q > 20q
+跳过 gf2_9_mult_cost1013.qasm: 27q > 20q
+跳过 qcla_adder_10_cost431.qasm: 36q > 20q
+跳过 qcla_com_7_cost299.qasm: 24q > 20q
+跳过 qcla_mod_7_cost821.qasm: 26q > 20q
+可用优化电路: 18 条
+Simulation failed and returned the following error message:
+ERROR:  [Experiment 0] Insufficient memory to run circuit circuit-192 using the density_matrix simulator. Required memory: 4194304M, max memory: 257547M
+barenco_tof_10_cost260.qasm: SABRE sw=47 fid=0.0192 | B5 sw=201 fid=0.5886
+barenco_tof_3_cost35.qasm: SABRE sw=5 fid=0.7201 | B5 sw=24 fid=0.6061
+barenco_tof_4_cost64.qasm: SABRE sw=9 fid=0.5150 | B5 sw=37 fid=0.3960
+WARNING:qiskit_aer.backends.aerbackend:Simulation failed and returned the following error message:
+ERROR:  [Experiment 0] Insufficient memory to run circuit circuit-3669 using the density_matrix simulator. Required memory: 16777216M, max memory: 257547M
+barenco_tof_5_cost88.qasm: SABRE sw=15 fid=0.2645 | B5 sw=309 fid=0.2815
+WARNING:qiskit_aer.backends.aerbackend:Simulation failed and returned the following error message:
+ERROR:  [Experiment 0] Insufficient memory to run circuit circuit-5786 using the density_matrix simulator. Required memory: 4194304M, max memory: 257547M
+csla_mux_3_cost142.qasm: SABRE sw=37 fid=0.1190 | B5 sw=377 fid=0.1447
+WARNING:qiskit_aer.backends.aerbackend:Simulation failed and returned the following error message:
+ERROR:  [Experiment 0] Insufficient memory to run circuit circuit-7849 using the density_matrix simulator. Required memory: 16777216M, max memory: 257547M
+gf2_4_mult_cost178.qasm: SABRE sw=59 fid=0.0560 | B5 sw=488 fid=0.1360
+WARNING:qiskit_aer.backends.aerbackend:Simulation failed and returned the following error message:
+ERROR:  [Experiment 0] Insufficient memory to run circuit circuit-10145 using the density_matrix simulator. Required memory: 262144M, max memory: 257547M
+gf2_5_mult_cost291.qasm: SABRE sw=91 fid=0.0900 | B5 sw=219 fid=0.1734
+WARNING:qiskit_aer.backends.aerbackend:Simulation failed and returned the following error message:
+ERROR:  [Experiment 0] Insufficient memory to run circuit circuit-11863 using the density_matrix simulator. Required memory: 1048576M, max memory: 257547M
+gf2_6_mult_cost428.qasm: SABRE sw=122 fid=0.0547 | B5 sw=361 fid=0.1769
+WARNING:qiskit_aer.backends.aerbackend:Simulation failed and returned the following error message:
+ERROR:  [Experiment 0] Insufficient memory to run circuit circuit-13788 using the density_matrix simulator. Required memory: 16777216M, max memory: 257547M
+hwb6_cost214.qasm: SABRE sw=34 fid=0.0541 | B5 sw=395 fid=0.0180
+mod5_4_cost24.qasm: SABRE sw=5 fid=0.6063 | B5 sw=8 fid=0.6030
+WARNING:qiskit_aer.backends.aerbackend:Simulation failed and returned the following error message:
+ERROR:  [Experiment 0] Insufficient memory to run circuit circuit-16636 using the density_matrix simulator. Required memory: 4194304M, max memory: 257547M
+mod_mult_55_cost86.qasm: SABRE sw=23 fid=0.1148 | B5 sw=433 fid=0.1607
+WARNING:qiskit_aer.backends.aerbackend:Simulation failed and returned the following error message:
+ERROR:  [Experiment 0] Insufficient memory to run circuit circuit-18755 using the density_matrix simulator. Required memory: 16777216M, max memory: 257547M
+mod_red_21_cost187.qasm: SABRE sw=39 fid=0.0601 | B5 sw=455 fid=0.1938
+WARNING:qiskit_aer.backends.aerbackend:Simulation failed and returned the following error message:
+ERROR:  [Experiment 0] Insufficient memory to run circuit circuit-21017 using the density_matrix simulator. Required memory: 16777216M, max memory: 257547M
+rc_adder_6_cost152.qasm: SABRE sw=37 fid=0.1575 | B5 sw=503 fid=0.2133
+WARNING:qiskit_aer.backends.aerbackend:Simulation failed and returned the following error message:
+ERROR:  [Experiment 0] Insufficient memory to run circuit circuit-23328 using the density_matrix simulator. Required memory: 4194304M, max memory: 257547M
+tof_10_cost175.qasm: SABRE sw=40 fid=0.3719 | B5 sw=329 fid=0.1420
+tof_3_cost33.qasm: SABRE sw=6 fid=0.5927 | B5 sw=17 fid=0.6998
+WARNING:qiskit_aer.backends.aerbackend:Simulation failed and returned the following error message:
+ERROR:  [Experiment 0] Insufficient memory to run circuit circuit-25941 using the density_matrix simulator. Required memory: 262144M, max memory: 257547M
+tof_4_cost51.qasm: SABRE sw=7 fid=0.7933 | B5 sw=58 fid=0.5194
+WARNING:qiskit_aer.backends.aerbackend:Simulation failed and returned the following error message:
+ERROR:  [Experiment 0] Insufficient memory to run circuit circuit-27442 using the density_matrix simulator. Required memory: 262144M, max memory: 257547M
+tof_5_cost71.qasm: SABRE sw=7 fid=0.4754 | B5 sw=223 fid=0.5705
+WARNING:qiskit_aer.backends.aerbackend:Simulation failed and returned the following error message:
+ERROR:  [Experiment 0] Insufficient memory to run circuit circuit-29163 using the density_matrix simulator. Required memory: 16777216M, max memory: 257547M
+vbe_adder_3_cost73.qasm: SABRE sw=17 fid=0.3541 | B5 sw=363 fid=0.1940
+
+=== 汇总（v1 trajectory_sched ×16, seed=0）===
+指标                               SABRE  R3b_beam5
+----------------------------------------------------
+SABRE(优化电路)                     0.3010
+B5(优化电路)                        0.3232
+原始 NAM (sabre_orig)             0.3249
+原始 NAM (beam5_orig)             0.3341
+原始 NAM (l05_orig)               0.3915
+
+逐电路:
+  barenco_tof_10_cost260.qasm  SABRE_fid=0.01916276115044035  B5_fid=0.5885617902276264
+  barenco_tof_3_cost35.qasm    SABRE_fid=0.7200541378989704  B5_fid=0.6061188724346716
+  barenco_tof_4_cost64.qasm    SABRE_fid=0.5149606820990762  B5_fid=0.39598310956070476
+  barenco_tof_5_cost88.qasm    SABRE_fid=0.26451239267323  B5_fid=0.2814547280339484
+  csla_mux_3_cost142.qasm      SABRE_fid=0.11901537250539002  B5_fid=0.14472122147563177
+  gf2_4_mult_cost178.qasm      SABRE_fid=0.05598899868493293  B5_fid=0.1359898971397699
+  gf2_5_mult_cost291.qasm      SABRE_fid=0.08999557285124463  B5_fid=0.17343853619050106
+  gf2_6_mult_cost428.qasm      SABRE_fid=0.05465653162868791  B5_fid=0.1768982619048992
+  hwb6_cost214.qasm            SABRE_fid=0.054059610546909484  B5_fid=0.018013113913211837
+  mod5_4_cost24.qasm           SABRE_fid=0.6063401729233995  B5_fid=0.6030384668028745
+  mod_mult_55_cost86.qasm      SABRE_fid=0.11482064873660082  B5_fid=0.16069384143238674
+  mod_red_21_cost187.qasm      SABRE_fid=0.06006957522922917  B5_fid=0.19379451241922446
+  rc_adder_6_cost152.qasm      SABRE_fid=0.15752991397406552  B5_fid=0.21334084084655489
+  tof_10_cost175.qasm          SABRE_fid=0.3719336137199496  B5_fid=0.14198833663932073
+  tof_3_cost33.qasm            SABRE_fid=0.592684636401985  B5_fid=0.6998323715450648
+  tof_4_cost51.qasm            SABRE_fid=0.7933234985292548  B5_fid=0.519353970742092
+  tof_5_cost71.qasm            SABRE_fid=0.47542570242676124  B5_fid=0.5705321215480901
+  vbe_adder_3_cost73.qasm      SABRE_fid=0.35412267367221417  B5_fid=0.19396416159527874
+ALL DONE

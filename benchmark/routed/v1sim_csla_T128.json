@@ -1,0 +1,32 @@
+{
+ "circuit": "csla_mux_3.qasm (15q, 170 gates)",
+ "note": "T=16 的深电路 MC 方差巨大，T=128 为可信口径",
+ "T128_seed42": {
+  "SABRE": 0.1606,
+  "R3b_beam5": 0.1689
+ },
+ "T16_seed0": {
+  "SABRE": 0.0007,
+  "R3b_beam5": 0.0156,
+  "R3b_mt_best": 0.151
+ },
+ "结构指标": {
+  "SABRE": {
+   "swaps": null,
+   "cx_err_mean": 0.2572,
+   "xtalk": 0.396,
+   "makespan": 42.2
+  },
+  "R3b_beam5": {
+   "cx_err_mean": 0.1865,
+   "xtalk": 0.211,
+   "makespan": 52.7
+  },
+  "R3b_mt_replay": {
+   "cx_err_mean": 0.2202,
+   "xtalk": 0.771,
+   "makespan": 85.8,
+   "swaps": 108
+  }
+ }
+}

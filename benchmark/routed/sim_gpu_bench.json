@@ -1,0 +1,38 @@
+[
+ {
+  "circuit": "gf2^6_mult",
+  "qubits": 18,
+  "swaps": 417,
+  "T": 64,
+  "backend": "cuda",
+  "fid": 0.034441,
+  "sec": 70.73
+ },
+ {
+  "circuit": "tof_10",
+  "qubits": 19,
+  "swaps": 99,
+  "T": 128,
+  "backend": "cuda",
+  "fid": 0.167938,
+  "sec": 47.61
+ },
+ {
+  "circuit": "tof_5",
+  "qubits": 9,
+  "swaps": 25,
+  "T": 16,
+  "backend": "cuda",
+  "fid": 0.425624,
+  "sec": 0.17
+ },
+ {
+  "circuit": "vbe_adder_3",
+  "qubits": 10,
+  "swaps": 64,
+  "T": 32,
+  "backend": "cuda",
+  "fid": 0.160499,
+  "sec": 0.33
+ }
+]

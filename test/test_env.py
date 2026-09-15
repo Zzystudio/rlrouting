@@ -347,3 +347,38 @@ def test_r3_shaping_telescoping():
         expected = -phi0 + (0.99 - 1.0) * phi_b_sum
         assert abs(total_shaping - expected) < 1e-6, \
             f"seed={seed}: {total_shaping} vs {expected}"
+
+
+def test_r5a_lookahead_features():
+    env = _env_r3(n=5)
+    env.reset()
+    feats = env._edge_lookahead_features()
+    E = env.num_edges
+    assert feats.shape == (E, 4)
+    assert np.isfinite(feats).all()
+    assert (feats[:, 0] >= 0).all() and (feats[:, 0] <= 1.0 + 1e-9).all()   # xtalk_pred 归一化
+    assert (feats[:, 1] >= 0).all() and (feats[:, 1] <= 1.0 + 1e-9).all()   # busy_contact /4
+
+    # xtalk_pred 精确性：手动复算边 (0,1) 的 1-hop 交叉 ZZ 和
+    ready = env._ready_2q_gates()
+    if ready:
+        p, q = env.coupling_map[0]
+        zz = env.hw.zz
+        adj = env.hw.adj
+        xt = 0.0
+        for g in ready:
+            a, b = env.mapping[g.qubits[0]], env.mapping[g.qubits[1]]
+            if a in (p, q) or b in (p, q):
+                continue
+            for (x, y) in ((p, a), (p, b), (q, a), (q, b)):
+                if adj[x, y] > 0:
+                    xt += float(zz[x, y])
+        assert abs(feats[0, 0] - xt / max(float(zz.max()), 1e-9)) < 1e-9
+
+
+def test_r5a_obs_dim_consistency():
+    env = _env_r3(n=5)
+    obs, _ = env.reset()
+    assert obs.shape == env.observation_space.shape
+    # 新特征确实进了 obs（维度 = gnn_dim + map/progress/phase）
+    assert env._edge_feat_dim == env._gnn.encoder.out_dim * 3 + 5 + 4

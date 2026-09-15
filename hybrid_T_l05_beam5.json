@@ -1,0 +1,173 @@
+[
+ {
+  "model": "l05_beam5",
+  "circuit": "barenco_tof_10.qasm",
+  "qubits": 19,
+  "swaps": 95,
+  "T": 64,
+  "fid": 0.030394512739690252,
+  "sec": -1788441867.1
+ },
+ {
+  "model": "l05_beam5",
+  "circuit": "barenco_tof_3.qasm",
+  "qubits": 5,
+  "swaps": 8,
+  "T": 16,
+  "fid": 0.46642922855598723,
+  "sec": -1788442368.0
+ },
+ {
+  "model": "l05_beam5",
+  "circuit": "barenco_tof_4.qasm",
+  "qubits": 7,
+  "swaps": 16,
+  "T": 16,
+  "fid": 0.3851192161742961,
+  "sec": -1788442368.0
+ },
+ {
+  "model": "l05_beam5",
+  "circuit": "barenco_tof_5.qasm",
+  "qubits": 9,
+  "swaps": 23,
+  "T": 16,
+  "fid": 0.2023090709242688,
+  "sec": -1788442367.9
+ },
+ {
+  "model": "l05_beam5",
+  "circuit": "csla_mux_3.qasm",
+  "qubits": 15,
+  "swaps": 40,
+  "T": 64,
+  "fid": 0.17046060963922993,
+  "sec": -1788442356.7
+ },
+ {
+  "model": "l05_beam5",
+  "circuit": "gf2^4_mult.qasm",
+  "qubits": 12,
+  "swaps": 47,
+  "T": 32,
+  "fid": 0.1174688785670706,
+  "sec": -1788442364.4
+ },
+ {
+  "model": "l05_beam5",
+  "circuit": "gf2^5_mult.qasm",
+  "qubits": 15,
+  "swaps": 84,
+  "T": 64,
+  "fid": 0.03902842966620074,
+  "sec": -1788442345.3
+ },
+ {
+  "model": "l05_beam5",
+  "circuit": "gf2^6_mult.qasm",
+  "qubits": 18,
+  "swaps": 129,
+  "T": 64,
+  "fid": 0.04459299453790974,
+  "sec": -1788442085.5
+ },
+ {
+  "model": "l05_beam5",
+  "circuit": "grover_5.qasm",
+  "qubits": 9,
+  "swaps": 101,
+  "T": 16,
+  "fid": 1.5665480536977465e-05,
+  "sec": -1788442366.6
+ },
+ {
+  "model": "l05_beam5",
+  "circuit": "hwb6.qasm",
+  "qubits": 7,
+  "swaps": 39,
+  "T": 16,
+  "fid": 1.3900421351176979e-06,
+  "sec": -1788442367.9
+ },
+ {
+  "model": "l05_beam5",
+  "circuit": "mod5_4.qasm",
+  "qubits": 5,
+  "swaps": 8,
+  "T": 16,
+  "fid": 0.5467306161181473,
+  "sec": -1788442368.0
+ },
+ {
+  "model": "l05_beam5",
+  "circuit": "mod_mult_55.qasm",
+  "qubits": 9,
+  "swaps": 15,
+  "T": 16,
+  "fid": 0.03154453092138077,
+  "sec": -1788442367.9
+ },
+ {
+  "model": "l05_beam5",
+  "circuit": "mod_red_21.qasm",
+  "qubits": 11,
+  "swaps": 43,
+  "T": 32,
+  "fid": 0.035128765277149206,
+  "sec": -1788442363.7
+ },
+ {
+  "model": "l05_beam5",
+  "circuit": "rc_adder_6.qasm",
+  "qubits": 14,
+  "swaps": 33,
+  "T": 32,
+  "fid": 0.024056523441498057,
+  "sec": -1788442342.3
+ },
+ {
+  "model": "l05_beam5",
+  "circuit": "tof_10.qasm",
+  "qubits": 19,
+  "swaps": 67,
+  "T": 64,
+  "fid": 0.21414709071875598,
+  "sec": -1788442059.4
+ },
+ {
+  "model": "l05_beam5",
+  "circuit": "tof_3.qasm",
+  "qubits": 5,
+  "swaps": 6,
+  "T": 16,
+  "fid": 0.7702478897637366,
+  "sec": -1788442368.0
+ },
+ {
+  "model": "l05_beam5",
+  "circuit": "tof_4.qasm",
+  "qubits": 7,
+  "swaps": 9,
+  "T": 16,
+  "fid": 0.4531970450373817,
+  "sec": -1788442368.0
+ },
+ {
+  "model": "l05_beam5",
+  "circuit": "tof_5.qasm",
+  "qubits": 9,
+  "swaps": 16,
+  "T": 16,
+  "fid": 0.2712283718600723,
+  "sec": -1788442368.0
+ },
+ {
+  "model": "l05_beam5",
+  "circuit": "vbe_adder_3.qasm",
+  "qubits": 10,
+  "swaps": 27,
+  "T": 32,
+  "fid": 0.293288761615881,
+  "sec": -1788442367.7
+ }
+]

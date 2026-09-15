@@ -146,6 +146,7 @@ class PPOAgent:
         coupling_map: Optional[list] = None,
         with_commit: bool = True,
         lambda_v_fid: float = 1.0,
+        edge_feat_dim: Optional[int] = None,
     ):
         self.gamma = gamma
         self.lam = lam
@@ -168,10 +169,14 @@ class PPOAgent:
         params = []
         if gnn is not None:
             self.gnn = gnn
-            edge_feat_dim = self.gnn.encoder.out_dim * 3 + 5
-            self.edge_feat_dim = edge_feat_dim
+            # edge_feat_dim 必须与 env 的 per-edge 特征布局一致：
+            # out*3 + SABRE5 + look4（env 恒发）+ noise5（P0-a 开启时）。
+            # 旧默认 out*3+5 仅作向后兼容（R5a-era 代码曾因未同步该值
+            # 导致 rollout obs 切片错位——行为/更新策略不一致的存量 bug）。
+            self.edge_feat_dim = edge_feat_dim if edge_feat_dim is not None \
+                else self.gnn.encoder.out_dim * 3 + 5
             self.gnn.to(device)
-            self.ac = EdgeActorCritic(edge_feat_dim, num_edges, num_qubits,
+            self.ac = EdgeActorCritic(self.edge_feat_dim, num_edges, num_qubits,
                                       with_commit=with_commit).to(device)
             params += list(self.gnn.parameters())
         else:
@@ -230,7 +235,8 @@ class PPOAgent:
             dist = torch.distributions.Categorical(logits=logits)
             action = dist.sample()
             logp = dist.log_prob(action).item()
-        return int(action.item()), logp, float(value.item()), \
+        action_i = action.item() if torch.is_tensor(action) else int(action)
+        return int(action_i), logp, float(value.item()), \
             float(v_route.item()), float(v_fid.item())
 
     @torch.no_grad()
@@ -300,6 +306,13 @@ class PPOAgent:
             if any(k.startswith("critic.") for k in ac_state):
                 ac_state = {k.replace("critic.", "critic_route.", 1): v
                             for k, v in ac_state.items()}
+            ref_w = ac_state.get("edge_mlp.0.weight")
+            if ref_w is not None and tuple(ref_w.shape) != tuple(
+                    teacher.edge_mlp[0].weight.shape):
+                raise ValueError(
+                    f"Teacher edge_feat_dim 不匹配：ckpt {tuple(ref_w.shape)} vs "
+                    f"current {tuple(teacher.edge_mlp[0].weight.shape)}"
+                    "（teacher 须与当前 obs 特征配置一致训练）")
             teacher.load_state_dict(ac_state, strict=False)
             if teacher_gnn is not None and "gnn" in state:
                 teacher_gnn.load_state_dict({k: v.to(self.device)
@@ -371,7 +384,8 @@ class PPOAgent:
         return torch.cat(edge_list, dim=0)
 
     def _build_edge_obs(self, graph_data_list, map_vec_list, progress_list,
-                        coupling_maps=None, sabre_feats_list=None, phase_list=None):
+                        coupling_maps=None, sabre_feats_list=None, phase_list=None,
+                        look_feats_list=None, noise_feats_list=None):
         all_ef, all_mv, all_pg, all_ph = [], [], [], []
         for i, (gd, mv, pg) in enumerate(zip(graph_data_list, map_vec_list, progress_list)):
             qubit_h = self.gnn.node_embeddings(gd)
@@ -382,6 +396,14 @@ class PPOAgent:
                 sf_flat = sabre_feats_list[i]
                 sf = torch.tensor(sf_flat, dtype=torch.float32, device=self.device).reshape(n_local, 5)
                 ef = torch.cat([ef, sf], dim=-1)
+            if look_feats_list is not None:
+                lf = torch.tensor(look_feats_list[i], dtype=torch.float32,
+                                  device=self.device).reshape(n_local, 4)
+                ef = torch.cat([ef, lf], dim=-1)
+            if noise_feats_list is not None:
+                nf = torch.tensor(noise_feats_list[i], dtype=torch.float32,
+                                  device=self.device).reshape(n_local, 5)
+                ef = torch.cat([ef, nf], dim=-1)
             # pad to self.num_edges (max_edges) for consistent batching
             if ef.shape[0] < self.num_edges:
                 pad = torch.zeros(self.num_edges - ef.shape[0], ef.shape[1],
@@ -439,6 +461,10 @@ class PPOAgent:
                              if "coupling_map" in batch else None)
                     sblist = ([batch["sabre_feats"][i] for i in sel]
                               if "sabre_feats" in batch else None)
+                    lflist = ([batch["look_feats"][i] for i in sel]
+                              if "look_feats" in batch else None)
+                    nflist = ([batch["noise_feats"][i] for i in sel]
+                              if "noise_feats" in batch else None)
                     phlist = ([batch["phase"][i] for i in sel]
                               if "phase" in batch else None)
                     ef, mv, pg, ph = self._build_edge_obs(
@@ -448,6 +474,8 @@ class PPOAgent:
                         coupling_maps=cmaps,
                         sabre_feats_list=sblist,
                         phase_list=phlist,
+                        look_feats_list=lflist,
+                        noise_feats_list=nflist,
                     )
                     mask = None
                     if cmaps is not None:
