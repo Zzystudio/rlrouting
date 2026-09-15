@@ -6621,8 +6621,8 @@ PYTHONPATH=src python3 ../scripts/diag_p0_costbenefit.py \
 逐电路保真度对比。S_sw/B_sw = SWAP 数；S_fid/B_fid = v1 保真度；
 S_orig/B_orig = 同协议下的原始 NAM 保真度（参照）。
 
-| 电路 | q | S_sw | B_sw | S_fid | B_fid | S_orig | B_orig | 优胜 |
-|------|---|------|------|-------|-------|--------|--------|------|
+| 电路 | q | S_fid | B_fid | S_orig | B_orig | 优胜 |
+|------|---|-------|-------|--------|--------|------|
 | barenco_tof_3_cost35 | 5 | 0.7201 | 0.6061 | 0.7467 | 0.7297 | SABRE |
 | mod5_4_cost24 | 5 | 0.6063 | 0.6030 | 0.5122 | 0.4568 | ≈ |
 | tof_3_cost33 | 5 | 0.5927 | 0.6998 | 0.7779 | 0.7247 | B5 |
@@ -6641,88 +6641,3 @@ S_orig/B_orig = 同协议下的原始 NAM 保真度（参照）。
 | gf2_6_mult_cost428 | 18 | 0.0547 | 0.1769 | 0.0000 | 0.0000 | B5 |
 | barenco_tof_10_cost260 | 19 | 0.0192 | 0.5886 | 0.0715 | 0.1794 | B5 |
 | tof_10_cost175 | 19 | 0.3719 | 0.1420 | 0.4264 | 0.1449 | SABRE |
-
----
-
-## P0/P1/S5 代码框架实施 + tianyan287_20q 正式训练启动（2026-09-15）
-
-> 按 `doc/20260915训练方案.md` §8 完成 S1-S3+S5 代码框架（一次性上线，G1/G4 监控兜底），
-> 在 tianyan287_20q 拓扑上从零启动 200k 步正式训练（tmux 会话 `p0t287`）。
-
-### 实施清单
-
-| 文件 | 改动 |
-|------|------|
-| `src/routing/graph/features.py` | **P0-b**：新增 `path_err` 矩阵（min-hop 路径最小 Σe，`_min_hop_path_err` BFS 分层 DP）+ `dist_noise(beta)` 方法（β=0 时与 dist 逐位一致） |
-| `src/routing/rl/env.py` | **P0-a**：`edge_noise_features`（+5 维 e_edge/zz_edge/e_rel/swap_price/cum_xz，物理端点经映射取逻辑 `_xz_errors`）；**P0-b**：`beta_noise` + `_dist()` 替换全部 4 处 `hw.dist`；**P0-c**：`_phi` 扩展 E_err/X(s) 项（`_ready_err_ext`/`_state_xtalk`，纯状态函数）+ per-swap 串扰价 `r_xt_swap`（`_xtalk_pred_edge` 与 lookahead 第 0 列同口径）；**P0-d**：`pot_progress_b`（默认 0.045 向后兼容）+ `pot_1q_reward`（1Q/measure 置零开关）；**P1-a**：`sabre_swap_budget`+`lambda_budget`（超预算每颗额外罚）；`clone()` 同步全部新字段 |
-| `src/routing/rl/agent.py` | **存量 bug 修复**：`edge_feat_dim` 硬编码 `out*3+5` 而环境为 `out*3+9`（R5a-era 起 rollout `act()` 特征切片错位——行为策略与更新策略不一致，R5a/t287sh 系 run 未 bootstrap 的候选根因）；改为显式传入 `edge_feat_dim`；`_build_edge_obs` 支持 look/noise 特征（update 路径与 act 路径同构）；`act()` deterministic 分支 int.item() bug 修复；teacher 加载加形状校验（fail loud） |
-| `src/routing/rl/train_agent.py` | `randomize_noise_landscape()`（S5 三档：L1 异构放大 amp∈{2,3} clip[0.001,0.1] / L2 位置重排含 T1T2 配对置换）+ `--noise-hetero`；`--qasm-stage-cap`（`pick_circuit_with_nam` 按课程阶段限幅，pick 改为返回 (dag, path, qc)）；SABRE SWAP 预算缓存（按 (topo, circuit) 键，SABRE 噪声盲故跨 episode 稳定）+ **G1 监控**（日志 `sr=` + metrics.csv `swap_ratio` 列 + >1.05 warn / >1.10 ALERT）；buffer/batch 补 look/noise 特征管线 |
-| `src/routing/rl/eval_policy.py` | 同步新 flags（`--edge-noise-features/--beta-noise/--w-*/--pot-*`），新旧模型均可对齐评估 |
-| `scripts/gen_structured_circuits_v2.py` | **S5 数据**：8 新族（qft_butterfly/qpe_block/pauli_evolution/mcx_ladder/clifford_layer/parallel_blocks/layered_matching/mixed_serial_parallel）× 规模档 {5,8,10,12,14,16,20} |
-| `scripts/audit_training_circuits.py` | V2 数据审计：族×规模覆盖矩阵 + 宽度/并发分布 |
-| `test/test_p0_features.py` | 19 项新单测：保序（t287 实拓扑）、telescoping（含新 Φ 项）、B 重标定/1Q 置零、预算锚（超预算罚/预算内零干扰）、噪声 L1/L2 不变量、stage-cap、**agent/env 特征布局对齐回归** |
-
-### 维度对齐修正说明
-
-env 的 per-edge 特征维度改为条件化：`out*3 + 5 + 4·look + 5·noise`。旧 checkpoint 评估需传
-`--no-lookahead-features --no-edge-noise-features` 对齐（`test_phase1_vs_baselines` 的 33.8 swaps
-假阳性即 153 维 env obs 与 149 维 checkpoint 错配所致，本次已修复——该测试现通过）。
-
-### 测试结果
-
-```
-test_p0_features.py        19 passed
-全量 test/                 97 passed, 1 failed
-（唯一失败 test_fidelity_shaping_step_zero 为存量问题：截断罚计入步奖励，与本次改动无关）
-```
-
-### 数据审计（V2）
-
-```
-gen_structured_v2: kept=330（+现有 93 = 423 池）
-族×规模矩阵: 18 族 × 档 {5,8,10,12,14,16,20} 全覆盖，无空档
-front_width_mean 谱: [0,2):116 / [2,4):160 / [4,6):73 / [6,8):40 / [8,10):17 / [10,15):17
-（v1 族为窄 front-layer 串行链，v2 并行族系统性补宽——串扰信号方差来源）
-```
-
-### 训练命令（tmux 会话 p0t287）
-
-```bash
-cd src && python3 -u -m routing.rl.train_agent \
-  --topo ../traindata/topo/tianyan287_20q.json --max-num-qubits 20 \
-  --reward-mode routing --reward-potential \
-  --shaping-gamma 0.99 --eta-shape 0.3 --alpha-ext 0.5 \
-  --use-scheduler --eta-time 0.01 --eta-xtalk-par 0.1 --eta-idle 0.005 --eta-parallel 0.05 \
-  --swap-cost 0.7 --unfinished-penalty 0.3 --no-progress-limit 200 \
-  --edge-noise-features --beta-noise 0.5 \
-  --w-err 0.02 --w-xt 0.01 --w-xt-swap 0.02 \
-  --pot-progress-b 0.20 --no-pot-1q-reward \
-  --lambda-budget 0.5 --budget-delta 1.05 \
-  --noise-hetero "0:0.4,1:0.3,2:0.3" \
-  --qasm-stage-cap "stage1:6,large_n8:10,large_n10:12,large_n12:14,large_n16:20,large_n20:20,unified:20" \
-  --nam-circuits-dir ../traindata/gen_structured,../traindata/gen_structured_v2 --nam-circuit-prob 0.3 \
-  --curriculum-keys stage1,large_n8,large_n10,large_n12,unified \
-  --timesteps 200000 \
-  --checkpoint-dir ../models/ckpts_p0t287 --checkpoint-interval 10 \
-  --out ../models/policy_p0_t287.pt --device cuda:0 --seed 0 \
-  2>&1 | tee ../models/train_p0t287.log
-```
-
-参数依据：β=0.5（S0 保序核算）、w_err=0.02/w_xt=0.01/w_xt_swap=0.02（G4 预算）、
-B=0.20（=1.5×mean(e_norm)）、eta_xtalk_par=0.1（t287 真实 ZZ 量纲重标定）、
-λ_budget=0.5/δ=1.05（G1 硬锚）、课程=坡道+尾段混合（R3c-v2 结构）。
-KL teacher 未启用：本次为换拓扑+换 obs 的从零训练，无可对齐维度的教师；
-P1-b KL 路径留给本 run 收敛后的微调阶段。
-
-### 开局状态（step 2560）
-
-```
-step=  256  rew=-2.794  swp=9.0   trunc=0%  ent=3.436  xtalk=0.615  [G1 ALERT] sr=21.17
-step= 2560  rew=-124.9  swp=75.0  trunc=18%  ent=3.386  xtalk=1.813  sr=14.16
-```
-
-- 从零随机策略 sr（swaps/SABRE）14-21× 属预期；观察点：sr 能否随训练降至 ≤3×、
-  最终贴住 1.05 预算锚；
-- swp 前期通胀（9→75）与 R3b stage1 的「SWAP 爆炸段」模式一致，等待阶段边界恢复；
-- 预计墙钟 ~12h（RTX 4090D）。完成后按 V5 协议评估：NAM（主）+ QUARL（第二）双
-  held-out、SABRE-only 基线、T=64/32/16 混合精度、G1/G2 闸门一票否决。
