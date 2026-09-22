@@ -138,6 +138,7 @@ def model_and_agent():
         num_qubits=NUM_QUBITS,
         num_edges=max_edges,
         coupling_map=cm,
+        edge_feat_dim=env._edge_feat_dim,  # 必须与 env per-edge 特征布局一致（含 E13 global）
         with_commit=False,
     )
     agent.load(MODEL_PATH)

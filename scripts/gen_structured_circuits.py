@@ -110,8 +110,11 @@ def gen_adder_stack(n: int, count: int, cls, rng) -> QuantumCircuit:
     return qc
 
 
-def build_all(per_variant: int):
-    """返回 [(name, logical_qc), ...]，name 已含族名/规模/种子。"""
+def build_all(per_variant: int, variant_offset: int = 0):
+    """返回 [(name, logical_qc), ...]，name 已含族名/规模/种子。
+
+    variant_offset：变体索引整体平移（held-out 用非零 offset 产出训练未见过的
+    新种子电路；默认 0 = 训练集行为）。"""
     import random
 
     out = []
@@ -121,7 +124,7 @@ def build_all(per_variant: int):
 
     # --- Toffoli 塔链 ---
     for n_q in range(5, 20):
-        for vi in range(max(2, per_variant // 2)):
+        for vi in range(variant_offset, variant_offset + max(2, per_variant // 2)):
             rng = random.Random(hash((n_q, vi)) & 0xFFFF)
             depth = rng.randint(4, max(5, 45 // max(1, n_q // 6)))
             add(f"tof_tower_{n_q}_{vi}", gen_tof_tower(n_q, depth, rng))
@@ -129,35 +132,35 @@ def build_all(per_variant: int):
     # --- 三类加法器 ---
     for n in range(2, 10):
         if 5 <= CDKMRippleCarryAdder(num_state_qubits=n).num_qubits <= 20:
-            for vi in range(per_variant):
+            for vi in range(variant_offset, variant_offset + per_variant):
                 add(f"cdkm_adder_{2*n+2}_{vi}", CDKMRippleCarryAdder(num_state_qubits=n))
     for n in range(2, 7):
         qn = VBERippleCarryAdder(num_state_qubits=n).num_qubits
         if 5 <= qn <= 20:
-            for vi in range(per_variant):
+            for vi in range(variant_offset, variant_offset + per_variant):
                 add(f"vbe_adder_{qn}_{vi}", VBERippleCarryAdder(num_state_qubits=n))
     for n in range(3, 11):
         qn = DraperQFTAdder(num_state_qubits=n).num_qubits
         if 5 <= qn <= 20:
-            for vi in range(max(1, per_variant // 2)):
+            for vi in range(variant_offset, variant_offset + max(1, per_variant // 2)):
                 add(f"draper_add_{qn}_{vi}", DraperQFTAdder(num_state_qubits=n))
 
     # --- QFT 乘法器 ---
     for n in range(2, 6):
         qn = RGQFTMultiplier(num_state_qubits=n).num_qubits
         if 5 <= qn <= 20:
-            for vi in range(per_variant):
+            for vi in range(variant_offset, variant_offset + per_variant):
                 add(f"rgqft_mult_{qn}_{vi}", RGQFTMultiplier(num_state_qubits=n))
 
     # --- GF(2) 乘法 ---
     for n in range(2, 6):
-        for vi in range(per_variant):
+        for vi in range(variant_offset, variant_offset + per_variant):
             add(f"gf2_mult_{4*n}_{vi}", gen_gf2_mult(n, __import__("random").Random(hash((n, vi)) & 0xFFFF)))
 
     # --- Grover ---
     for m in range(3, 9):
         for it in range(1, 4):
-            for vi in range(max(1, per_variant // 3)):
+            for vi in range(variant_offset, variant_offset + max(1, per_variant // 3)):
                 add(f"grover_{m}_{it}it_{vi}", gen_grover(m, it, __import__("random").Random(m * 7 + it)))
 
     # --- WeightedAdder ---
@@ -165,12 +168,12 @@ def build_all(per_variant: int):
         qn = k + 1
         if not (5 <= qn <= 20):
             continue
-        for vi in range(max(1, per_variant // 2)):
+        for vi in range(variant_offset, variant_offset + max(1, per_variant // 2)):
             add(f"wadd_{qn}_{vi}", WeightedAdder(num_state_qubits=k))
 
     # --- 随机置换网络 ---
     for n_q in range(6, 21, 2):
-        for vi in range(per_variant):
+        for vi in range(variant_offset, variant_offset + per_variant):
             rng = random.Random(hash((n_q, vi, "perm")) & 0xFFFF)
             perm = list(range(n_q))
             rng.shuffle(perm)
@@ -178,7 +181,7 @@ def build_all(per_variant: int):
 
     # --- 加法器级联 ---
     for n in range(3, 8):
-        for vi in range(max(1, per_variant // 3)):
+        for vi in range(variant_offset, variant_offset + max(1, per_variant // 3)):
             add(f"adder_stack_{n}_{vi}", gen_adder_stack(n, 3, CDKMRippleCarryAdder,
                                                          __import__("random").Random(n)))
 
@@ -190,6 +193,8 @@ def main():
     ap.add_argument("--out-dir", default="traindata/gen_structured")
     ap.add_argument("--per-variant", type=int, default=2,
                     help="每个(族,规模)组合的种子变体数；总电路数 ≈ 150×per_variant")
+    ap.add_argument("--variant-offset", type=int, default=0,
+                    help="变体索引平移（held-out 用非零值产出训练未见过的种子电路）")
     ap.add_argument("--max-gates", type=int, default=1500,
                     help="转译后门数上限（对齐 NAM max=831 与 episode 步数上限）")
     args = ap.parse_args()
@@ -197,7 +202,7 @@ def main():
     os.makedirs(args.out_dir, exist_ok=True)
     manifest = []
     kept = skipped_small = skipped_gates = 0
-    for name, qc in build_all(args.per_variant):
+    for name, qc in build_all(args.per_variant, args.variant_offset):
         try:
             tqc = transpile(qc, basis_gates=BASIS, optimization_level=0, seed_transpiler=0)
         except Exception as e:

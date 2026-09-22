@@ -1,0 +1,51 @@
+{
+ "circuit": "mixed_serial_parallel_5_1.qasm",
+ "model": "la287c_beam5la_bud_indist",
+ "num_logical_qubits": 5,
+ "num_physical_qubits": 20,
+ "topology": "tianyan287_20q",
+ "initial_layout": {
+  "0": 1,
+  "1": 2,
+  "2": 3,
+  "3": 0,
+  "4": 4
+ },
+ "routed_qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[20];\ncx q[4],q[1];\ncx q[1],q[3];\nswap q[3],q[1];\ncx q[1],q[0];\ncx q[0],q[2];\nswap q[4],q[1];\ncx q[4],q[2];\nrz(1.0344170242741086) q[2];\nswap q[4],q[1];\nswap q[7],q[4];\nswap q[4],q[1];\nswap q[4],q[1];\nswap q[7],q[4];\nswap q[3],q[1];\ncx q[1],q[0];\nrz(2.779933553032071) q[0];\nswap q[4],q[1];\nswap q[4],q[1];\nswap q[7],q[4];\nswap q[4],q[1];\nswap q[4],q[1];\nswap q[7],q[4];\nswap q[3],q[1];\ncx q[0],q[1];\nswap q[4],q[1];\ncx q[4],q[2];\nswap q[3],q[1];\nswap q[4],q[1];\ncx q[2],q[4];\nswap q[7],q[4];\ncx q[7],q[3];\nswap q[4],q[1];\ncx q[4],q[7];\nrz(0.9259893479146004) q[7];\ncx q[2],q[4];\nswap q[3],q[1];\ncx q[0],q[1];\nrz(0.879975626915699) q[1];\ncx q[4],q[1];\nswap q[4],q[1];\ncx q[4],q[7];\nswap q[4],q[1];\nswap q[7],q[4];\nswap q[4],q[1];\ncx q[1],q[0];\ncx q[4],q[1];\nrz(1.9632314375510973) q[1];\nswap q[7],q[4];\nswap q[1],q[0];\ncx q[4],q[1];\nrz(0.8520773646790221) q[1];\ncx q[0],q[1];\nswap q[7],q[4];\ncx q[1],q[4];\ncx q[0],q[1];\nrz(1.698018615515647) q[1];\ncx q[4],q[7];\nswap q[7],q[4];\ncx q[4],q[2];\ncx q[2],q[4];\nrz(0.020978993469390684) q[4];\ncx q[4],q[2];\nswap q[4],q[1];\nswap q[7],q[4];\ncx q[2],q[4];\ncx q[4],q[7];\ncx q[4],q[2];\nrz(1.2609883291903308) q[2];\nswap q[7],q[4];\nswap q[4],q[1];\ncx q[1],q[0];\nswap q[1],q[0];\ncx q[4],q[1];\nrz(2.8154643909370174) q[1];\ncx q[4],q[1];\nswap q[4],q[1];\ncx q[4],q[2];\ncx q[1],q[4];\nrz(2.518080735202272) q[4];\nswap q[7],q[4];\ncx q[2],q[4];\nswap q[4],q[2];\ncx q[2],q[0];\ncx q[2],q[4];\nrz(1.3395213100751029) q[4];\ncx q[7],q[4];\ncx q[4],q[1];\ncx q[4],q[7];\nrz(1.3182934951191503) q[7];\ncx q[1],q[0];\ncx q[4],q[1];\ncx q[0],q[2];\ncx q[2],q[0];\nrz(1.1284317563385395) q[0];\ncx q[1],q[0];\ncx q[0],q[2];\ncx q[1],q[0];\nrz(1.3581907369256079) q[0];\nswap q[7],q[4];\ncx q[2],q[4];\ncx q[4],q[7];\nrz(2.380060019054765) q[7];\nswap q[4],q[1];\ncx q[0],q[1];\nswap q[7],q[4];\ncx q[1],q[4];\ncx q[4],q[2];\ncx q[1],q[4];\nrz(2.3518184921964576) q[4];\nswap q[7],q[4];\ncx q[2],q[4];\nswap q[4],q[1];\ncx q[0],q[1];\nrz(1.5967665694657396) q[1];\ncx q[2],q[4];\ncx q[4],q[7];\nswap q[7],q[3];\ncx q[3],q[1];\ncx q[1],q[0];\ncx q[3],q[1];\nrz(1.5438892072024677) q[1];\ncx q[0],q[2];\nrz(0.23158420816350653) q[2];",
+ "num_swaps": 43,
+ "mapping_swaps": 4,
+ "completed": true,
+ "fidelity": null,
+ "final_layout": {
+  "0": 4,
+  "1": 3,
+  "2": 1,
+  "3": 0,
+  "4": 2
+ },
+ "wall_time_ms": 621.9,
+ "from_0_19": {
+  "0": "Q23",
+  "1": "Q29",
+  "2": "Q30",
+  "3": "Q36",
+  "4": "Q37",
+  "5": "Q38",
+  "6": "Q43",
+  "7": "Q44",
+  "8": "Q45",
+  "9": "Q46",
+  "10": "Q50",
+  "11": "Q51",
+  "12": "Q52",
+  "13": "Q53",
+  "14": "Q57",
+  "15": "Q58",
+  "16": "Q59",
+  "17": "Q65",
+  "18": "Q66",
+  "19": "Q73"
+ },
+ "sabre_budget": 24,
+ "lambda_budget": 1.8
+}

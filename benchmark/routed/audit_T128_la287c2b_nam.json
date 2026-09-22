@@ -1,0 +1,458 @@
+[
+ {
+  "method": "SABRE",
+  "circuit": "barenco_tof_10.qasm",
+  "swaps": 85,
+  "T": 128,
+  "fid": 0.03144839179377527,
+  "sec": 33.1
+ },
+ {
+  "method": "la287c2b",
+  "circuit": "barenco_tof_10.qasm",
+  "swaps": 157,
+  "T": 128,
+  "fid": 0.028763474996955394,
+  "sec": 39.6
+ },
+ {
+  "method": "la287c2b_beam",
+  "circuit": "barenco_tof_10.qasm",
+  "swaps": 249,
+  "T": 128,
+  "fid": 0.022510859321086586,
+  "sec": 97.4
+ },
+ {
+  "method": "SABRE",
+  "circuit": "barenco_tof_3.qasm",
+  "swaps": 5,
+  "T": 128,
+  "fid": 0.7270640272466826,
+  "sec": 0.0
+ },
+ {
+  "method": "la287c2b",
+  "circuit": "barenco_tof_3.qasm",
+  "swaps": 11,
+  "T": 128,
+  "fid": 0.6396984873522454,
+  "sec": 0.0
+ },
+ {
+  "method": "la287c2b_beam",
+  "circuit": "barenco_tof_3.qasm",
+  "swaps": 10,
+  "T": 128,
+  "fid": 0.6677636692325428,
+  "sec": 0.0
+ },
+ {
+  "method": "SABRE",
+  "circuit": "barenco_tof_4.qasm",
+  "swaps": 21,
+  "T": 128,
+  "fid": 0.395221941015988,
+  "sec": 0.5
+ },
+ {
+  "method": "la287c2b",
+  "circuit": "barenco_tof_4.qasm",
+  "swaps": 18,
+  "T": 128,
+  "fid": 0.4083472445720044,
+  "sec": 0.1
+ },
+ {
+  "method": "la287c2b_beam",
+  "circuit": "barenco_tof_4.qasm",
+  "swaps": 37,
+  "T": 128,
+  "fid": 0.3724476691126061,
+  "sec": 0.1
+ },
+ {
+  "method": "SABRE",
+  "circuit": "barenco_tof_5.qasm",
+  "swaps": 34,
+  "T": 128,
+  "fid": 0.2826278865620469,
+  "sec": 2.7
+ },
+ {
+  "method": "la287c2b",
+  "circuit": "barenco_tof_5.qasm",
+  "swaps": 42,
+  "T": 128,
+  "fid": 0.2119664809186234,
+  "sec": 0.4
+ },
+ {
+  "method": "la287c2b_beam",
+  "circuit": "barenco_tof_5.qasm",
+  "swaps": 70,
+  "T": 128,
+  "fid": 0.19803796342683036,
+  "sec": 1.0
+ },
+ {
+  "method": "SABRE",
+  "circuit": "csla_mux_3.qasm",
+  "swaps": 39,
+  "T": 128,
+  "fid": 0.2828688626233963,
+  "sec": 3.6
+ },
+ {
+  "method": "la287c2b",
+  "circuit": "csla_mux_3.qasm",
+  "swaps": 67,
+  "T": 128,
+  "fid": 0.14138786236871573,
+  "sec": 2.3
+ },
+ {
+  "method": "la287c2b_beam",
+  "circuit": "csla_mux_3.qasm",
+  "swaps": 95,
+  "T": 128,
+  "fid": 0.1373201938783341,
+  "sec": 29.7
+ },
+ {
+  "method": "SABRE",
+  "circuit": "gf2^4_mult.qasm",
+  "swaps": 41,
+  "T": 128,
+  "fid": 0.11178079056957907,
+  "sec": 6.7
+ },
+ {
+  "method": "la287c2b",
+  "circuit": "gf2^4_mult.qasm",
+  "swaps": 68,
+  "T": 128,
+  "fid": 0.11702833364961548,
+  "sec": 3.9
+ },
+ {
+  "method": "la287c2b_beam",
+  "circuit": "gf2^4_mult.qasm",
+  "swaps": 113,
+  "T": 128,
+  "fid": 0.07172208557769591,
+  "sec": 20.1
+ },
+ {
+  "method": "SABRE",
+  "circuit": "gf2^5_mult.qasm",
+  "swaps": 71,
+  "T": 128,
+  "fid": 0.028581608239676363,
+  "sec": 6.6
+ },
+ {
+  "method": "la287c2b",
+  "circuit": "gf2^5_mult.qasm",
+  "swaps": 144,
+  "T": 128,
+  "fid": 0.05000521065106129,
+  "sec": 51.6
+ },
+ {
+  "method": "la287c2b_beam",
+  "circuit": "gf2^5_mult.qasm",
+  "swaps": 220,
+  "T": 128,
+  "fid": 0.03075513574539621,
+  "sec": 10.6
+ },
+ {
+  "method": "SABRE",
+  "circuit": "gf2^6_mult.qasm",
+  "swaps": 109,
+  "T": 128,
+  "fid": 0.03437278099883836,
+  "sec": 18.8
+ },
+ {
+  "method": "la287c2b",
+  "circuit": "gf2^6_mult.qasm",
+  "swaps": 208,
+  "T": 128,
+  "fid": 0.03601560532138172,
+  "sec": 48.1
+ },
+ {
+  "method": "la287c2b_beam",
+  "circuit": "gf2^6_mult.qasm",
+  "swaps": 335,
+  "T": 128,
+  "fid": 0.042304699261498976,
+  "sec": 59.8
+ },
+ {
+  "method": "SABRE",
+  "circuit": "grover_5.qasm",
+  "swaps": 129,
+  "T": 128,
+  "fid": 0.0005962638878880403,
+  "sec": 3.0
+ },
+ {
+  "method": "la287c2b",
+  "circuit": "grover_5.qasm",
+  "swaps": 193,
+  "T": 128,
+  "fid": 0.0002551047682683241,
+  "sec": 3.5
+ },
+ {
+  "method": "la287c2b_beam",
+  "circuit": "grover_5.qasm",
+  "swaps": 244,
+  "T": 128,
+  "fid": 0.0004589306984073258,
+  "sec": 3.8
+ },
+ {
+  "method": "SABRE",
+  "circuit": "hwb6.qasm",
+  "swaps": 47,
+  "T": 128,
+  "fid": 0.007911493577611924,
+  "sec": 0.3
+ },
+ {
+  "method": "la287c2b",
+  "circuit": "hwb6.qasm",
+  "swaps": 994,
+  "T": 0,
+  "fid": 0.0,
+  "truncated": true
+ },
+ {
+  "method": "la287c2b_beam",
+  "circuit": "hwb6.qasm",
+  "swaps": 155,
+  "T": 128,
+  "fid": 0.014879506120527863,
+  "sec": 3.4
+ },
+ {
+  "method": "SABRE",
+  "circuit": "mod5_4.qasm",
+  "swaps": 11,
+  "T": 128,
+  "fid": 0.629693017110248,
+  "sec": 0.0
+ },
+ {
+  "method": "la287c2b",
+  "circuit": "mod5_4.qasm",
+  "swaps": 15,
+  "T": 128,
+  "fid": 0.5188706760175243,
+  "sec": 0.0
+ },
+ {
+  "method": "la287c2b_beam",
+  "circuit": "mod5_4.qasm",
+  "swaps": 12,
+  "T": 128,
+  "fid": 0.5836311842183032,
+  "sec": 0.0
+ },
+ {
+  "method": "SABRE",
+  "circuit": "mod_mult_55.qasm",
+  "swaps": 25,
+  "T": 128,
+  "fid": 0.12303196059230084,
+  "sec": 1.0
+ },
+ {
+  "method": "la287c2b",
+  "circuit": "mod_mult_55.qasm",
+  "swaps": 21,
+  "T": 128,
+  "fid": 0.13332650339983337,
+  "sec": 0.2
+ },
+ {
+  "method": "la287c2b_beam",
+  "circuit": "mod_mult_55.qasm",
+  "swaps": 46,
+  "T": 128,
+  "fid": 0.07265156336131003,
+  "sec": 0.7
+ },
+ {
+  "method": "SABRE",
+  "circuit": "mod_red_21.qasm",
+  "swaps": 46,
+  "T": 128,
+  "fid": 0.08050037451608982,
+  "sec": 16.1
+ },
+ {
+  "method": "la287c2b",
+  "circuit": "mod_red_21.qasm",
+  "swaps": 992,
+  "T": 0,
+  "fid": 0.0,
+  "truncated": true
+ },
+ {
+  "method": "la287c2b_beam",
+  "circuit": "mod_red_21.qasm",
+  "swaps": 994,
+  "T": 0,
+  "fid": 0.0,
+  "truncated": true
+ },
+ {
+  "method": "SABRE",
+  "circuit": "rc_adder_6.qasm",
+  "swaps": 44,
+  "T": 128,
+  "fid": 0.08262796517516934,
+  "sec": 24.4
+ },
+ {
+  "method": "la287c2b",
+  "circuit": "rc_adder_6.qasm",
+  "swaps": 81,
+  "T": 128,
+  "fid": 0.04918237050728465,
+  "sec": 33.5
+ },
+ {
+  "method": "la287c2b_beam",
+  "circuit": "rc_adder_6.qasm",
+  "swaps": 116,
+  "T": 128,
+  "fid": 0.037967017353479314,
+  "sec": 36.5
+ },
+ {
+  "method": "SABRE",
+  "circuit": "tof_10.qasm",
+  "swaps": 49,
+  "T": 128,
+  "fid": 0.140273185901286,
+  "sec": 19.0
+ },
+ {
+  "method": "la287c2b",
+  "circuit": "tof_10.qasm",
+  "swaps": 87,
+  "T": 128,
+  "fid": 0.14467888425729666,
+  "sec": 22.7
+ },
+ {
+  "method": "la287c2b_beam",
+  "circuit": "tof_10.qasm",
+  "swaps": 143,
+  "T": 128,
+  "fid": 0.08338479915618105,
+  "sec": 28.3
+ },
+ {
+  "method": "SABRE",
+  "circuit": "tof_3.qasm",
+  "swaps": 8,
+  "T": 128,
+  "fid": 0.7152048873609328,
+  "sec": 0.0
+ },
+ {
+  "method": "la287c2b",
+  "circuit": "tof_3.qasm",
+  "swaps": 9,
+  "T": 128,
+  "fid": 0.7157072152924021,
+  "sec": 0.0
+ },
+ {
+  "method": "la287c2b_beam",
+  "circuit": "tof_3.qasm",
+  "swaps": 12,
+  "T": 128,
+  "fid": 0.6844308302768982,
+  "sec": 0.0
+ },
+ {
+  "method": "SABRE",
+  "circuit": "tof_4.qasm",
+  "swaps": 14,
+  "T": 128,
+  "fid": 0.4758046757625264,
+  "sec": 0.1
+ },
+ {
+  "method": "la287c2b",
+  "circuit": "tof_4.qasm",
+  "swaps": 14,
+  "T": 128,
+  "fid": 0.5519463234879475,
+  "sec": 0.2
+ },
+ {
+  "method": "la287c2b_beam",
+  "circuit": "tof_4.qasm",
+  "swaps": 18,
+  "T": 128,
+  "fid": 0.5793016975310322,
+  "sec": 0.1
+ },
+ {
+  "method": "SABRE",
+  "circuit": "tof_5.qasm",
+  "swaps": 21,
+  "T": 128,
+  "fid": 0.402037145753426,
+  "sec": 0.4
+ },
+ {
+  "method": "la287c2b",
+  "circuit": "tof_5.qasm",
+  "swaps": 26,
+  "T": 128,
+  "fid": 0.3304553636155616,
+  "sec": 0.2
+ },
+ {
+  "method": "la287c2b_beam",
+  "circuit": "tof_5.qasm",
+  "swaps": 25,
+  "T": 128,
+  "fid": 0.4422811689831756,
+  "sec": 0.5
+ },
+ {
+  "method": "SABRE",
+  "circuit": "vbe_adder_3.qasm",
+  "swaps": 28,
+  "T": 128,
+  "fid": 0.2932097301795845,
+  "sec": 4.6
+ },
+ {
+  "method": "la287c2b",
+  "circuit": "vbe_adder_3.qasm",
+  "swaps": 47,
+  "T": 128,
+  "fid": 0.2025401626205079,
+  "sec": 0.7
+ },
+ {
+  "method": "la287c2b_beam",
+  "circuit": "vbe_adder_3.qasm",
+  "swaps": 67,
+  "T": 128,
+  "fid": 0.17090902723911255,
+  "sec": 1.7
+ }
+]

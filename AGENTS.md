@@ -10,6 +10,7 @@ and PPO with SABRE-inspired features, distance reward, deadlock masking, and bea
 - **每次跑完实验后，必须将实验结果写入 `doc/train.md`**：包括训练/评估命令、设置、关键日志摘要、评估结果表格以及结论与分析，按时间顺序追加到该文件末尾，并保持现有格式风格（`---` 分节、中文描述、代码块命令、markdown 表格）。
 - **所有训练必须在 `tmux` 会话中后台进行**：使用 `tmux new -s <会话名>` 启动（或用 `tmux attach -t <会话名>` 恢复），训练命令在会话内运行，避免终端断开导致训练中断。
 - **评估基线只保留 SABRE**：对比测试一律使用 `--baselines --no-greedy --no-random`（不考虑 greedy 与 random 算法），仅与 SABRE 对比。
+- **汇总实验结果前必须先简介被测模型配置**：每次在 `doc/train.md`（或对话中）汇总评估结果时，先用一小节简要介绍被测模型的训练配置——底座拓扑、续训来源（`--load` 自哪个模型）、关键机制与超参（如 layout-mix 比例、蒸馏 λ_d、`swap-price-scale`、TRUNC 门数化、reward-potential/shaping 参数等），再给出结果表格，保证结果可独立解读。
 
 ## Language / Framework / Package Manager
 

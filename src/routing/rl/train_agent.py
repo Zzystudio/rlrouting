@@ -5,6 +5,7 @@ import ast
 import copy
 import csv
 import json
+import math
 import os
 import pickle
 import random
@@ -222,11 +223,32 @@ def pick_circuit_with_nam(args, split_key, split_prefix, split_map, total_steps,
                                   max_qubits=topo_qubits[topo_idx])
 
 
+def _normalize_sabre_cache(data: dict) -> dict:
+    """兼容旧格式 {topo: {rel: [layout]}} → 新格式 {topo: {rel: {"layout":..,"swaps":..}}。"""
+    for ti, sub in data.items():
+        for k, v in list(sub.items()):
+            if isinstance(v, (list, tuple)):
+                sub[k] = {"layout": list(v), "swaps": None}
+    return data
+
+
+def _extract_swap_schedule(phys) -> list:
+    """从 sabre_route 返回的物理电路中按顺序提取 SWAP 边序列（物理索引对）。"""
+    swaps = []
+    if phys is None:
+        return swaps
+    for inst, qargs, _cargs in phys.data:
+        if inst.name == "swap" and qargs:
+            swaps.append((qargs[0]._index, qargs[1]._index))
+    return swaps
+
+
 def _build_sabre_layout_cache(args, topo_list) -> dict:
     """预计算训练池中每个电路在各拓扑下的 SABRE 初始布局。
 
-    返回 {topo_idx: {rel_path: [phys_idx, ...]}}。布局是免费的初始映射
-    （虚拟重标号），用于训练期 'sabre' 布局混合，迫使策略学习布局无关路由。
+    返回 {topo_idx: {rel_path: {"layout": [phys_idx,...], "swaps": [(p,q),...]}}}。
+    布局是免费的初始映射（虚拟重标号），用于训练期 'sabre' 布局混合，迫使策略
+    学习布局无关路由；swaps 是 SABRE 示范蒸馏（--sabre-demo-lambda）的换手序列。
     """
     from routing.routing import sabre_route
 
@@ -237,11 +259,22 @@ def _build_sabre_layout_cache(args, topo_list) -> dict:
     }[args.reward_mode]
     split_names = [f"{prefix}_phase1", f"{prefix}_phase2", f"{prefix}_phase3"]
 
+    need_schedule = getattr(args, "sabre_demo_lambda", 0.0) > 0
+
     # 缓存可复用：从文件加载或构建后保存
     if args.sabre_cache_file and os.path.exists(args.sabre_cache_file):
         with open(args.sabre_cache_file, "rb") as f:
-            print(f"[sabre-cache] 复用缓存 {args.sabre_cache_file}")
-            return pickle.load(f)
+            data = _normalize_sabre_cache(pickle.load(f))
+        has_schedule = any(
+            (entry is not None and isinstance(entry, dict)
+             and entry.get("swaps")) or False
+            for sub in data.values() for entry in sub.values())
+        if not (need_schedule and not has_schedule):
+            print(f"[sabre-cache] 复用缓存 {args.sabre_cache_file}"
+                  + ("" if not need_schedule else "（含换手序列）"))
+            return data
+        print(f"[sabre-cache] demo 需换手序列但缓存为旧格式，重建 "
+              f"{args.sabre_cache_file}")
 
     rels = set()
     for sn in split_names:
@@ -259,19 +292,56 @@ def _build_sabre_layout_cache(args, topo_list) -> dict:
             try:
                 with open(full, "rb") as f:
                     qc = pickle.load(f)
-                _, info = sabre_route(
+                phys, info = sabre_route(
                     qc, config, heuristic="decay",
                     swap_trials=args.sabre_layout_trials, seed=args.seed,
                 )
-                cache[topo_idx][rel] = info.get("initial_layout")
+                cache[topo_idx][rel] = {
+                    "layout": info.get("initial_layout"),
+                    "swaps": _extract_swap_schedule(phys),
+                }
             except Exception as e:
                 print(f"[sabre-cache] 跳过 {rel} (topo{topo_idx}): {e}")
+
+    # 扩展：覆盖 --nam-circuits-dir 的 QASM 电路（20260917 B1：layout-mix
+    # 需覆盖 QASM 训练分布，否则 nam 分支缓存缺失退化恒等，mix 不生效）
+    if getattr(args, "nam_circuits_dir", None):
+        from qiskit.qasm2 import loads as _qasm_load
+        for _qd in args.nam_circuits_dir.split(","):
+            _qd = _qd.strip()
+            if not _qd or not os.path.isdir(_qd):
+                continue
+            for _f in sorted(os.listdir(_qd)):
+                if not _f.endswith(".qasm"):
+                    continue
+                _key = f"nam/{_f.removesuffix('.qasm')}"
+                for _ti in range(len(topo_list)):
+                    if _key in cache[_ti]:
+                        continue
+                    try:
+                        with open(os.path.join(_qd, _f)) as _fh:
+                            _qc_q = _qasm_load(_fh.read())
+                        _phys, _si = sabre_route(_qc_q, topo_list[_ti][0],
+                                                 swap_trials=args.sabre_layout_trials,
+                                                 seed=args.seed)
+                        _il = _si.get("initial_layout")
+                        if _il is not None:
+                            cache[_ti][_key] = {
+                                "layout": list(_il),
+                                "swaps": _extract_swap_schedule(_phys),
+                            }
+                    except Exception as _e:
+                        print(f"[sabre-cache] 跳过 {_key} (topo{_ti}): {_e}",
+                              flush=True)
+        _n_qasm = sum(1 for ti in range(len(topo_list))
+                      for k in cache[ti] if k.startswith("nam/"))
+        print(f"[sabre-cache] QASM 电路布局扩展: {_n_qasm} 条")
 
     if args.sabre_cache_file:
         os.makedirs(os.path.dirname(args.sabre_cache_file) or ".", exist_ok=True)
         with open(args.sabre_cache_file, "wb") as f:
             pickle.dump(cache, f)
-        print(f"[sabre-cache] 保存 {len(rels)} 条缓存 -> {args.sabre_cache_file}")
+        print(f"[sabre-cache] 保存 {sum(len(v) for v in cache.values())} 条缓存 -> {args.sabre_cache_file}")
     return cache
 
 
@@ -383,7 +453,7 @@ def _eval_ema(agent, eval_circuits, args, gnn, use_gnn, max_edges, topo_list):
                 deterministic=True, seed=0,
                 noise_config=noise_config if args.reward_mode != "routing" else None,
                 max_num_qubits=args.eval_max_qubits,
-                use_scheduler=(args.use_scheduler or args.fidelity_sim in ("trajectory_sched", "trajectory_v2")),
+                use_scheduler=(args.use_scheduler or args.fidelity_sim in ("trajectory_sched", "trajectory_v2", "trajectory_v3")),
                 eta_time=args.eta_time,
                 eta_xtalk_par=args.eta_xtalk_par,
                 eta_idle=args.eta_idle,
@@ -427,7 +497,10 @@ def _parse_sabre_fid_map(spec: Optional[str]) -> dict:
     return out
 
 
-def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_init, seed, gnn=None, use_gnn=True, max_num_edges=None, max_num_qubits=None, noise_config=None, lambda_fid=None, eta_dist=None, mapping_budget=None, mapping_phase=True, fidelity_fn=None, use_scheduler=None, eta_time=None, eta_xtalk_par=None, eta_idle=None, eta_parallel=None, xtalk_alpha=None, swap_duration=None, swap_cost=None, eta_swap_err=None, eta_err=None, reward_potential=None, eta_xtalk=None, unfinished_penalty=None, gate_base_cx=None, gate_base_1q=None, shaping_gamma=None, eta_shape=None, alpha_ext=None, no_progress_limit=None, lookahead_features=None, init_mapping=None, lambda_layout=None, sabre_fid_map=None, sref_override=None, edge_noise_features=None, beta_noise=None, w_err=None, w_xt=None, w_xt_swap=None, pot_progress_b=None, pot_1q_reward=None, lambda_budget=None, budget_delta=None, sabre_swap_budget=None):
+def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_init, seed, gnn=None, use_gnn=True, max_num_edges=None, max_num_qubits=None, noise_config=None, lambda_fid=None, eta_dist=None, mapping_budget=None, mapping_phase=True, fidelity_fn=None, use_scheduler=None, eta_time=None, eta_xtalk_par=None, eta_idle=None, eta_parallel=None, xtalk_alpha=None, swap_duration=None, swap_cost=None, eta_swap_err=None, eta_err=None, reward_potential=None, eta_xtalk=None, unfinished_penalty=None, gate_base_cx=None, gate_base_1q=None, shaping_gamma=None, eta_shape=None, alpha_ext=None, no_progress_limit=None, lookahead_features=None, init_mapping=None, lambda_layout=None, sabre_fid_map=None, sref_override=None, edge_noise_features=None, beta_noise=None, w_err=None, w_xt=None, w_xt_swap=None, pot_progress_b=None, pot_1q_reward=None, lambda_budget=None, budget_delta=None, sabre_swap_budget=None,
+                    swap_price_scale=None, step_cap_mult=None,
+                    clocked=False, max_ready=None, w_xt_launch=None,
+                    w_zz=None, eta_ao=None, step_cap_factor=None):
     kw = dict(
         dag=dag, hw=hw, coupling_map=coupling_map,
         reward_mode=reward_mode,
@@ -524,9 +597,25 @@ def create_env(dag, hw, coupling_map, reward_mode, max_episode_steps, random_ini
         kw["lambda_budget"] = lambda_budget
     if sabre_swap_budget is not None:
         kw["sabre_swap_budget"] = sabre_swap_budget
+    if swap_price_scale is not None:
+        kw["swap_price_scale"] = swap_price_scale
+    if step_cap_mult is not None:
+        kw["step_cap_mult"] = step_cap_mult
     kw["mapping_phase"] = mapping_phase
+    if clocked:
+        from routing.rl.env_clocked import ClockedRoutingEnv
+        if max_ready is not None:
+            kw["max_ready"] = max_ready
+        if w_xt_launch is not None:
+            kw["w_xt_launch"] = w_xt_launch
+        if w_zz is not None:
+            kw["w_zz"] = w_zz
+        if eta_ao is not None:
+            kw["eta_ao"] = eta_ao
+        if step_cap_factor is not None:
+            kw["step_cap_factor"] = step_cap_factor
+        return ClockedRoutingEnv(**kw)
     return RoutingEnv(**kw)
-
 
 def build_fidelity_fn(fidelity_sim: str, noise_config, num_trajectories: int = 64, seed=None,
                       analytic_thermal: bool = True, analytic_crosstalk: bool = False,
@@ -551,6 +640,11 @@ def build_fidelity_fn(fidelity_sim: str, noise_config, num_trajectories: int = 6
         from sim.trajectory_sim_v2 import make_event_fidelity_fn
         return make_event_fidelity_fn(noise_config, num_trajectories=num_trajectories,
                                       seed=seed, backend=backend)
+    if fidelity_sim == "trajectory_v3":
+        from sim.trajectory_sim_v3 import make_event_fidelity_fn_v3
+        return make_event_fidelity_fn_v3(noise_config,
+                                         num_trajectories=num_trajectories,
+                                         seed=seed, backend=backend)
     if fidelity_sim == "analytic":
         from sim.trajectory_sim import make_analytic_fidelity_fn
         return make_analytic_fidelity_fn(noise_config, include_thermal=analytic_thermal,
@@ -701,6 +795,29 @@ def main():
                         help="奖励模式")
     parser.add_argument("--max-episode-steps", type=int, default=200,
                         help="每个 episode 的最大步数（超时截断）")
+    parser.add_argument("--clocked", action="store_true", default=False,
+                        help="时钟化动作空间（doc/20260920训练方案.md）："
+                             "词表 [E SWAP | K EXEC | commit | skip]，事件时间")
+    parser.add_argument("--max-ready-2q", type=int, default=24,
+                        help="时钟化 EXEC 候选槽位数 K（priority-K，pad+mask）")
+    parser.add_argument("--w-xt-launch", type=float, default=0.0,
+                        help="时钟化边际 ZZ 价（Step 0 v3 审计标定）")
+    parser.add_argument("--w-zz", type=float, default=0.0,
+                        help="时钟化静态 ZZ 价（Step 0 v3 审计标定）")
+    parser.add_argument("--eta-ao", type=float, default=0.0,
+                        help="always-on ZZ 价（与模拟器 always_on_zz 联动，默认关）")
+    parser.add_argument("--step-cap-factor", type=float, default=2.0,
+                        help="时钟化步数上限系数（相对门数，默认 2.0）")
+    parser.add_argument("--freeze-edge-gnn", action="store_true", default=False,
+                        help="C0：冻结 GNN + edge 头，只训 gate/skip/critic")
+    parser.add_argument("--edge-anchor-lambda", type=float, default=0.0,
+                        help="C1b：edge 头 + GNN 的 L2 锚定权重（防解冻漂移，"
+                             "锚 = 载入时 LA287core 初值）")
+    parser.add_argument("--routing-mimic", action="store_true", default=False,
+                        help="路由头用特征驱动 SABRE 模仿（argmin sabre_core，"
+                             "确定性、零训练、t287 平价）；RL 只学 EXEC/SKIP 调度")
+    parser.add_argument("--bc-warmup-steps", type=int, default=0,
+                        help="C0 前置：auto-batch 示范蒸馏步数（gate/skip 头 BC）")
     parser.add_argument("--random-init", action=argparse.BooleanOptionalAction,
                         default=False,
                         help="是否随机化初始映射")
@@ -794,6 +911,13 @@ def main():
                         help="噪声项渐入比例（占训练进度；0=立即满值）。两阶段奖励课程："
                              "progress 达该比例前 swap_cost/eta_swap_err/eta_err/"
                              "eta_xtalk_par 从 0 线性升至目标值——先路由能力后噪声感知")
+    parser.add_argument("--noise-scale", type=float, default=1.0,
+                        help="噪声项总乘性比例（E16 两阶段：阶段 A 用 0.05≈纯效率路由，"
+                             "阶段 B 用 1.0 恢复）。乘性作用于势函数噪声项 w_err/w_xt/"
+                             "w_xt_swap/eta_xtalk_par/eta_swap_err/eta_err/swap_cost——"
+                             "与 --noise-ramp 的进度爬升正交")
+    parser.add_argument("--edge-hidden", type=int, default=64,
+                        help="edge_mlp 首层隐藏宽度（E17 容量升级：64→128）")
     parser.add_argument("--lookahead-features", action=argparse.BooleanOptionalAction,
                         default=None,
                         help="R5a 并发/前瞻观测特征开关（默认 None=开启；"
@@ -821,7 +945,14 @@ def main():
                              "消除 ~60%% 策略不可控事件流）")
     parser.add_argument("--lambda-budget", type=float, default=0.0,
                         help="P1-a SABRE SWAP 预算锚：超出预算后每颗额外 SWAP 罚"
-                             "（0=关；建议 0.5）")
+                             "（0=关；建议 0.5；20260917 审计校准值 1.8）")
+    parser.add_argument("--swap-price-scale", type=float, default=1.0,
+                        help="potential 模式 SWAP 边际价格缩放（20260917 审计："
+                             "奖励把 SWAP 低估 ~4.6×，校准值 4.6；默认 1.0=历史口径）")
+    parser.add_argument("--swap-price-ramp", type=float, default=0.0,
+                        help="价格渐入：占训练进度比例 R，scale/λ_budget 从旧值"
+                             "线性爬升到目标值（0=立即满值；校准续训建议 0.4——"
+                             "×4.6 价格跳变会导致熵塌缩+KL 爆炸，实测教训）")
     parser.add_argument("--budget-delta", type=float, default=1.05,
                         help="P1-a 预算膨胀系数 δ（budget=ceil(δ×SABRE swaps)）")
     parser.add_argument("--noise-hetero", type=str, default=None,
@@ -864,7 +995,7 @@ def main():
                         help="逗号分隔的 split prefix 列表，按训练进度从小规模到大规模递进 "
                              "(如 large_n10,large_n20,tianyan；默认单 prefix)")
     parser.add_argument("--fidelity-sim", type=str, default="aer",
-                        choices=["aer", "trajectory", "trajectory_sched", "trajectory_v2", "analytic"],
+                        choices=["aer", "trajectory", "trajectory_sched", "trajectory_v2", "trajectory_v3", "analytic"],
                         help="终端保真度模拟器: aer=density_matrix/counts (小比特数), "
                              "trajectory=轨迹状态向量(串行, O(2^n) 内存), "
                              "trajectory_sched=轨迹状态向量+调度感知(空闲退相干/动态串扰, 需 --use-scheduler), "
@@ -877,6 +1008,39 @@ def main():
     parser.add_argument("--sim-device", type=str, default="cpu",
                         help="轨迹模拟器后端（cpu/cuda/cuda:N/auto；默认 cpu=历史口径）。"
                              "v3 噪声训练建议 --sim-device cuda（20q fidelity 提速 ~10-50x）")
+    # ---- 训练期 beam lookahead（doc/20260916训练方案.md v2）----
+    parser.add_argument("--la-beam", type=int, default=0,
+                        help="训练期 beam expectimax 宽度（0=关；建议 3）")
+    parser.add_argument("--la-depth", type=int, default=2,
+                        help="beam expectimax 展开深度（默认 2）")
+    parser.add_argument("--la-interval", type=int, default=4,
+                        help="每 N 个 routing 步一个 LA anchor（默认 4；吞吐超 4x 时调 8）")
+    parser.add_argument("--la-max-anchors", type=int, default=64,
+                        help="每 episode 的 LA anchor 上限（默认 64）")
+    parser.add_argument("--la-vf-coef", type=float, default=0.1,
+                        help="V_LA expectimax 回归 loss 权重（默认 0.1）")
+    parser.add_argument("--la-raw-target", action="store_true",
+                        help="V_LA 回归原始尺度 la_val（20260917 A2：batch 归一化"
+                             "使 γ 折扣语义失效，×4.6 价格下放大——校准续训必须开）")
+    parser.add_argument("--la-distill-lambda", type=float, default=0.0,
+                        help="beam 选择蒸馏强度 λ_d：L += λ_d·(−log π(la_act|s))"
+                             "（0=关；v2 建议 0.5）")
+    parser.add_argument("--la-distill-ramp", type=float, default=0.6,
+                        help="λ_d 渐入：占训练进度比例，进度达该比例时爬满")
+    parser.add_argument("--sabre-demo-lambda", type=float, default=0.0,
+                        help="SABRE 示范蒸馏强度 λ_s：L += λ_s·(−log π(a_sabre|s))"
+                             "（0=关；批效率老师，demo 回合强制沿 SABRE 换手序列"
+                             "执行，仅路由期标签，off-policy 仅用于 BC）")
+    parser.add_argument("--sabre-demo-prob", type=float, default=0.15,
+                        help="每 episode 进入 demo 回合（强制 SABRE 布局+动作）的概率")
+    parser.add_argument("--sabre-demo-ramp", type=float, default=0.6,
+                        help="λ_s 渐入：占训练进度比例（同 λ_d ramp 语义）")
+    parser.add_argument("--step-cap-mult", type=float, default=2.0,
+                        help="动态步数上限的门数乘数（TRUNC 门数化，20260917："
+                             "1.2 = 完成解 p90 的 1.8 倍余量；默认 2.0=历史口径）")
+    parser.add_argument("--no-progress-gates-div", type=int, default=0,
+                        help="反游走门数化：no_progress = max(20, gates/D)"
+                             "（0=用 --no-progress-limit 固定值；建议 D=16）")
     parser.add_argument("--analytic-thermal", action="store_true", default=True,
                         help="解析保真度代理包含热弛豫（idle 退相干）项")
     parser.add_argument("--no-analytic-thermal", dest="analytic_thermal", action="store_false",
@@ -1035,7 +1199,7 @@ def main():
                       eta_dist=args.eta_dist,
                       mapping_budget=args.mapping_budget,
                       mapping_phase=args.mapping_phase,
-                       use_scheduler=(args.use_scheduler or args.fidelity_sim in ("trajectory_sched", "trajectory_v2")),
+                       use_scheduler=(args.use_scheduler or args.fidelity_sim in ("trajectory_sched", "trajectory_v2", "trajectory_v3")),
                        eta_time=args.eta_time,
                                     eta_xtalk_par=args.eta_xtalk_par,
                                     eta_idle=args.eta_idle,
@@ -1063,19 +1227,50 @@ def main():
                                       pot_progress_b=args.pot_progress_b,
                                       pot_1q_reward=args.pot_1q_reward,
                                       lambda_budget=args.lambda_budget,
+                                      swap_price_scale=args.swap_price_scale,
+                                      step_cap_mult=args.step_cap_mult,
                                       init_mapping=None,
                                       lambda_layout=args.lambda_layout,
-                         fidelity_fn=build_fidelity_fn(
+                          fidelity_fn=build_fidelity_fn(
                            args.fidelity_sim, noise_config,
                           num_trajectories=args.traj_trajectories, seed=args.traj_seed,
                           analytic_thermal=args.analytic_thermal,
                           analytic_crosstalk=args.analytic_crosstalk,
                           backend=args.sim_device,
-                      ) if args.reward_mode != "routing" else None)
+                      ) if args.reward_mode != "routing" else None,
+                      clocked=args.clocked,
+                      max_ready=args.max_ready_2q,
+                      w_xt_launch=args.w_xt_launch,
+                      w_zz=args.w_zz,
+                      eta_ao=args.eta_ao,
+                      step_cap_factor=args.step_cap_factor)
 
     agent_n_qubits = args.max_num_qubits or sample_dag.num_logical_qubits
     agent_action_dim = max_edges + (1 if args.mapping_phase else 0)
-    agent = PPOAgent(
+    if args.clocked:
+        from routing.rl.agent_clocked import ClockedPPOAgent, D_EXEC, D_TIMING_GLOB
+        agent = ClockedPPOAgent(
+            obs_dim=int(np.prod(env.observation_space.shape)),
+            action_dim=env.action_space.n,
+            num_qubits=agent_n_qubits,
+            num_edges=max_edges,
+            max_ready=args.max_ready_2q,
+            edge_feat_dim=int(getattr(env, "_edge_feat_dim", 0)),
+            exec_feat_dim=D_EXEC,
+            timing_glob_dim=D_TIMING_GLOB,
+            lr=args.lr,
+            device=args.device,
+            gnn=shared_gnn,
+            coupling_map=coupling_map,
+            vf_coef=args.vf_coef,
+            with_commit=args.mapping_phase,
+            lambda_v_fid=args.lambda_v_fid,
+            with_la_head=False,
+            edge_hidden=args.edge_hidden,
+            edge_anchor_lambda=args.edge_anchor_lambda,
+        )
+    else:
+        agent = PPOAgent(
         obs_dim=int(np.prod(env.observation_space.shape)),
         action_dim=agent_action_dim,
         lr=args.lr,
@@ -1088,6 +1283,10 @@ def main():
         with_commit=args.mapping_phase,
         lambda_v_fid=args.lambda_v_fid,
         edge_feat_dim=(getattr(env, "_edge_feat_dim", None) if use_gnn else None),
+        with_la_head=(args.la_beam > 0),
+        la_vf_coef=args.la_vf_coef,
+        la_raw_target=args.la_raw_target,
+        edge_hidden=args.edge_hidden,
     )
     if args.load:
         state = agent.load_checkpoint(args.load)
@@ -1106,6 +1305,18 @@ def main():
     if args.ema_decay > 0:
         agent.init_ema(decay=args.ema_decay)
         print(f"EMA enabled: decay={args.ema_decay}")
+
+    # ---- 时钟化 C0：冻结 edge+GNN + auto-batch BC 预热（§6.2/§七）----
+    if args.clocked:
+        if args.freeze_edge_gnn:
+            agent.freeze_edge_gnn(freeze=True)
+            print("[clocked-C0] frozen GNN + edge heads")
+        if args.bc_warmup_steps > 0:
+            from routing.rl.agent_clocked import bc_warmup_auto_batch
+            _n, _loss = bc_warmup_auto_batch(agent, env,
+                                             num_steps=args.bc_warmup_steps,
+                                             seed=args.seed)
+            print(f"[clocked-C0] BC warmup done: {_n} samples, loss={_loss:.3f}")
 
     # 加载 EMA 评估用的 test split 电路
     _eval_circuits = []
@@ -1128,7 +1339,7 @@ def main():
     ckpt_dir = args.checkpoint_dir or os.path.join(os.path.dirname(args.out) or ".", "ckpts")
     os.makedirs(ckpt_dir, exist_ok=True)
     _metrics_path = os.path.join(ckpt_dir, "metrics.csv")
-    _metrics_fields = ["step", "reward", "swaps", "map_swaps", "trunc_pct", "pl", "vl", "vfl", "klp1", "ent", "kl", "grad", "fid", "time_us", "xtalk", "idle", "par", "swap_ratio"]
+    _metrics_fields = ["step", "reward", "swaps", "map_swaps", "trunc_pct", "pl", "vl", "vfl", "vla", "dil", "agr", "agr_map", "agr_rout", "klp1", "ent", "kl", "grad", "fid", "time_us", "xtalk", "idle", "par", "swap_ratio", "gps", "dsl", "dalg"]
     # 续训时追加而非覆盖；已有行丢到 resume_step 为止，避免旧行与新续训混合
     if resume_step > 0 and os.path.exists(_metrics_path):
         _metrics_fh = open(_metrics_path, "r", newline="")
@@ -1147,7 +1358,11 @@ def main():
 
     obs, _ = env.reset()
     ep_buffer = {"act": [], "logp": [], "val": [], "val_route": [], "val_fid": [],
-                 "rew": [], "term_rew": [], "done": []}
+                 "rew": [], "term_rew": [], "done": [],
+                 "la_mask": [], "la_act": [], "la_val": [],
+                 "demo_mask": [], "demo_act": []}
+    if args.clocked:
+        ep_buffer["obs"] = []
     look_on = args.lookahead_features is not False
     if use_gnn:
         ep_buffer["graph_data"] = []
@@ -1160,6 +1375,8 @@ def main():
             ep_buffer["look_feats"] = []
         if args.edge_noise_features:
             ep_buffer["noise_feats"] = []
+        ep_buffer["global_feats"] = []
+        ep_buffer["sabre_core_feats"] = []
     else:
         ep_buffer["obs"] = []
     ep_total_reward = 0.0
@@ -1173,6 +1390,7 @@ def main():
     ep_par_log = []
     ep_truncated = 0
     ep_completed = 0
+    ep_demo_align = []
 
     # Per-topology tracking
     topo_steps = [0] * num_topos
@@ -1204,6 +1422,7 @@ def main():
         print(f"[qasm-stage-cap] {qasm_stage_cap}")
     sabre_swap_cache = {}
     ep_swap_ratio_log = []
+    ep_gps_log = []
 
     total_steps = resume_step
     best_metric = resume_best if resume_best > -1.0 else -1.0
@@ -1211,10 +1430,26 @@ def main():
     best_ema_step = 0
     cycle_idx = 0
     circuit_path = None  # 当前 episode 的电路路径（首个 episode 为 sample 电路）
+    la_anchors_this_ep = 0  # 当前 episode 已消耗的 LA anchor 数（防成本失控）
+    ep_demo = False  # SABRE 示范回合标志（E4；首个 episode 为 sample 电路无缓存）
+    demo_swaps = []
+    demo_ptr = 0
+    demo_eidx = {}
+    if args.clocked:
+        # 时钟化路径暂不启用 LA beam / SABRE demo（C0 用 BC 预热替代）
+        args.la_beam = 0
+        args.sabre_demo_lambda = 0.0
+    if args.la_beam > 0:
+        from routing.rl.lookahead import beam_expectimax
+        print(f"[LA] beam expectimax 开启：B={args.la_beam} K={args.la_depth} "
+              f"interval={args.la_interval} cap={args.la_max_anchors}/ep "
+              f"vf_coef={args.la_vf_coef}")
 
     while total_steps < args.timesteps:
         for _ in range(args.rollout_steps):
-            if use_gnn:
+            if args.clocked:
+                ep_buffer["obs"].append(obs)
+            elif use_gnn:
                 ep_buffer["graph_data"].append(env._last_graph_data)
                 ep_buffer["map_vec"].append(env._last_map_vec)
                 ep_buffer["progress"].append(env._last_progress)
@@ -1225,6 +1460,8 @@ def main():
                     ep_buffer["look_feats"].append(env._last_look_feats.flatten())
                 if args.edge_noise_features:
                     ep_buffer["noise_feats"].append(env._last_noise_feats.flatten())
+                ep_buffer["global_feats"].append(env._last_global_feats)
+                ep_buffer["sabre_core_feats"].append(env._last_sabre_core_feats)
             else:
                 ep_buffer["obs"].append(obs)
 
@@ -1233,8 +1470,59 @@ def main():
             commit_allowed = env.mapping_phase and (
                 env._mapping_swaps >= args.mapping_min_swaps
             )
-            action, logp, val, v_route, v_fid = agent.act(obs, deadlock_mask=combined_mask,
-                                                          mapping_phase=commit_allowed)
+            # LA anchor：映射期+路由期（20260917 A3：V_LA 需覆盖映射态——
+            # s3 案例布局决策是最高杠杆规划点且评估 beam 在映射期用 V_LA 打分）、
+            # 每 interval 步一次、episode 内 cap（demo 回合跳过——纯 SABRE 标签）
+            if (args.la_beam > 0 and not ep_demo
+                    and env._episode_step % args.la_interval == 0
+                    and la_anchors_this_ep < args.la_max_anchors):
+                a_star, v_star, _qr = beam_expectimax(
+                    env, agent, obs, beam_width=args.la_beam,
+                    depth=args.la_depth, gamma=agent.gamma)
+                if _qr:  # 全掩码状态无候选 → 退化为非 anchor
+                    ep_buffer["la_mask"].append(True)
+                    ep_buffer["la_act"].append(a_star)
+                    ep_buffer["la_val"].append(v_star)
+                    la_anchors_this_ep += 1
+                else:
+                    ep_buffer["la_mask"].append(False)
+                    ep_buffer["la_act"].append(0)
+                    ep_buffer["la_val"].append(0.0)
+            else:
+                ep_buffer["la_mask"].append(False)
+                ep_buffer["la_act"].append(0)
+                ep_buffer["la_val"].append(0.0)
+            if ep_demo and not env.mapping_phase and demo_ptr < len(demo_swaps):
+                # SABRE 示范：沿换手序列执行（强制动作，off-policy），
+                # 仅当该边未被死锁掩码时才产生 BC 标签（掩码动作教了白教）
+                _demo_edge = demo_swaps[demo_ptr]
+                demo_ptr += 1
+                action = demo_eidx.get(_demo_edge, 0)
+                logp, val, v_route, v_fid = 0.0, 0.0, 0.0, 0.0
+                demo_label = bool(action < len(deadlock_mask)
+                                  and not deadlock_mask[action])
+                ep_buffer["demo_mask"].append(demo_label)
+                ep_buffer["demo_act"].append(action)
+            else:
+                # demo 序列耗尽（SABRE 路由已完成、剩余门自动执行中）或非 demo：
+                # 回退正常策略采样（demo 尾部不产生 BC 标签）
+                if args.clocked:
+                    if args.routing_mimic:
+                        amask = env.get_action_mask()
+                        e = env.mimic_swap_index()
+                        amask[:env.num_edges] = False
+                        amask[e] = True
+                        action, logp, val, v_route, v_fid = agent.act(
+                            obs, action_mask=amask)
+                    else:
+                        action, logp, val, v_route, v_fid = agent.act(
+                            obs, action_mask=env.get_action_mask())
+                else:
+                    action, logp, val, v_route, v_fid = agent.act(
+                        obs, deadlock_mask=combined_mask,
+                        mapping_phase=commit_allowed)
+                ep_buffer["demo_mask"].append(False)
+                ep_buffer["demo_act"].append(0)
             next_obs, reward, done, truncated, info = env.step(action)
 
             episode_end = done or truncated
@@ -1262,6 +1550,11 @@ def main():
                 if info.get("fidelity") is not None:
                     ep_fids.append(info["fidelity"])
                 ep_swaps_log.append(info.get("num_swaps", 0))
+                # 批效率（20260917：规划内化的主过程判据，SABRE ≈6.0）
+                _nsw = max(1, info.get("num_swaps", 0))
+                ep_gps_log.append(len(env.executed) / _nsw)
+                if ep_demo and demo_swaps:
+                    ep_demo_align.append(demo_ptr / max(1, len(demo_swaps)))
                 ep_map_swaps_log.append(info.get("mapping_swaps", 0))
                 if args.lambda_budget > 0 and circuit_path is not None:
                     s_sw = sabre_swap_cache.get((topo_idx, circuit_path))
@@ -1338,6 +1631,10 @@ def main():
                 # 布局混合：按 mix 比例选 恒等/随机/SABRE 初始布局
                 ep_random_init = args.random_init
                 ep_init_mapping = None
+                ep_demo = False
+                demo_swaps = []
+                demo_ptr = 0
+                demo_eidx = {}
                 if mix is not None:
                     cat = np.random.choice(["id", "rand", "sabre"], p=mix)
                     if cat == "id":
@@ -1345,11 +1642,32 @@ def main():
                     elif cat == "rand":
                         ep_random_init = True
                     else:  # sabre
-                        layout = sabre_cache[topo_idx].get(circuit_path)
+                        entry = sabre_cache[topo_idx].get(circuit_path)
+                        layout = entry["layout"] if isinstance(entry, dict) else entry
                         if layout is not None:
                             ep_random_init = False
                             ep_init_mapping = layout
                         # 缓存缺失则退化恒等
+                # SABRE 示范回合（20260917 E4）：强制 SABRE 布局 + 沿换手序列
+                # 执行，收集 (obs, a_sabre) 仅用于 BC 蒸馏（off-policy，不进 PPO）。
+                # 需换手序列存在；demo 回合关闭映射期以从 SABRE 布局精确进入路由期。
+                if (args.sabre_demo_lambda > 0
+                        and np.random.rand() < args.sabre_demo_prob):
+                    _entry = sabre_cache[topo_idx].get(circuit_path)
+                    _swaps = (_entry.get("swaps") if isinstance(_entry, dict)
+                              else None)
+                    if _swaps:
+                        ep_demo = True
+                        ep_random_init = False
+                        ep_init_mapping = (_entry["layout"] if isinstance(_entry, dict)
+                                           else _entry)
+                        demo_swaps = list(_swaps)
+                        demo_ptr = 0
+                        demo_eidx = {}
+                        for _a, (_p, _q) in enumerate(coupling_map):
+                            demo_eidx[(_p, _q)] = _a
+                            demo_eidx[(_q, _p)] = _a
+                ep_mapping_phase = args.mapping_phase
                 cur_lambda_fid = lambda_fid_schedule(
                     progress, args.lambda_fid_warmup,
                     adaptive_lambda_fid_max(progress, args.lambda_fid_max_schedule, args.lambda_fid_max)
@@ -1361,6 +1679,9 @@ def main():
                 if args.noise_ramp:
                     _nr = max(args.noise_ramp, 1e-9)
                     noise_f = min(1.0, progress / _nr)
+                # E16：噪声总比例（--noise-scale，两阶段课程用；与 noise_f 叠乘，
+                # 使势函数噪声项 w_err/w_xt/w_xt_swap 也被缩放，达到"纯效率阶段"）
+                noise_f = noise_f * args.noise_scale
                 # 方案1：NAM 电路若有 per-circuit SABRE 参考（nam_sref_map）则用它做 log-相对
                 # 分母（sref_override 优先于按 num_qubits 共享的 sabre_fid_map_nam），避免
                 # 深电路因共享同尺寸 sref 而 log(F/sref) 爆炸成极端负奖励。
@@ -1374,8 +1695,25 @@ def main():
                     if pc_sref is not None and pc_sref > 0:
                         ep_sref_override = float(pc_sref)
                         ep_sabre_map = None  # 用 per-circuit sref，不再需要共享表
+                # 价格渐入：scale/λ_budget 从历史值线性爬升到校准值
+                if args.swap_price_ramp > 0:
+                    _ramp = min(1.0, progress / args.swap_price_ramp)
+                else:
+                    _ramp = 1.0
+                _ep_scale = 1.0 + (args.swap_price_scale - 1.0) * _ramp
+                _ep_lb = 0.5 + (args.lambda_budget - 0.5) * _ramp
+                # TRUNC 门数化（20260917）：步数上限 = max(50, mult×gates)、
+                # 反游走 = max(20, gates/D)——完成解 sw/g ≤1.24 vs 游走 3.6-8.3×
+                if args.step_cap_mult != 2.0 or args.no_progress_gates_div > 0:
+                    _g = new_dag.num_gates
+                    _cap = max(50, math.ceil(args.step_cap_mult * _g)) \
+                        if args.step_cap_mult > 0 else args.max_episode_steps
+                    _np = max(20, math.ceil(_g / args.no_progress_gates_div)) \
+                        if args.no_progress_gates_div > 0 else args.no_progress_limit
+                else:
+                    _cap, _np = args.max_episode_steps, args.no_progress_limit
                 env = create_env(new_dag, hw, coupling_map, args.reward_mode,
-                                 args.max_episode_steps, ep_random_init,
+                                 _cap, ep_random_init,
                                  args.seed + total_steps,
                                  gnn=shared_gnn, use_gnn=use_gnn,
                                  max_num_edges=max_edges,
@@ -1384,8 +1722,8 @@ def main():
                                    lambda_fid=cur_lambda_fid,
                                    eta_dist=args.eta_dist,
                                    mapping_budget=args.mapping_budget,
-                                   mapping_phase=args.mapping_phase,
-                                    use_scheduler=(args.use_scheduler or args.fidelity_sim in ("trajectory_sched", "trajectory_v2")),
+                                   mapping_phase=ep_mapping_phase,
+                                    use_scheduler=(args.use_scheduler or args.fidelity_sim in ("trajectory_sched", "trajectory_v2", "trajectory_v3")),
                                     eta_time=args.eta_time,
                                     eta_xtalk_par=(args.eta_xtalk_par * noise_f
                                                   if args.eta_xtalk_par is not None else None),
@@ -1407,7 +1745,7 @@ def main():
                                      shaping_gamma=args.shaping_gamma,
                                      eta_shape=args.eta_shape,
                                      alpha_ext=args.alpha_ext,
-                                     no_progress_limit=args.no_progress_limit,
+                                     no_progress_limit=_np,
                                      lookahead_features=args.lookahead_features,
                                       init_mapping=ep_init_mapping,
                                      lambda_layout=args.lambda_layout,
@@ -1423,27 +1761,47 @@ def main():
                                      sref_override=ep_sref_override,
                                      edge_noise_features=args.edge_noise_features,
                                      beta_noise=args.beta_noise,
-                                     w_err=args.w_err,
-                                     w_xt=args.w_xt,
-                                     w_xt_swap=args.w_xt_swap,
+                                     w_err=(args.w_err * noise_f
+                                            if args.w_err is not None else None),
+                                     w_xt=(args.w_xt * noise_f
+                                           if args.w_xt is not None else None),
+                                     w_xt_swap=(args.w_xt_swap * noise_f
+                                                if args.w_xt_swap is not None else None),
                                      pot_progress_b=args.pot_progress_b,
                                      pot_1q_reward=args.pot_1q_reward,
-                                     lambda_budget=args.lambda_budget,
-                                     sabre_swap_budget=ep_swap_budget)
+                                     lambda_budget=_ep_lb,
+                                     sabre_swap_budget=ep_swap_budget,
+                                      swap_price_scale=_ep_scale,
+                                      step_cap_mult=args.step_cap_mult,
+                                      clocked=args.clocked,
+                                      max_ready=args.max_ready_2q,
+                                      w_xt_launch=args.w_xt_launch,
+                                      w_zz=args.w_zz,
+                                      eta_ao=args.eta_ao,
+                                      step_cap_factor=args.step_cap_factor)
                 obs, _ = env.reset()
+                if ep_demo:
+                    # demo 回合：保留 mapping-phase 架构维度（obs 形状不变），
+                    # 仅翻 phase 标志直接进入路由期（从 SABRE 布局精确对齐换手序列）
+                    env.mapping_phase = False
                 ep_total_reward = 0.0
+                la_anchors_this_ep = 0
 
         with torch.no_grad():
-            if use_gnn:
+            if args.clocked:
+                last_logits, last_v_route, last_v_fid, _last_v_la = \
+                    agent._forward_obs_split(obs)
+                last_val = last_v_route + agent.lambda_v_fid * last_v_fid
+            elif use_gnn:
                 mask = torch.zeros(agent.num_edges + 1, dtype=torch.bool, device=agent.device)
                 mask[:len(agent.coupling_map)] = True
                 if env.mapping_phase and env._mapping_swaps >= args.mapping_min_swaps:
                     mask[agent.num_edges] = True
-                last_logits, last_v_route, last_v_fid = agent._forward_obs_split(
+                last_logits, last_v_route, last_v_fid, _last_v_la = agent._forward_obs_split(
                     obs, action_mask=mask.unsqueeze(0))
                 last_val = last_v_route + agent.lambda_v_fid * last_v_fid
             else:
-                last_logits, last_v_route, last_v_fid = agent._forward_obs_split(obs)
+                last_logits, last_v_route, last_v_fid, _last_v_la = agent._forward_obs_split(obs)
                 last_val = last_v_route + agent.lambda_v_fid * last_v_fid
         if use_gnn:
             rew_arr = np.array(ep_buffer["rew"], dtype=float)
@@ -1500,9 +1858,18 @@ def main():
             "adv": adv,
             "ret": ret,
         }
+        if args.la_beam > 0:
+            train_batch["la_mask"] = ep_buffer["la_mask"]
+            train_batch["la_act"] = ep_buffer["la_act"]
+            train_batch["la_val"] = ep_buffer["la_val"]
+        if args.sabre_demo_lambda > 0:
+            train_batch["demo_mask"] = ep_buffer["demo_mask"]
+            train_batch["demo_act"] = ep_buffer["demo_act"]
         if dual_critic:
             train_batch["ret_fid"] = ret_fid
-        if use_gnn:
+        if args.clocked:
+            train_batch["obs"] = ep_buffer["obs"]
+        elif use_gnn:
             train_batch["graph_data"] = ep_buffer["graph_data"]
             train_batch["map_vec"] = ep_buffer["map_vec"]
             train_batch["progress"] = ep_buffer["progress"]
@@ -1514,8 +1881,14 @@ def main():
                 train_batch["look_feats"] = ep_buffer["look_feats"]
             if args.edge_noise_features and "noise_feats" in ep_buffer:
                 train_batch["noise_feats"] = ep_buffer["noise_feats"]
+            if "global_feats" in ep_buffer and len(ep_buffer["global_feats"]) > 0:
+                train_batch["global_feats"] = ep_buffer["global_feats"]
+            if "sabre_core_feats" in ep_buffer and len(ep_buffer["sabre_core_feats"]) > 0:
+                train_batch["sabre_core_feats"] = ep_buffer["sabre_core_feats"]
         else:
             train_batch["obs"] = ep_buffer["obs"]
+        if args.clocked:
+            progress = total_steps / max(1, args.timesteps)
         if use_gnn:
             agent.gnn.train()
         if total_steps < args.freeze_first_steps:
@@ -1523,7 +1896,19 @@ def main():
                       "klp1": 0.0, "grad": 0.0}
         else:
             beta_kl = float(args.beta_kl) if args.variant == "P2C" else 0.0
-            losses = agent.update(train_batch, epochs=args.epochs, beta_kl=beta_kl)
+            # λ_d 渐入：进度达 ramp 比例时爬满（0916 §5 v2 蒸馏）
+            _lam_d = (args.la_distill_lambda
+                      * (min(1.0, progress / args.la_distill_ramp)
+                         if args.la_distill_ramp > 0 else 1.0))
+            # λ_s 渐入：SABRE 示范蒸馏同 ramp 语义（E4）
+            _lam_s = (args.sabre_demo_lambda
+                      * (min(1.0, progress / args.sabre_demo_ramp)
+                         if args.sabre_demo_ramp > 0 else 1.0))
+            losses = agent.update(train_batch, epochs=args.epochs, beta_kl=beta_kl,
+                                  la_distill_lambda=_lam_d,
+                                  sabre_demo_lambda=_lam_s,
+                                  global_feats_list=train_batch.get("global_feats"),
+                                  sabre_core_feats_list=train_batch.get("sabre_core_feats"))
             agent.update_ema()
         ep_buffer = {k: [] for k in ep_buffer}
 
@@ -1547,6 +1932,14 @@ def main():
         if args.variant in ("P2B", "P2C"):
             parts.append(f"vfl={losses['vfl']:.3f}")
             parts.append(f"klp1={losses['klp1']:.4f}")
+        if args.la_beam > 0:
+            parts.append(f"vla={losses.get('vla', 0.0):.3f}")
+            parts.append(f"agr={losses.get('agr', 0.0):.2f}")
+        if ep_gps_log:
+            parts.append(f"gps={np.mean(ep_gps_log[-20:]):.1f}")
+        if os.environ.get("LA_DEBUG"):
+            parts.append(f"[dbg eps={len(ep_rewards)} la_ep={la_anchors_this_ep} "
+                         f"ep_step={env._episode_step} map_ph={env.mapping_phase}]")
         if ep_fids:
             avg_fid = np.mean(ep_fids[-20:])
             parts.append(f"fid={avg_fid:.4f}")
@@ -1591,6 +1984,8 @@ def main():
             "pl": losses["pl"],
             "vl": losses["vl"],
             "vfl": losses.get("vfl", ""),
+            "vla": losses.get("vla", ""),
+            "agr": losses.get("agr", ""),
             "klp1": losses.get("klp1", ""),
             "ent": losses["ent"],
             "kl": losses["kl"],
@@ -1602,6 +1997,11 @@ def main():
             "par": avg_par,
             "swap_ratio": (float(np.mean(ep_swap_ratio_log[-20:]))
                            if ep_swap_ratio_log else ""),
+            "gps": (float(np.mean(ep_gps_log[-20:]))
+                    if ep_gps_log else ""),
+            "dsl": losses.get("dsl", ""),
+            "dalg": (round(float(np.mean(ep_demo_align[-20:])), 4)
+                     if ep_demo_align else ""),
         }
         _metrics_writer.writerow(row)
         _metrics_fh.flush()

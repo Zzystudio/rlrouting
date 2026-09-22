@@ -1,3 +1,218 @@
+\subsection{GNN+RL 路由映射联合框架}
+
+本节综合 \texttt{doc/}（GNN.md、sim.md、plan.md、train.md、20260915/16/17 训练方案、模拟器加速.md）与 \texttt{2026挑战杯/body/routing/part.tex} 的全部内容，对当前实验框架做系统性介绍：问题定义、门调度、编码方式、算法、映射联合优化、训练流水线、推理框架、模拟器设计与实验结果，并给出完整的历史战役脉络。
+
+\subsubsection{零、问题定义与总体流水线}
+
+\textbf{问题定义。}量子比特路由将逻辑电路映射到物理硬件：给定逻辑电路 $C$（$n$ 个逻辑比特与门序列）、物理拓扑 $G=(V,E)$（$m\ge n$ 个物理比特，$E$ 为相邻边集）与初始映射 $\pi:[n]\to[m]$，每步从 $E$ 中选一条边执行 SWAP（交换两端物理比特上的内容），SWAP 后所有前置门已执行完且操作数物理相邻的双比特门自动执行；重复直至全部门执行完毕或达到最大步数。目标是满足物理约束下最小化 SWAP 数、缩短 makespan 或最大化终端保真度——NISQ 设备中 SWAP 引入额外噪声并加深电路，因此三者在物理上相互耦合。
+
+\textbf{总体流水线。}系统构成「图编码—策略决策—噪声评估」闭环：输入量子线路（Qiskit \texttt{QuantumCircuit}）与硬件拓扑+校准噪声（topo JSON），依次经线路解析（\texttt{CircuitDAG}）$\to$ 噪声特征构建（\texttt{HardwareFeatures}）$\to$ 二分异构图编码（\texttt{RoutingGraphData}）$\to$ SubGNN 节点嵌入 $\to$ per-edge 观测拼接 $\to$ PPO（EdgeActorCritic）为每条候选 SWAP 边打分并选择动作（路由阶段物理 SWAP / 映射阶段虚拟 SWAP / commit）$\to$ 环境宏步自动批执行就绪门 $\to$ 事件级调度器记录时序 $\to$ 势函数经济账奖励 $\to$ 训练（多级课程）/ 推理（argmax 或 beam search）$\to$ 轨迹采样模拟器（v1/v2，GPU 加速）计算终端保真度。
+
+\subsubsection{一、门调度算法}
+
+路由决策决定在哪些耦合边上插入 SWAP，门调度决定这些 SWAP 及其释放的门以什么时刻、什么方式并行执行——二者与噪声模型深度耦合：SWAP 改变可执行门集合进而改变调度，调度结果（makespan、空闲退相干、并行串扰）又作为训练奖励分量与调度感知保真度评估的输入。
+
+系统采用\textbf{事件级 ASAP 贪心调度器}（\texttt{src/routing/timing.py}）替代传统锁步轮调度：每门开始时刻
+\[
+\mathrm{start}=\max(\text{前驱门结束时刻},\ \text{本比特上次空闲时刻}),
+\]
+即门只要同时满足数据依赖（前驱完成）与资源约束（比特空闲）即可立刻开始，无需等待当前轮次结束，使不相关比特上的门跨步重叠、真实反映硬件并行性。调度优先级综合三项：
+\[
+\mathrm{priority}=\mathrm{criticality}+W_{\mathrm{dur}}\cdot\frac{\mathrm{dur}}{\max\_dur}-W_{\mathrm{xtalk}}\cdot\mathrm{xtalk\_cost},
+\]
+其中 criticality 为关键路径深度比（靠近线路终点的门优先）、第二项为最长处理时间优先（LPT）、第三项为与同批其他门在相邻耦合对上的串扰代价。调度器强制同波比特互不相交，与动态串扰记账口径保持一致；事件序列同时供事件级模拟器（v2）消费，保证训练奖励与评估口径同源。
+
+
+\subsubsection{二、编码方式（状态表示与特征）}
+
+\textbf{线路解析（\texttt{circuit\_dag.py}）。}将 Qiskit 线路解析为 \texttt{GateRecord} 列表（门名、作用的逻辑比特、是否双比特门/测量、同比特上前驱门索引），\texttt{predecessors} 构成逻辑依赖图，支持拓扑排序与 front\_layer 提取（所有依赖已满足且未执行的双比特门集合）。
+
+\textbf{硬件噪声特征（\texttt{features.py}）。}\texttt{HardwareFeatures} 由 \texttt{NoiseConfig} 构建，将噪声参数归一化到相近尺度：T1/T2 相干时间（$\div100$）、频率（$\div5.0$）、读出错误（$\div0.1$）、单/双比特门错误率（$\div0.05$）、ZZ 串扰强度、耦合邻接矩阵、BFS 最短路距离。P0-b 起引入噪声加权距离 $d_{\mathrm{noise}}=\mathrm{hops}+\beta\cdot path\_err$（BFS 分层 DP 求 min-hop 路径的最小 $\Sigma e$），保序约束 $\beta\cdot k_{\max}\cdot e_{\max}<1$ 使距离 argmin 仍落在最小跳数解集内、噪声仅在等跳数路径间做 tie-break；全局取 $\beta=0.5$（tianyan287 上 $\beta_{\mathrm{crit}}\approx0.82$），$\beta=0$ 时与原距离逐位一致。
+
+\textbf{图编码（\texttt{RoutingGraphData}）。}二分异构图含三个子图：逻辑线路图（gate 节点 $\times$ precedes 依赖边）、物理拓扑图（qubit 节点 $\times$ couples 耦合边）、跨图映射边（maps\_to，每次 SWAP 后按最新映射重算）。门节点与比特节点各 32 维：门节点编码门类型 one-hot、双比特标志、门错误率、DAG 层数/剩余关键路径深度、逻辑比特编号、入/出度、执行状态、映射物理距离等；比特节点编码编号、T1/T2/频率/读写错误率、邻居聚合统计（平均 T1/T2/频率/误差/串扰）、占用状态/占用率、频率失谐等。三类边各 16 维（前 3 维类型 one-hot + 类型特有信息：依赖边层数差与关键路径标志、耦合边双比特错误率/ZZ/几何平均/频率碰撞、映射边的物理比特属性与操作比特角色）。该编码使 GAT 消息传播同时沿「门依赖」与「物理耦合」两个方向进行，物理比特嵌入既反映经过它的门在电路中的位置与关键性，也反映其所在物理位置的噪声水平与邻域拓扑。
+
+\textbf{节点嵌入（\texttt{encoder.py} 的 SubGNN）。}SubGNN 内部为多头 GAT 编码器：2 层 $\times$ 3 头、hidden 48、输出每节点 48 维（最后一层单头、无 concat）；\texttt{node\_embeddings} 取全图编码后段的物理比特节点；mean+max 全局池化得 96 维全局嵌入（供早期全局观测/图级任务使用）。GNN 编码器参数纳入 PPO 优化器，实现 RL 驱动的端到端特征学习。
+
+\textbf{per-edge 观测（\texttt{env.py:\_obs}）。}每条候选 SWAP 耦合边拼接为
+\[
+e_{pq}=\big[\,h_p,\ h_q,\ h_p-h_q,\ \mathrm{SABRE}^{5},\ \mathrm{LOOK}^{4},\ \mathrm{NOISE}^{5}\,\big]\in\mathbb{R}^{158},
+\]
+其中 $h_p,h_q$ 为两端比特嵌入（$3\times48=144$ 维），该表示直接建模 $Q(s,a)$、规避全局 pooling 的 state-action ambiguity。观测向量 $=$ 全部边特征（padding 至 \texttt{max\_num\_edges}）$+$ 归一化映射向量（每比特物理位置）$+$ progress（已执行门比例）$+$ phase（映射阶段标志）。特征维度完全条件化：$3h{+}5{+}4\cdot\mathrm{look}{+}5\cdot\mathrm{noise}$，对应 R3b/R5a/P0 三档 checkpoint 特征维 149/153/158，推理 CLI 自动识别。
+\begin{itemize}
+    \item \textbf{SABRE 5 维}：front\_dist\_before / front\_dist\_after / dist\_improvement / num\_improved / num\_worsened——让策略直接获取 SABRE 的距离信息；
+    \item \textbf{前瞻 4 维（R5a）}：换位预测串扰 $xtalk\_pred$（与调度记账同口径）、并发接触面 $busy\_contact$、extended set（对齐 qiskit SabreSwap 的 \texttt{with\_lookahead(0.5,20)}）换位后距离差分/水平——让策略「看见」并发结构与未来距离；
+    \item \textbf{直接噪声 5 维（P0-a）}：$e_{\mathrm{edge}}$ / $zz_{\mathrm{edge}}$ / 相对拓扑均值 $e_{\mathrm{rel}}$ / SWAP 物理价 $3e$ / 端点累积 XZ 误差（经映射取逻辑比特）——策略不必从 GAT 混合后的嵌入反推「这条边贵不贵」。
+\end{itemize}
+
+
+\subsubsection{三、算法（MDP、奖励与 PPO）}
+
+\textbf{MDP（\texttt{env.py}）。}动作空间 $\mathrm{Discrete}(\mathrm{num\_edges}+1)$：前 $E$ 个动作为在对应耦合边上做 SWAP，末位为 commit（仅映射阶段有效）。每个动作是宏步：执行 SWAP 后环境自动执行所有就绪的双比特门并累计奖励，直至无可执行门。\texttt{\_apply\_swap} 处理空闲/占用比特的四种分支（空闲$\leftrightarrow$空闲为 no-op、空闲$\leftrightarrow$占用为迁移、双占用为正常交换）。
+
+\textbf{死锁掩码与截断。}\texttt{get\_deadlock\_mask()} 检测三类 SWAP 震荡并屏蔽对应边：连续重复同一边（lookback 2 步内仅一条边）、末尾周期 $N\in[2,6]$ 往返震荡、最近 6 步无门执行的失速；另有未映射边掩码（两端均无逻辑比特的空 SWAP）。反游走：连续 \texttt{no\_progress\_limit}（默认 200）步无门执行即主动截断；动态步数上限 $\max(200,\ 2\times N_{\mathrm{gates}})$（类型A 大电路自动放宽、类型B 游走小电路提前止损）。评估侧可调大掩码窗口（max\_cycle/stall\_window $6\to20$）。
+
+\textbf{奖励设计演进}（按历史顺序，最终形态 = R3b 经济账 + P0 结构注入 + P1-a 预算锚）：
+\begin{itemize}
+    \item \textbf{Phase 1 早期（三组件）}：$r_t=r_{\mathrm{swap}}+\sum r_{\mathrm{execute}}+\sum r_{\mathrm{propagate}}+r_{\mathrm{dist}}$——$r_{\mathrm{swap}}=-0.3$（3 CNOT 等价）、门执行收益按类型查表（CX=2.0、1Q=0.3--0.5）并扣错误率/串扰、X/Z 错误传播惩罚、距离缩短奖励 $r_{\mathrm{dist}}=-\eta\cdot(d_{\mathrm{after}}-d_{\mathrm{before}})/\max(d_{\mathrm{before}},1)$（$\eta=1.0$）；
+    \item \textbf{R2 势函数}：$r=B-\mathrm{cost}$（progress 奖励 $B=0.045$ 减去物理噪声代价），取消 +2.0/门的任意完成奖励，SWAP 按 $3\times e_{\mathrm{edge}}$ 计价；截断按未执行门数罚 \texttt{unfinished\_penalty}（0.3）；
+    \item \textbf{R3 势函数 shaping}：$\Phi(s)=-\eta_{\mathrm{shape}}(D_{\mathrm{front}}/|F|+\alpha_{\mathrm{ext}}D_{\mathrm{ext}}/|E|)$，步级 $r=\gamma\Phi(s')-\Phi(s)$（$\gamma=0.99$ 与 PPO 折扣严格一致，Ng--Harada--Russell 策略不变性成立的前提），终态/截断 $\Phi=0$；均值口径跨电路尺度稳定；
+    \item \textbf{R3b 经济账}：$\eta_{\mathrm{shape}}=0.3$、$\alpha_{\mathrm{ext}}=0.5$、ext\_set\_size=20（对齐 SabreSwap with\_lookahead）、SWAP 定价 $0.667\times 3e\equiv 2e$、调度感知分量（$\eta_{\mathrm{time}}$/$\eta_{\mathrm{idle}}$/$\eta_{\mathrm{parallel}}$/$\eta_{\mathrm{xtalk\_par}}$）——SWAP 数与 SABRE 打平（45.0 vs 45.1）；
+    \item \textbf{P0 结构注入（20260915，「改信号、不改价格」）}：P0-a 观测 +5 维噪声特征；P0-b 噪声加权距离 $\beta=0.5$；P0-c 势函数扩展 $\Phi\mathrel{+}=-[w_{\mathrm{err}}E_{\mathrm{err}}(s)+w_{\mathrm{xt}}X(s)]$（$E_{\mathrm{err}}$ 为 front/ext 门期望边误差、$X(s)$ 为 ready 门对间 1-hop 交叉 ZZ，纯状态函数、telescoping 测试通过）+ per-swap 即时串扰价 $-w_{\mathrm{xt\_swap}}\cdot xtalk\_pred(edge)$（把串扰信用钉在具体动作上，解决整批结算的信用错位）；P0-d $B$ 重标定 $0.045\to0.20$（$=1.5\times$ 平均边误差，恢复「完成优于停摆」）+ 1Q/measure 门 progress 置零（消除约 60\% 不可控事件流）；
+    \item \textbf{P1-a SWAP 预算锚}：每电路缓存 SABRE SWAP 数，超预算 $\delta=1.05$ 后每颗额外 SWAP 罚 $\lambda_{\mathrm{budget}}=0.5$（$r\mathrel{-}=\lambda_{\mathrm{budget}}\max(0,\mathrm{swaps}-\delta\cdot\mathrm{sabre})$），把「用多少 SWAP」结构性锚在 SABRE、把「用哪条边/何时换」交给噪声项优化——数量与位置解耦；
+    \item \textbf{噪声感知终端（Stage 2/3）}：早期 $R_{\mathrm{term}}=\lambda_{\mathrm{fid}}\cdot\frac{F-F_{\mathrm{sabre}}(n)}{1-F_{\mathrm{sabre}}(n)}$（per-size SABRE 基线归一化），后期相对对数口径 $R_{\mathrm{term}}=\lambda_{\mathrm{fid}}\cdot(\log F-\log F_{\mathrm{sabre}})$（clip $[-50,50]$）；$\lambda_{\mathrm{fid}}$ 从 0 线性退火/阶梯增长至 5.0（前 50\% 步纯路由、后 50\% 引入保真度，防止策略遗忘路由能力）。
+\end{itemize}
+
+\textbf{PPO 智能体（\texttt{agent.py}）。}核心为 \texttt{EdgeActorCritic}：\texttt{edge\_mlp} 对所有候选边共享参数打分（64$\to$32$\to$1）+ 软注意力池化（价值头输入）+ commit 头 + \textbf{双价值头} $V_{\mathrm{route}}$（路由回报）与 $V_{\mathrm{fid}}$（保真度回报，zero-init 平滑注入），推理时 $V=V_{\mathrm{route}}+\lambda_{V_{\mathrm{fid}}}V_{\mathrm{fid}}$；可选 $V_{\mathrm{LA}}$ 零初始化 lookahead 价值头（训练期 beam expectimax 目标，见下）。超参数：lr $3\times10^{-4}$、$\gamma=0.99$、GAE $\lambda=0.95$（支持随 episode 深度自适应增长）、clip $\varepsilon=0.2$、ent 系数 $0.01$、vf 系数 $0.1$、epochs 4、mini-batch 64、rollout 256 步、梯度裁剪 0.5；reward/terminal 归一化器（EMA）；可选冻结 $\pi_{P1}$ 教师做 KL 锚定微调（P2C 变体 $\beta_{KL}=0.05$，限制分布级策略漂移）；双通道 GAE 分别回归路由回报与保真度回报。
+
+\textbf{训练期 beam lookahead（20260916，V\_LA）}：在 PPO 本体（采样动作、GAE on $V_{\mathrm{route}}$）完全不动的前提下，以附加价值损失注入多步前瞻——每 \texttt{la\_interval}=4 步（routing phase）对 anchor 状态做 $B{=}3$ 候选 $\times$ $K{=}2$ 层展开（env.clone 逐层模拟），叶节点批量 GNN 前向取 $V_{\mathrm{LA}}$，expectimax 回溯 $V_{\mathrm{LA}}(s_t)\leftarrow\max_{a\in\mathrm{top}B}\big[r(s_t,a)+\gamma\cdot V_{\mathrm{child}}(s_{t+1}(a))\big]$（done/trunc 节点 $Q=r_c$，叶节点自举），anchor 上限 128（覆盖 t287 动态步数上限下的深段状态）；$V_{\mathrm{LA}}$ 作为独立价值头训练（batch 内归一化 MSE），不改 PPO advantage 公式（避免 max-return 与 $\mathbb{E}_\pi$-return 混算的乐观偏置）。
+
+
+\subsubsection{四、映射联合优化（映射即路由）}
+
+\textbf{方法概述。}比特映射（初始布局选择）与路由（SWAP 插入）传统上分离（SABRE 用 \texttt{swap\_trials} 多次采样选布局、再固定布局路由），忽略了布局质量与路由效率的耦合。本工作视角：\textbf{映射本质上是一种特殊的路由}——两者作用于同一物理耦合边集、动作形式同构：路由 SWAP 交换物理比特上的线路内容，映射 SWAP 仅重排逻辑比特到物理比特的映射向量（不写入物理线路、不递增 SWAP 计数、不引入噪声代价），可视为不落地的「虚拟路由」。因此映射与路由共享同一动作空间、同一观测编码与同一距离奖励结构，可统一到同一个强化学习 MDP 中联合优化。
+
+\textbf{统一 MDP。}动作空间 $\mathrm{Discrete}(\mathrm{num\_edges}+1)$：前 $E$ 个为耦合边上的（虚拟/物理）SWAP，末位 commit 结束映射阶段切换路由阶段；观测末尾追加 phase 标识（映射 1.0 / 路由 0.0）。映射阶段最大虚拟 SWAP 数 $\mathrm{mapping\_budget}=n-1$（防止无限映射），可提前 commit 平衡布局探索与路由效率。虚拟 SWAP 的距离缩短奖励与路由阶段同式（front-layer 距离），使智能体在映射阶段即学到「什么布局能减少后续路由 SWAP」。commit 时刻可选布局质量惩罚 $r_{\mathrm{layout}}=-\lambda_{\mathrm{layout}}\cdot\frac1{|F|}\sum_{g\in F}d(\pi(g.q_1),\pi(g.q_2))$。
+
+\textbf{布局混合训练（layout-mix）。}早期发现训练若一律从恒等映射出发，策略退化为「恒等布局专用」：评估时注入 SABRE 优质布局 warm-start 反而劣化（SWAP 31.0 vs 27.5），根因是策略从未见过非恒等初始布局。为此每个 episode 按比例 $(\alpha_{\text{恒等}},\alpha_{\text{随机}},\alpha_{\text{SABRE}})=0.3/0.3/0.4$ 从三种布局源抽取初始映射：恒等映射（回归项）、随机置换（迫使布局无关的路由能力）、SABRE 布局 warm-start（好布局上的精细化路由）。SABRE 布局离线预计算缓存（\texttt{swap\_trials}=5 全训练池落盘），避免训练期重复搜索。消融（$\lambda_{\mathrm{layout}}\in\{0,0.5,2.0\}$）表明收益主要来自训练分布多样性本身，commit 布局惩罚贡献很小（映射阶段平均仅 0.1--0.8 次虚拟 SWAP），取 $\lambda_{\mathrm{layout}}=0.5$。
+
+\textbf{Warm-start 混合推理管线。}layout-mix 解锁「启发式布局 + 学习路由」混合管线：评估先用 SABRE 搜索初始布局，再由 PPO 策略从该布局出发路由——SABRE 的多次采样擅长找好布局、RL 策略擅长在给定布局下做噪声感知 SWAP 决策，两者解耦为各自最擅长的组件。真机 20 比特拓扑消融：warm-start 在 SWAP 数与 SABRE 统计持平的同时，makespan 降至 SABRE 的 0.66 倍、串扰代价降至 0.45 倍、并行度提升至 1.6 倍，构成多目标严格占优。由此支持两种互补部署形态：\textbf{纯 RL 管线}（映射+路由均单次前馈，推理开销最小）与 \textbf{warm-start 混合管线}（允许离线预计算布局时进一步压低 SWAP 并保持调度优势）。
+
+\subsubsection{五、训练流水线与课程}
+
+\textbf{早期两阶段课程。}Phase 1（routing，100k 步）学习纯路由先验（SWAP 数最小化，无终端保真度），SABRE 距离特征 + 距离即时奖励 + 死锁掩码，数据集课程 phase1$\to$phase2$\to$phase3（深度 2--13）；日志显示 entropy 从 1.38 降至 0.79（约 45K 步收敛）、value loss 降至 0.1、SWAP 均值稳定在 4.6。Phase 2（noise\_aware，100k 步）加载 Phase 1 检查点微调，$\lambda_{\mathrm{fid}}$ 前 50\% 步从 0 线性退火至 5.0，多拓扑混合（cross\_5q/ring\_5q/ibmq\_5\_line）；全程 trunc=0\%、entropy 0.79、value loss 0.06--0.29、fidelity 约 0.78。
+
+\textbf{多规模课程。}按量子比特数组织独立 split（\texttt{large\_n8/n10/n12/n16} 各 150--500 条、\texttt{unified\_mixed} 700 条、规模档 $\{5,8,10,12,14,16,20\}$），经 \texttt{--curriculum-keys} 按训练进度自动切换（每规模 phase1/2/3 对应浅/中/深三层），从易到难坡道保证从零训练的 bootstrap 可学性。
+
+\textbf{真机拓扑微调与调度感知训练。}面向真实硬件，在天衍 176 芯片 20 比特连通子拓扑 \texttt{tianyan176\_20q}（Q23 根 BFS 截取，20q/29 边）上微调，噪声参数取自真机校准（逐比特 T1/T2、逐边 CX 错误率；修复字符串键序列化导致逐边错误率被静默丢弃的 bug 后，28 个互异逐边错误率才真正进入 GNN 特征与保真度）。开启事件级 ASAP 调度器（\texttt{--use-scheduler}），奖励在距离项之外叠加调度感知分量（$\eta_{\mathrm{time}}$ 总时长、$\eta_{\mathrm{idle}}$ 空闲退相干、$\eta_{\mathrm{parallel}}$ 并行度、$\eta_{\mathrm{xtalk\_par}}$ 1-hop 动态串扰），配合 layout-mix 得最终主模型 \textbf{l05}。串扰建模用相干 ZZ 旋转 $e^{-i\theta Z\otimes Z}$（$\theta$ 取逐边串扰强度）而非概率性硬 $Z$ 翻转——后者对叠加态造成正交归零式失真惩罚，前者以 $\theta^2$ 量级平滑退化，与真实超导残余耦合物理一致。
+
+\textbf{噪声感知训练细节。}保真度信号来源二选一：调度感知轨迹采样（$T=16$ 条轨迹平均，精确但随比特数指数增长）或解析保真度代理（$O(G)$，$\ge16$q 大规模训练用，见第七部分）；per-size SABRE 基线归一化；每 episode 噪声参数标称值附近 $\pm20\%$ 随机扰动增强鲁棒性；EMA 权重定期验证保存最佳模型。
+
+\textbf{课程坡道 + 尾段混合（R3c-v2）。}历史复盘确立：从零训练失稳率 50--60\%（R2/R3/R3b/R3c/isoA/isoB/R5iso/R5a-t287 等 8+ 战役），bootstrap 需要易到难坡道、且「混合分布治愈过训练」只对已 bootstrap 策略生效。最终课程 = 前四级坡道（stage1$\to$n8$\to$n10$\to$n12，各 20\%）bootstrap + 末级尾段混合（n16$\to$n20$\to$unified）；QASM 结构电路混训约 30\% 概率（\texttt{gen\_structured} 94 + \texttt{gen\_structured\_v2} 331 = 425 池，18 族 $\times$ 规模档无空档，\textbf{NAM 完全 held-out} 消除评估污染）；课程限幅 \texttt{--qasm-stage-cap}（修复 5q 阶段采到 20q 电路缺口）；噪声景观三档随机化（L0 乘性扰动 40\% / L1 异构放大 30\% / L2 位置重排 30\%，T1/T2 配对置换保持 $T_2\le T_1$）；P0 注入项经 \texttt{noise-ramp} 线性渐入。
+
+\textbf{训练战役脉络}（详见 \texttt{doc/train.md}）：R3 势函数奖励修复从零可学性（trunc 33\%$\to$15\%）；R3b 达成 SWAP 与 SABRE 打平（45.0 vs 45.1）；\texttt{policy\_p0\_t287}（200k 步从零，tianyan287\_20q，P0 四件套 + P1-a，trunc 20.3\%$\to$11.0\%、sr 8.1$\times\to$1.9--2.8$\times$，一次健康 run）；\texttt{LA287}/\texttt{FTC287}（KL 锚定微调 + 训练期 beam，各 100k，tmux 双 GPU 并行）；A3 v2 蒸馏（argmax 内化前瞻，规划中）。
+
+
+\subsubsection{六、推理框架}
+
+\textbf{argmax。}确定性推理：每步构建有效边掩码（合法边 + 死锁掩码 + 未映射边 + commit/phase 条件），取 logits 最大动作，直至完成或截断。
+
+\textbf{Beam search（1 步 lookahead）。}为弥补 PPO 前馈推理无法搜索的缺陷：策略输出全部边 logit，取 top-$K$ 候选（默认 $K=3$），对每个候选克隆环境（\texttt{clone()} 深拷贝全状态）执行虚拟 step（\texttt{compute\_obs=False} 跳过无用观测计算），批量 GNN 前向（\texttt{node\_embeddings\_batched} 单次替代 $K$ 次）后打分
+\[
+\mathrm{score}=r_c+\gamma\cdot V(s'),
+\]
+取最高分动作执行真实 step；$V(s')$ 可选路由头或 $V_{\mathrm{LA}}$ 多步价值头（\texttt{--beam-vhead \{auto,route,la\}}，ckpt 含 critic\_la 自动切换）。支持 logit $\varepsilon$-扰动多试验（SABRE 随机 tie-break 的 RL 版）与推理侧预算约束（见下）。批量前向把 $K$ 次 GNN/MLP 前向合并为一次，是深电路下 beam 可用的关键。
+
+\textbf{推理侧预算约束（A1，eval 版 P1-a）。}20260917 复盘确认：训练时 $r_c$ 含超预算惩罚（$V_{\mathrm{LA}}$ 在预算约束回报上训练），而推理时 beam 的 $r_c$ 无任何预算惩罚（\texttt{generate\_routing.py}/\texttt{eval\_policy.py} 的 beam 环境缺 \texttt{lambda\_budget/sabre\_swap\_budget} 参数）——超预算零成本导致 beam 深电路发散。修复含两次机制修正：（i）env 级常数惩罚对 beam 排序是空操作（每候选都 +1 SWAP，常数项不改排序），须与候选特异进度交互；（ii）进度信号用「门解锁 OR $\Phi$ 改进」而非仅门解锁（深电路上门解锁稀疏，$\Phi$ 距离改善稠密）。最终机制：超预算状态（$\mathrm{swaps}>1.05\times$SABRE）下，既未解锁门也未改善 $\Phi$ 的候选按超支深度受罚（$\mathrm{score}\mathrel{-}=\lambda_{\mathrm{budget}}\times\mathrm{over\_by}$），解锁门或改善距离的候选豁免。
+
+\textbf{基线与指标。}对比一律用 SABRE（qiskit SabreSwap 口径，\texttt{with\_lookahead(0.5,20)}），禁用 greedy/random（\texttt{--baselines --no-greedy --no-random}）。指标含 SWAP 数、完成率、保真度（mean/logmean/分段 5--9q/10--14q/15--19q）、调度统计（makespan/并行密度/串扰事件）；报告同时给出 completed-only 口径（截断记 0 对 PPO 均值偏严）。
+
+\subsubsection{七、模拟器设计}
+
+\textbf{噪声模型。}以 \texttt{NoiseConfig} 统一参数化四类基本噪声（逐比特/逐边异质，同时进入 GNN 特征与保真度计算）：
+\begin{itemize}
+    \item \textbf{退极化}：单比特门恒等概率 $1-3p/4$、X/Y/Z 各 $p/4$；双比特门恒等 $1-15p/16$、15 个非单位 Pauli 各 $p/16$；
+    \item \textbf{热弛豫}：$|1\rangle$ 自发衰减（$p_{\mathrm{reset}}=1-e^{-t/T_1}$）与相位漂移（$p_z=1-e^{t/T_1-2t/T_2}$）——时间依赖，比特空闲越久衰减越重；
+    \item \textbf{ZZ 串扰}：相邻比特残余耦合 $H_{ZZ}=\theta\cdot Z\otimes Z$，两对不相交双比特门同时执行且交叉比特相邻时产生相干错误（动态串扰）；
+    \item \textbf{读出错误}：对称测量错误矩阵。
+\end{itemize}
+
+\textbf{Aer 密度矩阵仿真（v1，\texttt{sim.py}）。}基于 Qiskit Aer 构建完整噪声模型（热弛豫+退极化+ZZ+读出），以密度矩阵求解器仿真——精确参考，但内存 $O(4^n)$（20q 约 16 TB），仅适用 $\le12$q 小规模终端保真度。
+
+\textbf{轨迹采样（\texttt{trajectory\_sim.py}）。}蒙特卡洛轨迹采样解决密度矩阵内存爆炸：对路由后物理线路执行 $T$ 条独立噪声轨迹，每条维护单个纯态状态向量（内存 $O(2^n)$），对每个噪声通道逐门做 Kraus 采样（热弛豫三段采样、1Q 退极化、2Q 的 15 Pauli、ZZ 与退极化叠加、读出翻转），保真度
+\[
+F=\frac1T\sum_{t=1}^{T}\big|\langle\psi_{\mathrm{ideal}}|\psi_t\rangle\big|^2.
+\]
+相同噪声语义下与 Aer 密度矩阵统计一致（$|\Delta F|<0.02$）。\textbf{物理比特截断优化}：自动检测实际使用的比特子集裁剪到 $k$ 比特（$2^k$ 空间），在退极化+热弛豫+ZZ 模型下未被作用比特恒为 $|0\rangle$（热弛豫不动点），对保真度精确等价、无近似。
+
+\textbf{事件级调度感知 v2（\texttt{trajectory\_sim\_v2.py}）。}以每门精确 \texttt{start/end} 事件驱动噪声演化（事件序列直接取自环境调度日志，与训练奖励口径同源），修复同步波近似三类失真：每比特独立时钟 + 门前空闲热弛豫（Markov 精确复合，零时长事件前等待期也计账）；SWAP 事件带真实噪声（酉矩阵 + $3\times$depol2+ZZ+thermal，物理等价 3$\times$CX，v1 无）；rz 零时长只施加酉演化、不引入退相干；动态串扰按实际重叠时长缩放（$\chi\cdot\Delta t$，含 1Q-2Q spectator 对）；可选 always-on 空闲 ZZ。以 Qiskit DensityMatrix 与解析 Kraus 通道为精确参考对拍（22 用例，端到端 $|\Delta F|<0.02$），同步波退化下与 v1 数值一致。
+
+\textbf{解析保真度代理。}为支持 $\ge16$q 大规模训练，实现 $O(G)$ 一阶错误累积代理（$G$ 为门数）：
+\[
+\log F\approx\sum_{g\in C}\log(1-\varepsilon_g),\quad
+\varepsilon_{\mathrm{depol}}=p,\quad
+\varepsilon_{\mathrm{th}}=\frac12\frac{t}{T_1}+\frac12\frac{t}{T_2},\quad
+\varepsilon_{\mathrm{xtalk}}=\theta^2,
+\]
+忽略门间相干效应与调度差异但保留逐比特/逐边异质性；19q 上较轨迹采样（$T=16$）加速约 8000 倍（35.7\,s$\to$4.6\,ms）。
+
+\textbf{GPU 加速（\texttt{模拟器加速.md}）。}轨迹模拟器全部成本在访存受限的批量态矢量内核（CPU 侧 8 MiB 工作集上限使 20q 批量退化为逐轨迹串行）。将 8 个批量内核 torch 化为 PyTorch CUDA（v1/v2 一次继承），状态 $(T,2^n)$ complex128 常驻 GPU、按空闲 VRAM 25\% 动态切块、动作流编译留 CPU；\texttt{auto} 按工作集分流（$T\times2^n\times16\,\mathrm{B}\ge128$ MiB 才走 GPU，小电路 GPU 反慢 2--5$\times$）。实测深电路约 34$\times$ 加速（gf2\textsuperscript{6}\_mult T=64：2368\,s$\to$70.7\,s；tof\_10 T=128：1655\,s$\to$47.6\,s），19q T=128 复核从 ~28 min 压至 <1 min；无噪声路径 CPU/GPU 逐位一致、噪声路径统计等价；\texttt{test/test\_sim\_gpu.py} 29 项全绿（全量 126 passed）。
+
+
+\subsubsection{八、实验结果}
+
+\textbf{（1）小规模 5q 路由基准（route-only，确定性，历史最佳）}：PPO 在 ring/cross 上与 SABRE 基本持平，beam3 与 SABRE 差距 $\le0.1$ SWAP；line 上 PPO 反超 Greedy 但落后 SABRE。
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{l|ccc|c}
+\hline
+拓扑 & PPO argmax & PPO beam3 & SABRE & Greedy \\
+\hline
+cross\_5q & 2.0 & \textbf{1.3} & \textbf{1.2} & 1.8 \\
+ring\_5q & 1.6 & \textbf{1.2} & \textbf{1.0} & 1.1 \\
+ibmq\_5\_line & 2.8 & \textbf{2.3} & \textbf{2.0} & 3.1 \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{（2）噪声感知 5q（routing + Aer 保真度，确定性）}：PPO 在三种拓扑上保真度均超越 SABRE（line 上 +3.3 个点），代价是 SWAP 多约 $1.2$--$1.3\times$；beam search 将路由 SWAP gap 闭合 63--88\%。
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{l|cc|cc}
+\hline
+拓扑 & PPO SWAPs & SABRE SWAPs & PPO Fidelity & SABRE Fidelity \\
+\hline
+cross\_5q & \textbf{3.2} & 3.0 & \textbf{0.9453} & 0.9327 \\
+ring\_5q & \textbf{4.5} & 3.5 & \textbf{0.9419} & 0.9371 \\
+ibmq\_5\_line & \textbf{6.7} & 5.5 & \textbf{0.9557} & 0.9228 \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{（3）真机 20q 微调（l05 / R3b 血统）}：v2 混合精度（T=64/32/16）下 R3b\_beam5 与 SABRE SWAP 打平（45.0 vs 45.1）；强异构噪声景观下 R3b\_beam5 0.2175 vs SABRE 0.1962（\textbf{+10.9\%，胜局 10/19}），19 电路平均 CX 边误差 SABRE 0.2136 $\to$ R3b 0.2026（$-5.2\%$，12/19 更低）——边噪声选择学会，串扰规避未学会（调度串扰占回报仅 0.02\%，是后续 P0-c 的动机）；最终交付基线 R3b beam5 0.2366 vs SABRE 0.2301、SWAP 45.0 打平。
+
+\textbf{（4）NAM 19 条 $\times$ tianyan287\_20q 全战役}（v2 事件级混合精度 T=64/32/16，seed=42，SABRE-only；GPU 加速评估）：
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{l|ccc|ccc|c}
+\hline
+方法 & mean & logmean & SWAPs & 5--9q & 10--14q & 15--19q & TRUNC \\
+\hline
+SABRE & \textbf{0.2461} & \textbf{0.0863} & \textbf{43.5} & \textbf{0.3691} & \textbf{0.1088} & \textbf{0.1097} & 0/19 \\
+p0t287 argmax & 0.2237 & 0.0061 & 236.8 & 0.3522 & 0.0779 & 0.0833 & 3/19 \\
+p0t287 beam5 & 0.1508 & 0.0001 & 420.9 & 0.2640 & 0.0139 & 0.0340 & \textbf{7/19} \\
+LA287 argmax & 0.2392 & 0.0175 & 176.4 & — & — & — & 2/19 \\
+LA287 beam5(la) & 0.2316 & 0.0002 & 375.7 & — & — & — & 6/19 \\
+LA287 beam5(la)+bud & 0.2314 & 0.0060 & 136.9 & — & — & — & 1/19 \\
+LA287 beam5(r)+bud & \textbf{0.2341} & 0.0047 & 189.3 & — & — & — & 2/19 \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{深电路 T=128 复核}（GPU，近胜局常态化）：p0t287 argmax 4 胜 3 负 SABRE（gf2\textsuperscript{5} +39\% / gf2\textsuperscript{6} +25\% / barenco\_tof\_10 +49\% / tof\_10 翻转 +20\%）；LA287 argmax 3/7 胜（gf2\textsuperscript{5} +45\%、barenco\_tof\_10 +24\%、tof\_10 +24\%、gf2\textsuperscript{4} ≈$\to$+9\%）。
+
+\textbf{战役结论}：
+\begin{itemize}
+    \item \textbf{P0 结构注入生效（p0t287）}：argmax 深电路 2.2--3.8$\times$ SWAP 下保真度 +61\%--+71\%（gf2/tof/barenco 族，恰好是 SABRE 换位密度最高的电路），但总体 $-9.1\%$、SWAP $5.4\times$，G2 闸门未过；3 条电路（hwb6/mod\_red\_21/rc\_adder\_6）陷阱游走；beam5 反转（7/19 截断），「beam 能逃逸」假说证伪，指向 $V(s')$ 对分布外深电路状态高估；
+    \item \textbf{训练期 beam 进入学习闭环（LA287，M4）}：G9 主判据成立（同 ckpt beam5(la) 0.2316 $\ge$ beam5(route) 0.2187，+5.9\%）；argmax 0.2392（+6.9\%）且 TRUNC 3$\to$2、SWAPs 236.8$\to$176.4；FTC287 对照归因：+5.8\% 来自 KL 微调「继续训练」、LA 纯贡献 +1.1\%（但 V\_LA 经共享 GNN 主干外溢使 route 头 beam5 +13.1\%）；逐电路亮点 rc\_adder\_6 beam5(la) 0.0917（+204\% vs SABRE）、mod\_mult\_55 0.2008（修复 p0t287 的 0.0259）；G10 未达标（6/19）→ 下一路标；
+    \item \textbf{推理侧预算约束修复发散（A1-reval）}：根因是训练有锚、推理裸奔的工程缺口；修复后发散 6/19 $\to$ 1/19（唯一残余为起点固化的 mod\_red\_21），SWAPs 375.7$\to$136.9（$-64\%$），但 fid\_mean 0.2341 未达 $\ge0.24$——预算锚固有张力：惩罚不分「必要绕路」与「无效游走」（rc\_adder\_6/tof\_4 的 SWAP 换保真度被误伤），G9 翻转（route 头 0.2341 反超 la 头 0.2314，V\_LA 训练分布与预算评分语境不匹配）——下一步为预算状态进观测的 V\_LA 重训 + v2 蒸馏（argmax 内化前瞻）。
+\end{itemize}
+
+\textbf{（5）GPU 加速基准}（NAM 路由电路 $\times$ tianyan287\_20q，seed=42）：gf2\textsuperscript{6}\_mult（18q, T=64）2368.0\,s$\to$70.7\,s（33.5$\times$）、tof\_10（19q, T=128）1655.2\,s$\to$47.6\,s（34.8$\times$）；小电路（$\le$14q）GPU 反慢 2--5$\times$，按 128 MiB 工作集阈值 auto 分流。
+
+
+\subsubsection{九、工程与硬件}
+
+\textbf{工程纪律。}训练与评估均在 tmux 会话后台进行（防终端断开）；训练/评估脚本于 \texttt{src/} 下执行；每次实验后按统一格式将命令、设置、关键日志摘要与结果表追加至 \texttt{doc/train.md}（按时间顺序、`---` 分节、中文描述、代码块命令、markdown 表格）；磁盘纪律：checkpoint/日志/临时文件一律在 \texttt{/home} 或 \texttt{/tmp}（严禁涉及损坏的 \texttt{/data1}）。
+
+\textbf{闸门体系（以工程闸门替代经验判断）}。训练/评估全流程按一票否决闸门把关：G1 训练中 SWAP/SABRE 比率监控（>1.05 报警、>1.10 回滚）、G2 checkpoint 准入（NAM held-out SWAP $\le1.05\times$SABRE 且分规模段过闸）、G3 单变量分阶段上线、G4 奖励分量占比审计（噪声项合计 $\le10$--15\% 回报量级）、G5 KL 漂移约束（微调期均值 $\le0.05$--0.1）、G6 回归测试（pytest 全绿）、G7 vla\_loss 无发散、G8 训练期 beam 吞吐 slowdown $\le4\times$、G9（主判据）同 ckpt beam5(la) $\ge$ beam5(route)、G10（关键判据）beam5(la) TRUNC $\le2/19$。
+
+\textbf{度量规范。}深电路结论 T$\ge64$（T=16 方差已证伪多个结论）；近胜局 T$\ge128$ 复核（GPU 加速后常态化）；评估协议 NAM 19 条主基准 + QUARL 18 条第二评估集（均 held-out），v2 混合精度 T=64/32/16、seed=42、SABRE-only 基线；串扰 claim 用确定性结构指标（CX 边误差、crosstalk\_events、makespan）+ v1/v2 双口径声明；换真实器件量级物理参数时所有奖励权重有效量纲重对齐。
+
+\textbf{硬件配置。}CPU 推理口径 2$\times$ Xeon Gold 6348、251\,GB 内存；保真度模拟链 CUDA GPU 加速（批量轨迹内核常驻显存，小电路按 128 MiB 工作集阈值回退 CPU）；训练双 GPU 并行（LA287/FTC287 各占一卡，tmux 双会话）。
+
 \subsection{噪声感知路由增强战役：详细进展、问题与后续规划（2026-09-15）}
 
 本节完整记录噪声感知路由增强战役（P0 系列结构性注入 $\to$ tianyan287\_20q 重训 $\to$ NAM 全量评估）的进展、问题与规划。方法论约束为「改信号、不改价格」：单纯调奖励权重的路线已被 t287-v1 / t287-v2 / t287sh 三次失败证伪，本轮全部改动为结构性注入，并以工程闸门（G1--G6）替代经验判断。与早前摘要版相比，本版补齐了\textbf{评估定论}：argmax/beam5 各 19 条电路已全部完成，结论出现重要反转，详见第五部分。

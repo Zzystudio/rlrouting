@@ -89,6 +89,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="对 benchmark 电路生成 PPO/SABRE 映射和路由策略")
     parser.add_argument("--model", required=True, help="模型 checkpoint 路径")
+    parser.add_argument("--edge-hidden", type=int, default=64,
+                        help="edge_mlp 首层隐藏宽度（E17 容量升级：64→128）")
     parser.add_argument("--model-name", default="ppo",
                         help="模型名称（输出标签，如 l05、ph2v4）")
     parser.add_argument("--circuit-dir", required=True, help="QASM 电路目录")
@@ -115,6 +117,21 @@ def main():
     parser.add_argument("--no-gnn", action="store_true")
     parser.add_argument("--beam-width", type=int, default=0,
                         help="Beam search width (0=argmax, 3/5 for beam)")
+    parser.add_argument("--beam-vhead", type=str, default="auto",
+                        choices=["auto", "route", "la"],
+                        help="beam 打分价值头：auto=ckpt 含 critic_la 则用 la；"
+                             "route=v_route+λv_fid；la=V_LA 多步价值头")
+    parser.add_argument("--lambda-budget", type=float, default=0.0,
+                        help="P1-a 推理版：SWAP 超预算后每颗惩罚（0=关，默认关=历史口径）。"
+                             "使 beam 打分的 r_c 与训练口径一致（训练有预算锚、推理此前裸奔）")
+    parser.add_argument("--budget-delta", type=float, default=1.05,
+                        help="预算膨胀系数：budget = ceil(delta × SABRE swaps)")
+    parser.add_argument("--swap-price-scale", type=float, default=1.0,
+                        help="potential 模式 SWAP 边际价格缩放（与训练一致；"
+                             "20260917 审计校准值 4.6）")
+    parser.add_argument("--warm-start-sabre", action="store_true",
+                        help="SABRE 初始布局 warm-start：跳过模型映射阶段，"
+                             "直接从 SABRE 布局进入路由（布局 A/B 实验用）")
     parser.add_argument("--swap-cost", type=float, default=0.0,
                         help="Per-SWAP penalty (match training: ph2v4=0.5)")
     parser.add_argument("--eta-xtalk-par", type=float, default=1.0,
@@ -184,6 +201,18 @@ def main():
         beta_noise=args.beta_noise,
     )
     n_edges = args.max_num_edges or len(coupling_map)
+    # 探测 checkpoint 是否带 V_LA 头（训练期 beam lookahead 产物）
+    _probe = torch.load(args.model, map_location='cpu', weights_only=False)
+    _has_la = isinstance(_probe, dict) and any(
+        k.startswith('critic_la') for k in _probe.get('ac', {}))
+    if args.beam_vhead == 'auto':
+        vhead = 'la' if _has_la else 'route'
+    elif args.beam_vhead == 'la' and not _has_la:
+        print('[warn] --beam-vhead la 但 ckpt 无 critic_la 权重，回退 route 口径')
+        vhead = 'route'
+    else:
+        vhead = args.beam_vhead
+    print(f'[vhead] beam 打分价值头 = {vhead}（ckpt critic_la: {_has_la}）')
     agent = PPOAgent(
         obs_dim=int(np.prod(dummy_env.observation_space.shape)),
         action_dim=n_edges + 1,  # +1 for commit action
@@ -195,6 +224,8 @@ def main():
         with_commit=True,
         edge_feat_dim=(getattr(dummy_env, "_edge_feat_dim", None)
                        if use_gnn else None),
+        with_la_head=_has_la,
+        edge_hidden=args.edge_hidden,
     )
     agent.load(args.model)
     agent.ac.eval()
@@ -217,6 +248,7 @@ def main():
     os.makedirs(args.out_dir, exist_ok=True)
     results = []
     skipped = []
+    _budget_cache = {}  # fname -> SABRE swaps（P1-a 推理版预算锚缓存）
 
     for fname in qasm_files:
         fpath = os.path.join(args.circuit_dir, fname)
@@ -237,6 +269,23 @@ def main():
 
         # ── 路由 ──
         t0 = time.perf_counter()
+        # SABRE 布局 warm-start（布局 A/B 实验）：SABRE 求布局，模型只做路由
+        ws_layout = None
+        if args.warm_start_sabre:
+            from routing.routing import sabre_route
+            _, ws_info = sabre_route(qc, config, swap_trials=20, seed=args.seed)
+            ws_layout = ws_info.get('initial_layout')
+        # P1-a 推理版：SABRE SWAP 预算锚——超预算后每颗额外 SWAP 罚 lambda_budget，
+        # 使 beam 打分的 r_c 与训练口径一致（doc/20260917训练方案.md §2-A1）
+        ep_budget = None
+        if args.lambda_budget > 0:
+            from routing.routing import sabre_route
+            if fname not in _budget_cache:
+                _, sinfo = sabre_route(qc, config, swap_trials=20, seed=args.seed)
+                _budget_cache[fname] = int(sinfo.get("num_swaps", 0) or 0)
+            s_sw = _budget_cache[fname]
+            if s_sw > 0:
+                ep_budget = int(np.ceil(args.budget_delta * s_sw))
         env = RoutingEnv(
             dag, hw, coupling_map, reward_mode=args.reward_mode,
             max_episode_steps=args.max_episode_steps,
@@ -246,11 +295,15 @@ def main():
             max_num_qubits=args.max_num_qubits,
             max_num_edges=n_edges,
             mapping_phase=True,
+            init_mapping=ws_layout,
             fidelity_fn=None,
             use_scheduler=False,
             swap_cost=args.swap_cost,
             eta_xtalk_par=args.eta_xtalk_par,
             lambda_fid=args.lambda_fid_max if args.reward_mode != 'routing' else 0.0,
+            lambda_budget=args.lambda_budget,
+            sabre_swap_budget=ep_budget,
+            swap_price_scale=args.swap_price_scale,
             lookahead_features=(True if args.lookahead_features is None
                                 else args.lookahead_features),
             edge_noise_features=args.edge_noise_features,
@@ -262,6 +315,11 @@ def main():
             eta_shape=args.eta_shape, alpha_ext=args.alpha_ext,
         )
         obs, _ = env.reset()
+        if ws_layout is not None:
+            # 覆盖运行期映射阶段（保留 enable_mapping_phase 以不丢 phase 特征，
+            # 与 eval_policy 的 A1 模式同构）
+            env.mapping_phase = False
+            obs = env._obs()
 
         if args.beam_width > 0:
             # Beam search: inline 1-step lookahead
@@ -303,11 +361,31 @@ def main():
                         qubit_hs = agent.gnn.node_embeddings_batched(graph_datas)
                         clone_obs_list = [t[0]._obs(qubit_h=qh.cpu().numpy())
                                           for t, qh in zip(clones, qubit_hs)]
-                        # K 个候选的 V(s') 批量前向（单次替代 K 次）
-                        _, values = agent._forward_obs_batch(np.stack(clone_obs_list))
+                        # K 个候选的 V(s') 批量前向（单次替代 K 次）；
+                        # vhead='la' 用 V_LA 多步价值头（训练期 beam expectimax 训得）
+                        if vhead == 'la':
+                            _, values = agent._forward_obs_batch_vla(np.stack(clone_obs_list))
+                        else:
+                            _, values = agent._forward_obs_batch(np.stack(clone_obs_list))
+                        # P1-a 推理版：父状态势函数基准（每步一次）
+                        phi_parent = env._phi() if (ep_budget is not None
+                                                    and args.lambda_budget > 0) else None
                         for (clone, a, reward_c, done_c, truncated_c), clone_obs, v in zip(
                                 clones, clone_obs_list, values):
                             score = reward_c if (done_c or truncated_c) else reward_c + agent.gamma * v.item()
+                            # P1-a 推理版（排序有效）：超预算下既未解锁门、也未改善
+                            # 势函数（距离）的候选按超支深度受罚——常数级惩罚不改变
+                            # 同步内排序，必须与候选特异进度交互；进度用 Φ 改进
+                            # 而非仅门解锁（深电路上门解锁稀疏、Φ 改进稠密）
+                            if (ep_budget is not None and not done_c
+                                    and not truncated_c):
+                                over_by = clone._swap_counter - ep_budget
+                                if over_by > 0:
+                                    prog = ((len(clone.executed)
+                                             - len(env.executed)) > 0
+                                            or (clone._phi() > phi_parent + 1e-9))
+                                    if not prog:
+                                        score -= args.lambda_budget * over_by
                             if score > best_score:
                                 best_score = score
                                 best_action = a
@@ -392,6 +470,8 @@ def main():
             "final_layout": final_layout,
             "wall_time_ms": round(wall_time_ms, 1),
             "from_0_19": from_0_19,
+            "sabre_budget": ep_budget,
+            "lambda_budget": args.lambda_budget,
         }
         results.append(result)
 

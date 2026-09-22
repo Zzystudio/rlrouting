@@ -209,6 +209,10 @@ def build_fidelity_fn(fidelity_sim: str, config, num_trajectories: int = 64, see
         from sim.trajectory_sim_v2 import make_event_fidelity_fn
         return make_event_fidelity_fn(config, num_trajectories=num_trajectories,
                                       seed=seed, backend=backend)
+    if fidelity_sim == "trajectory_v3":
+        from sim.trajectory_sim_v3 import make_event_fidelity_fn_v3
+        return make_event_fidelity_fn_v3(config, num_trajectories=num_trajectories,
+                                         seed=seed, backend=backend)
     if fidelity_sim == "analytic":
         from sim.trajectory_sim import make_analytic_fidelity_fn
         return make_analytic_fidelity_fn(config)
@@ -230,6 +234,11 @@ def phys_fidelity(phys, config, fidelity_sim: str, num_trajectories: int = 64, s
         return trajectory_circuit_fidelity_events(phys, config,
                                                   num_trajectories=num_trajectories,
                                                   seed=seed)
+    if fidelity_sim == "trajectory_v3":
+        from sim.trajectory_sim_v3 import trajectory_circuit_fidelity_events_v3
+        return trajectory_circuit_fidelity_events_v3(phys, config,
+                                                     num_trajectories=num_trajectories,
+                                                     seed=seed)
     from sim.sim import NoiseSimulator
     from qiskit_aer import AerSimulator
     try:
@@ -290,6 +299,8 @@ def evaluate_circuit(
     w_xt_swap: float = 0.0,
     pot_progress_b: float = 0.045,
     pot_1q_reward: bool = True,
+    lambda_budget: float = 0.0,
+    sabre_swap_budget: Optional[int] = None,
 ) -> CircuitMetrics:
     import torch
     env = RoutingEnv(
@@ -310,6 +321,7 @@ def evaluate_circuit(
         use_scheduler=use_scheduler,
         eta_time=eta_time, eta_xtalk_par=eta_xtalk_par, eta_idle=eta_idle,
         eta_parallel=eta_parallel, xtalk_alpha=xtalk_alpha, swap_duration_us=swap_duration,
+        lambda_budget=lambda_budget, sabre_swap_budget=sabre_swap_budget,
     )
 
     obs, _ = env.reset()
@@ -411,6 +423,7 @@ def evaluate_circuit_beam(
     seed: int = 0,
     noise_config: Optional[NoiseConfig] = None,
     beam_width: int = 3,
+    vhead: str = 'route',
     max_num_qubits: Optional[int] = None,
     max_num_edges: Optional[int] = None,
     random_init: bool = False,
@@ -440,6 +453,8 @@ def evaluate_circuit_beam(
     w_xt_swap: float = 0.0,
     pot_progress_b: float = 0.045,
     pot_1q_reward: bool = True,
+    lambda_budget: float = 0.0,
+    sabre_swap_budget: Optional[int] = None,
 ) -> CircuitMetrics:
     import torch
     env = RoutingEnv(
@@ -462,6 +477,7 @@ def evaluate_circuit_beam(
         use_scheduler=use_scheduler,
         eta_time=eta_time, eta_xtalk_par=eta_xtalk_par, eta_idle=eta_idle,
         eta_parallel=eta_parallel, xtalk_alpha=xtalk_alpha, swap_duration_us=swap_duration,
+        lambda_budget=lambda_budget, sabre_swap_budget=sabre_swap_budget,
     )
 
     obs, _ = env.reset()
@@ -521,14 +537,33 @@ def evaluate_circuit_beam(
                 qubit_hs = agent.gnn.node_embeddings_batched(graph_datas)
                 clone_obs_list = [t[0]._obs(qubit_h=qh.cpu().numpy())
                                   for t, qh in zip(clones, qubit_hs)]
-                # K 个候选的 V(s') 批量前向（单次替代 K 次）
-                _, values = agent._forward_obs_batch(np.stack(clone_obs_list))
+                # K 个候选的 V(s') 批量前向（单次替代 K 次）；
+                # vhead='la' 时用 V_LA 多步价值头（训练期 beam expectimax 训得）
+                if vhead == 'la':
+                    _, values = agent._forward_obs_batch_vla(np.stack(clone_obs_list))
+                else:
+                    _, values = agent._forward_obs_batch(np.stack(clone_obs_list))
+                # P1-a 推理版：父状态势函数（进度判定的基准，每步一次）
+                phi_parent = env._phi() if (sabre_swap_budget is not None
+                                            and lambda_budget > 0) else None
                 for (clone, a, reward_c, done_c, truncated_c), clone_obs, v in zip(
                         clones, clone_obs_list, values):
                     if done_c or truncated_c:
                         score = reward_c
                     else:
                         score = reward_c + agent.gamma * v.item()
+                    # P1-a 推理版（排序有效）：常数级预算惩罚不改变同步内排序
+                    # （每候选均 +1 swap），必须与候选特异进度交互——超预算
+                    # 状态下既未解锁门、也未改善势函数（距离）的候选按超支深度受罚。
+                    # 进度用 Φ 改进而非仅门解锁：深电路上门解锁稀疏，Φ 改进稠密
+                    if (sabre_swap_budget is not None and not done_c
+                            and not truncated_c):
+                        over_by = clone._swap_counter - sabre_swap_budget
+                        if over_by > 0:
+                            prog = ((len(clone.executed) - len(env.executed)) > 0
+                                    or (clone._phi() > phi_parent + 1e-9))
+                            if not prog:
+                                score -= lambda_budget * over_by
                     if score > best_score:
                         best_score = score
                         best_action = a
@@ -536,12 +571,22 @@ def evaluate_circuit_beam(
             else:
                 clone_obs_list = [c._obs() for c, *_ in clones]
                 _, values = agent._forward_obs_batch(np.stack(clone_obs_list))
+                phi_parent = env._phi() if (sabre_swap_budget is not None
+                                            and lambda_budget > 0) else None
                 for (clone, a, reward_c, done_c, truncated_c), clone_obs, v in zip(
                         clones, clone_obs_list, values):
                     if done_c or truncated_c:
                         score = reward_c
                     else:
                         score = reward_c + agent.gamma * v.item()
+                    if (sabre_swap_budget is not None and not done_c
+                            and not truncated_c):
+                        over_by = clone._swap_counter - sabre_swap_budget
+                        if over_by > 0:
+                            prog = ((len(clone.executed) - len(env.executed)) > 0
+                                    or (clone._phi() > phi_parent + 1e-9))
+                            if not prog:
+                                score -= lambda_budget * over_by
                     if score > best_score:
                         best_score = score
                         best_action = a
@@ -847,6 +892,8 @@ def print_report(
 def main():
     parser = argparse.ArgumentParser(
         description='Evaluate trained routing policy')
+    parser.add_argument("--edge-hidden", type=int, default=64,
+                        help="edge_mlp 首层隐藏宽度（E17 容量升级：64→128）")
     parser.add_argument('--model', type=str, required=True,
                         help='policy checkpoint path')
     parser.add_argument('--data-dir', type=str, default='../traindata',
@@ -899,6 +946,15 @@ def main():
                         help='limit number of circuits to evaluate')
     parser.add_argument('--beam-width', type=int, default=0,
                         help='beam search 宽度（1-step lookahead）；0 表示 argmax')
+    parser.add_argument('--beam-vhead', type=str, default='auto',
+                        choices=['auto', 'route', 'la'],
+                        help='beam 打分价值头：auto=ckpt 含 critic_la 则用 la；'
+                             'route=v_route+λv_fid（历史口径）；la=V_LA 多步价值头')
+    parser.add_argument('--lambda-budget', type=float, default=0.0,
+                        help='P1-a 推理版：SWAP 超预算后每颗惩罚（0=关，默认关=历史口径）。'
+                             '使 beam 打分的 r_c 与训练口径一致')
+    parser.add_argument('--budget-delta', type=float, default=1.05,
+                        help='预算膨胀系数：budget = ceil(delta × SABRE swaps)')
     parser.add_argument('--use-scheduler', action='store_true', default=False,
                         help='启用门调度器（timing_aware），导出并行调度序列')
     parser.add_argument('--eta-time', type=float, default=0.01)
@@ -915,7 +971,7 @@ def main():
     parser.add_argument('--verbose', action='store_true', default=False,
                         help='print per-circuit results')
     parser.add_argument('--fidelity-sim', type=str, default='aer',
-                        choices=['aer', 'trajectory', 'trajectory_sched', 'trajectory_v2', 'analytic'],
+                        choices=['aer', 'trajectory', 'trajectory_sched', 'trajectory_v2', 'trajectory_v3', 'analytic'],
                         help='保真度模拟器: aer=density_matrix/counts (n<=12), '
                              'trajectory=轨迹状态向量(串行, O(2^n) 内存), '
                              'trajectory_sched=轨迹状态向量+调度感知(空闲退相干/动态串扰), '
@@ -976,6 +1032,19 @@ def main():
     sample_qc = load_qc(args.data_dir, rel_paths[0])
     sample_dag = CircuitDAG.from_circuit(sample_qc)
 
+    # 探测 checkpoint 是否带 V_LA 头（训练期 beam lookahead 产物）
+    _probe = torch.load(args.model, map_location='cpu', weights_only=False)
+    _has_la = isinstance(_probe, dict) and any(
+        k.startswith('critic_la') for k in _probe.get('ac', {}))
+    if args.beam_vhead == 'auto':
+        vhead = 'la' if _has_la else 'route'
+    elif args.beam_vhead == 'la' and not _has_la:
+        print('[warn] --beam-vhead la 但 ckpt 无 critic_la 权重，回退 route 口径')
+        vhead = 'route'
+    else:
+        vhead = args.beam_vhead
+    print(f'[vhead] beam 打分价值头 = {vhead}（ckpt critic_la: {_has_la}）')
+
     use_gnn = not args.no_gnn
     shared_gnn = SubGNN(subgraph='full') if use_gnn else None
     if use_gnn:
@@ -1004,6 +1073,8 @@ def main():
         coupling_map=coupling_map,
         with_commit=args.mapping_phase,
         edge_feat_dim=(getattr(sample_env, '_edge_feat_dim', None) if use_gnn else None),
+        with_la_head=_has_la,
+        edge_hidden=args.edge_hidden,
     )
     agent.load(args.model)
     agent.ac.eval()
@@ -1015,7 +1086,8 @@ def main():
         if args.verbose:
             print(f'  [{i+1}/{total}] {method}...', end=' ', flush=True)
 
-    label = f'PPO_beam{args.beam_width}' if args.beam_width > 0 else 'PPO'
+    label = (f'PPO_beam{args.beam_width}_{vhead}'
+             if args.beam_width > 0 else 'PPO')
     traj_seed = args.traj_seed if args.traj_seed is not None else args.seed
     fid_fn = build_fidelity_fn(args.fidelity_sim, config, args.traj_trajectories, traj_seed,
                                backend=args.sim_device) \
@@ -1027,6 +1099,15 @@ def main():
             _progress(i, len(rel_paths), label)
             qc = load_qc(args.data_dir, rel_path)
             dag = CircuitDAG.from_circuit(qc)
+            # P1-a 推理版：每电路 SABRE SWAP 预算（超预算每颗罚 lambda_budget，
+            # 使 beam 打分的 r_c 与训练口径一致；默认关=历史行为）
+            ep_budget = None
+            if args.lambda_budget > 0:
+                _, sinfo = sabre_route(qc, config, swap_trials=args.sabre_trials,
+                                       seed=args.seed)
+                s_sw = int(sinfo.get('num_swaps', 0) or 0)
+                if s_sw > 0:
+                    ep_budget = int(np.ceil(args.budget_delta * s_sw))
             init_mapping = None
             if args.warm_start_sabre:
                 _, info = sabre_route(
@@ -1043,11 +1124,14 @@ def main():
                     seed=args.seed + i,
                     noise_config=config if args.reward_mode != 'routing' else None,
                     beam_width=args.beam_width,
+                    vhead=vhead,
+                    lambda_budget=args.lambda_budget,
+                    sabre_swap_budget=ep_budget,
                     max_num_qubits=args.max_num_qubits,
                     max_num_edges=args.max_num_edges,
                     random_init=random_init,
                     init_mapping=init_mapping,
-                    use_scheduler=(args.use_scheduler or args.fidelity_sim in ("trajectory_sched", "trajectory_v2")),
+                    use_scheduler=(args.use_scheduler or args.fidelity_sim in ("trajectory_sched", "trajectory_v2", "trajectory_v3")),
                     eta_time=args.eta_time,
                     eta_xtalk_par=args.eta_xtalk_par,
                     eta_idle=args.eta_idle,
@@ -1078,7 +1162,9 @@ def main():
                     max_num_edges=args.max_num_edges,
                     random_init=random_init,
                     init_mapping=init_mapping,
-                    use_scheduler=(args.use_scheduler or args.fidelity_sim in ("trajectory_sched", "trajectory_v2")),
+                    lambda_budget=args.lambda_budget,
+                    sabre_swap_budget=ep_budget,
+                    use_scheduler=(args.use_scheduler or args.fidelity_sim in ("trajectory_sched", "trajectory_v2", "trajectory_v3")),
                     eta_time=args.eta_time,
                     eta_xtalk_par=args.eta_xtalk_par,
                     eta_idle=args.eta_idle,
@@ -1113,6 +1199,14 @@ def main():
     show_fid = (args.reward_mode != 'routing') or (args.fidelity_sim in ('trajectory', 'trajectory_sched', 'trajectory_v2'))
     print_header(show_fidelity=show_fid)
     print_report(label, agent_stats, show_fidelity=show_fid)
+
+    # trunc 诊断：预算型（步数耗尽）vs 能力/游走型（no_progress 提前截断）
+    _tb = sum(1 for m in agent_metrics
+              if not m.completed and m.episode_steps >= args.max_episode_steps)
+    _tn = sum(1 for m in agent_metrics
+              if not m.completed and m.episode_steps < args.max_episode_steps)
+    if _tb + _tn:
+        print(f'  [trunc诊断] 预算型={_tb}  能力/游走型={_tn}')
 
     if args.baselines:
         # Random
@@ -1220,3 +1314,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

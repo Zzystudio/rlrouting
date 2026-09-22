@@ -19,7 +19,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from qiskit.qasm2 import loads as qasm2_loads
 
-from sim.trajectory_sim_v2 import trajectory_circuit_fidelity_events
+from sim.trajectory_sim_v2 import trajectory_circuit_fidelity_events as _fid_v2
+from sim.trajectory_sim_v3 import trajectory_circuit_fidelity_events_v3 as _fid_v3
 from routing.routing import sabre_route
 from routing.rl.eval_policy import load_topo
 
@@ -33,6 +34,10 @@ IS_CPU = '--cpu' in sys.argv
 SIM_BACKEND = 'cpu' if IS_CPU else 'auto'
 # --circ-dir <dir>：评估集目录（默认 benchmark/nam_circs；QUARL 第二评估集用
 # benchmark/quarl_opt_wo_rm），路由结果仍从 benchmark/routed/<MODEL_DIR>/ 读取
+SIM_VERSION = 'v2'
+if '--sim' in sys.argv:
+    SIM_VERSION = sys.argv[sys.argv.index('--sim') + 1]
+_FID = _fid_v3 if SIM_VERSION == 'v3' else _fid_v2
 CIRC_DIR = 'benchmark/nam_circs'
 if '--circ-dir' in sys.argv:
     CIRC_DIR = sys.argv[sys.argv.index('--circ-dir') + 1]
@@ -97,7 +102,7 @@ for fname in circuits:
     q = qasm2_loads(open(os.path.join(NAM_DIR, fname)).read()).num_qubits
     T = T_for(q)
     t0 = time.perf_counter()
-    fid = trajectory_circuit_fidelity_events(phys, config, num_trajectories=T,
+    fid = _FID(phys, config, num_trajectories=T,
                                              seed=SEED, backend=SIM_BACKEND)
     dt = round(time.perf_counter() - t0, 1)
     results.append({'model': MODEL_DIR, 'circuit': fname, 'qubits': q,

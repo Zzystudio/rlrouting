@@ -150,6 +150,48 @@ class SubGNN(nn.Module):
         qubit_h = h[-data.num_physical:]  # last P nodes = qubit nodes
         return qubit_h
 
+    def gate_embeddings(self, data) -> torch.Tensor:
+        """返回 gate 节点嵌入 h[:G]（全图段首 G 个节点）。
+
+        时钟化动作空间 EXEC 候选打分需要 per-gate 嵌入
+        （doc/20260920训练方案.md §2.2）；旧代码 path 仅用 qubit 行，
+        本方法为纯新增。
+        """
+        from ..graph.circuit_dag import RoutingGraphData as RGD
+        assert isinstance(data, RGD), "gate_embeddings expects RoutingGraphData"
+        pyg = data.to_pyg("full")
+        pyg = pyg.to(next(self.encoder.parameters()).device)
+        h = self.encoder.forward(pyg.x, pyg.edge_index, pyg.edge_attr)
+        return h[:data.num_gates]
+
+    def node_and_gate_embeddings(self, data):
+        """一次前向返回 (gate_h[:G], qubit_h[-P:])（时钟化 obs 用，省一次 forward）。"""
+        from ..graph.circuit_dag import RoutingGraphData as RGD
+        assert isinstance(data, RGD), "expects RoutingGraphData"
+        pyg = data.to_pyg("full")
+        pyg = pyg.to(next(self.encoder.parameters()).device)
+        h = self.encoder.forward(pyg.x, pyg.edge_index, pyg.edge_attr)
+        return h[:data.num_gates], h[-data.num_physical:]
+
+    def gate_embeddings_batched(self, data_list) -> list:
+        """对多个 RoutingGraphData 批量前向，返回每图 gate 嵌入列表（段首 G 个）。"""
+        from ..graph.circuit_dag import RoutingGraphData as RGD
+        from torch_geometric.data import Batch
+
+        assert all(isinstance(d, RGD) for d in data_list)
+        pygs = [d.to_pyg("full") for d in data_list]
+        dev = next(self.encoder.parameters()).device
+        pygs = [p.to(dev) for p in pygs]
+        batch = Batch.from_data_list(pygs)
+        h = self.encoder.forward(batch.x, batch.edge_index, batch.edge_attr)
+        outs = []
+        start = 0
+        for d in data_list:
+            seg = d.num_gates + d.num_physical
+            outs.append(h[start:start + d.num_gates])
+            start += seg
+        return outs
+
     def node_embeddings_batched(self, data_list) -> list:
         """对多个 RoutingGraphData 做批量 GNN 前向，返回每图 qubit 嵌入列表。
 

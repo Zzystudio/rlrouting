@@ -266,6 +266,29 @@ class RoutingGraphData:
         return result
 
 
+@dataclass
+class TimingState:
+    """时钟化 env 的时序状态快照，供 build_routing_graph 填充 GNN 空余维度。
+
+    None（默认）时所有时序列保持 0——旧路径逐位不变（doc/20260920训练方案.md
+    §2.1）。维度分配：qubit 19-24 / gate 27-30 / coupling 12-14 / dep 10。
+    """
+
+    t: float = 0.0                              # 当前时钟 T（µs）
+    busy_until: Optional[np.ndarray] = None     # [P] 每物理比特锁释放时刻
+    last_free: Optional[np.ndarray] = None      # [P] 上次门结束时刻（-1=未激活）
+    qubit_idle_time: Optional[np.ndarray] = None   # [P] 累计空闲 µs
+    qubit_crosstalk: Optional[np.ndarray] = None   # [P] 累计 ZZ 曝露（zz·µs）
+    run_kind: Optional[np.ndarray] = None       # [P] 在飞类型：1=swap -1=2q 0=无
+    parallel_usage: Optional[np.ndarray] = None # [P,P] 并行使用计数
+    gate_in_flight: Optional[set] = None        # 已物化未完成 gate idx
+    launchable_2q: Optional[set] = None         # EXEC 候选（launchable）gate idx
+    chain_dur: Optional[dict] = None            # gate idx -> 前置未物化 1Q 尾链时长
+    ready_age: Optional[dict] = None            # gate idx -> 距首次可 launch 的 SKIP 数
+    max_dur: float = 0.9                        # 归一化基准（SWAP 时长）
+    ready_age_cap: float = 16.0                 # ready_age 归一化分母
+
+
 def build_routing_graph(
     dag: CircuitDAG,
     mapping: List[int],
@@ -275,6 +298,7 @@ def build_routing_graph(
     two_gate_time: float = 0.3,
     executed_mask: Optional[np.ndarray] = None,
     executable_2q: Optional[set] = None,
+    timing_state: Optional[TimingState] = None,
 ) -> RoutingGraphData:
     """构建路由图（每步调用）。
 
@@ -447,6 +471,84 @@ def build_routing_graph(
     else:
         map_index = np.empty((2, 0), dtype=int)
         map_attr_arr = np.empty((0, EDGE_FEATURE_DIM), dtype=float)
+
+    # ---- 时钟化时序特征填充（timing_state=None 时全部保持 0，旧路径逐位不变）----
+    if timing_state is not None:
+        ts = timing_state
+        bu = np.asarray(ts.busy_until, dtype=float) if ts.busy_until is not None else np.zeros(P)
+        lf = np.asarray(ts.last_free, dtype=float) if ts.last_free is not None else np.full(P, -1.0)
+        md = max(float(ts.max_dur), 1e-9)
+        t = float(ts.t)
+        # --- qubit 节点 19-24 ---
+        lock_rem = np.clip((bu - t) / md, 0.0, 3.0)
+        running = (bu > t + 1e-9).astype(float)
+        if ts.run_kind is not None:
+            rk = np.asarray(ts.run_kind, dtype=float) * running
+        else:
+            rk = np.zeros(P, dtype=float)
+        if ts.qubit_idle_time is not None:
+            idle_n = np.clip(np.asarray(ts.qubit_idle_time, float) / 100.0, 0.0, 1.0)
+        else:
+            idle_n = np.zeros(P, dtype=float)
+        if ts.qubit_crosstalk is not None:
+            xt_n = np.clip(np.asarray(ts.qubit_crosstalk, float) / (md * max(1, P) * 5.0), 0.0, 1.0)
+        else:
+            xt_n = np.zeros(P, dtype=float)
+        activated = (lf >= 0.0).astype(float)
+        qubit_feat[:, 19] = lock_rem
+        qubit_feat[:, 20] = running
+        qubit_feat[:, 21] = rk
+        qubit_feat[:, 22] = idle_n
+        qubit_feat[:, 23] = xt_n
+        qubit_feat[:, 24] = activated
+        # --- gate 节点 27-30 ---
+        if ts.gate_in_flight:
+            in_fl = np.array([1.0 if gi in ts.gate_in_flight else 0.0 for gi in range(G)], dtype=float)
+        else:
+            in_fl = np.zeros(G, dtype=float)
+        if ts.launchable_2q:
+            launchable = np.array([1.0 if gi in ts.launchable_2q else 0.0 for gi in range(G)], dtype=float)
+        else:
+            launchable = np.zeros(G, dtype=float)
+        chain_arr = np.zeros(G, dtype=float)
+        if ts.chain_dur:
+            for gi, d in ts.chain_dur.items():
+                if 0 <= gi < G:
+                    chain_arr[gi] = min(float(d) / md, 3.0)
+        age_arr = np.zeros(G, dtype=float)
+        if ts.ready_age:
+            cap = max(float(ts.ready_age_cap), 1e-9)
+            for gi, a in ts.ready_age.items():
+                if 0 <= gi < G:
+                    age_arr[gi] = min(float(a) / cap, 1.0)
+        gate_feat[:, 27] = in_fl
+        gate_feat[:, 28] = launchable
+        gate_feat[:, 29] = chain_arr
+        gate_feat[:, 30] = age_arr
+        # --- coupling 边 12-14（双向同值）---
+        if coupling_map:
+            q1_arr = np.fromiter((e[0] for e in coupling_map), dtype=np.int64,
+                                 count=len(coupling_map))
+            q2_arr = np.fromiter((e[1] for e in coupling_map), dtype=np.int64,
+                                 count=len(coupling_map))
+            bf = ((bu[q1_arr] <= t + 1e-9) & (bu[q2_arr] <= t + 1e-9)).astype(float)
+            busy_min = np.clip((np.minimum(bu[q1_arr], bu[q2_arr]) - t) / md, 0.0, 3.0)
+            if ts.parallel_usage is not None:
+                pu = np.asarray(ts.parallel_usage, dtype=float)
+                pu_n = np.clip(pu[q1_arr, q2_arr] / max(1, G), 0.0, 1.0)
+            else:
+                pu_n = np.zeros(q1_arr.size, dtype=float)
+            for off in (0, 1):
+                coup_attr_arr[off::2, 12] = bf
+                coup_attr_arr[off::2, 13] = busy_min
+                coup_attr_arr[off::2, 14] = pu_n
+        # --- dep 边 10：src 已物化未完成 ---
+        if dep_index.shape[1] > 0:
+            dep_src = dep_index[0]
+            src_in_fl = np.array(
+                [1.0 if int(s) in (ts.gate_in_flight or set()) else 0.0 for s in dep_src],
+                dtype=float)
+            dep_attr_arr[:, 10] = src_in_fl
 
     return RoutingGraphData(
         num_gates=G,

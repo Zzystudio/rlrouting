@@ -1,0 +1,51 @@
+{
+ "circuit": "tof_tower_5_10.qasm",
+ "model": "la287c_argmax_sh",
+ "num_logical_qubits": 5,
+ "num_physical_qubits": 20,
+ "topology": "tianyan287_20q_stronghetero",
+ "initial_layout": {
+  "0": 0,
+  "1": 2,
+  "2": 3,
+  "3": 1,
+  "4": 7
+ },
+ "routed_qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[20];\nh q[1];\nh q[7];\ncx q[3],q[1];\ntdg q[1];\ncx q[0],q[1];\nt q[1];\ncx q[3],q[1];\nt q[3];\ntdg q[1];\ncx q[0],q[1];\nt q[1];\nh q[1];\nswap q[1],q[3];\ncx q[0],q[1];\nt q[0];\ntdg q[1];\ncx q[0],q[1];\nswap q[1],q[2];\nswap q[2],q[4];\ncx q[4],q[7];\ntdg q[7];\nswap q[7],q[11];\nswap q[11],q[15];\nswap q[15],q[18];\nswap q[18],q[19];\nswap q[0],q[1];\nswap q[1],q[2];\nswap q[3],q[5];\nswap q[5],q[8];\nswap q[8],q[11];\nswap q[11],q[15];\nswap q[4],q[7];\nswap q[2],q[4];\nswap q[15],q[18];\nswap q[18],q[19];\nswap q[7],q[11];\nswap q[0],q[1];\nswap q[1],q[3];\nswap q[4],q[7];\nswap q[7],q[10];\nswap q[10],q[15];\ncx q[15],q[18];\nt q[18];\nswap q[11],q[15];\ncx q[15],q[18];\nt q[15];\ntdg q[18];\nswap q[11],q[15];\ncx q[15],q[18];\nt q[18];\nh q[18];\nh q[18];\ncx q[15],q[11];\nt q[15];\ntdg q[11];\ncx q[15],q[11];\ncx q[19],q[18];\ntdg q[18];\nswap q[3],q[5];\nswap q[5],q[7];\nswap q[7],q[10];\nswap q[10],q[15];\ncx q[15],q[18];\nt q[18];\ncx q[19],q[18];\nt q[19];\ntdg q[18];\ncx q[15],q[18];\nt q[18];\nh q[18];\nh q[18];\nswap q[18],q[19];\ncx q[15],q[18];\nt q[15];\ntdg q[18];\ncx q[15],q[18];\nh q[18];\nswap q[15],q[18];\ncx q[11],q[15];\ntdg q[15];\ncx q[10],q[15];\nt q[15];\ncx q[11],q[15];\nt q[11];\ntdg q[15];\ncx q[10],q[15];\nt q[15];\nh q[15];\ncx q[18],q[19];\ntdg q[19];\nswap q[11],q[15];\ncx q[10],q[15];\nt q[10];\ntdg q[15];\ncx q[10],q[15];\nswap q[10],q[14];\nswap q[14],q[17];\ncx q[17],q[19];\nt q[19];\ncx q[18],q[19];\nt q[18];\ntdg q[19];\ncx q[17],q[19];\nt q[19];\nh q[19];\nh q[19];\nswap q[15],q[18];\ncx q[17],q[15];\nt q[17];\ntdg q[15];\ncx q[17],q[15];\ncx q[18],q[19];\ntdg q[19];\nswap q[15],q[17];\ncx q[17],q[19];\nt q[19];\ncx q[18],q[19];\nt q[18];\ntdg q[19];\ncx q[17],q[19];\nt q[19];\nh q[19];\nh q[19];\nswap q[11],q[15];\nswap q[15],q[18];\ncx q[17],q[15];\nt q[17];\ntdg q[15];\ncx q[17],q[15];\nh q[15];\ncx q[18],q[19];\ntdg q[19];\ncx q[17],q[19];\nt q[19];\ncx q[18],q[19];\nt q[18];\ntdg q[19];\ncx q[17],q[19];\nt q[19];\nh q[19];\nh q[19];\nswap q[15],q[17];\ncx q[15],q[18];\nt q[15];\ntdg q[18];\ncx q[15],q[18];\nh q[18];\ncx q[15],q[17];\ntdg q[17];\nswap q[11],q[15];\ncx q[15],q[17];\nt q[17];\nswap q[18],q[19];\nswap q[11],q[15];\ncx q[15],q[17];\nt q[15];\ntdg q[17];\nswap q[11],q[15];\ncx q[15],q[17];\nt q[17];\nh q[17];\ncx q[15],q[11];\nt q[15];\ntdg q[11];\ncx q[15],q[11];\nswap q[18],q[19];\nswap q[11],q[15];\ncx q[15],q[18];\ntdg q[18];\nswap q[15],q[18];\ncx q[11],q[15];\nt q[15];\ncx q[18],q[15];\nt q[18];\ntdg q[15];\ncx q[11],q[15];\nt q[15];\nh q[15];\nswap q[15],q[18];\ncx q[11],q[15];\nt q[11];\ntdg q[15];\ncx q[11],q[15];\ncx q[18],q[19];\ntdg q[19];\ncx q[17],q[19];\nt q[19];\ncx q[18],q[19];\nt q[18];\ntdg q[19];\ncx q[17],q[19];\nt q[19];\nh q[19];\nh q[19];\nswap q[18],q[19];\ncx q[17],q[19];\nt q[17];\ntdg q[19];\ncx q[17],q[19];\ncx q[19],q[18];\ntdg q[18];\nswap q[18],q[19];\ncx q[17],q[19];\nt q[19];\ncx q[18],q[19];\nt q[18];\ntdg q[19];\ncx q[17],q[19];\nt q[19];\nh q[19];\nh q[19];\nswap q[15],q[18];\ncx q[17],q[15];\nt q[17];\ntdg q[15];\ncx q[17],q[15];\nh q[15];\ncx q[18],q[15];\ntdg q[15];\ncx q[11],q[15];\nt q[15];\ncx q[18],q[15];\nt q[18];\ntdg q[15];\ncx q[11],q[15];\nt q[15];\nh q[15];\nh q[15];\ncx q[17],q[19];\ntdg q[19];\nswap q[15],q[18];\ncx q[11],q[15];\nt q[11];\ntdg q[15];\ncx q[11],q[15];\nswap q[11],q[15];\nswap q[18],q[19];\ncx q[15],q[18];\nt q[18];\nswap q[18],q[19];\ncx q[17],q[19];\nt q[17];\ntdg q[19];\nswap q[15],q[18];\ncx q[18],q[19];\nt q[19];\nh q[19];\nh q[19];\nswap q[15],q[18];\ncx q[15],q[17];\nt q[15];\ntdg q[17];\ncx q[15],q[17];\nswap q[18],q[19];\ncx q[17],q[19];\ntdg q[19];\nswap q[11],q[15];\nswap q[18],q[19];\ncx q[15],q[18];\nt q[18];\nswap q[15],q[18];\ncx q[17],q[15];\nt q[17];\ntdg q[15];\ncx q[18],q[15];\nt q[15];\nh q[15];\nh q[15];\nswap q[15],q[18];\ncx q[15],q[17];\nt q[15];\ntdg q[17];\ncx q[15],q[17];\ncx q[17],q[19];\ntdg q[19];\nswap q[11],q[15];\nswap q[18],q[19];\ncx q[15],q[18];\nt q[18];\nswap q[18],q[19];\ncx q[17],q[19];\nt q[17];\ntdg q[19];\nswap q[15],q[18];\ncx q[18],q[19];\nt q[19];\nh q[19];\nh q[19];\nswap q[15],q[18];\ncx q[15],q[17];\nt q[15];\ntdg q[17];\ncx q[15],q[17];\nswap q[18],q[19];\ncx q[17],q[19];\ntdg q[19];\nswap q[18],q[19];\ncx q[15],q[18];\nt q[18];\nswap q[15],q[18];\ncx q[17],q[15];\nt q[17];\ntdg q[15];\ncx q[18],q[15];\nt q[15];\nh q[15];\nh q[15];\nswap q[15],q[18];\ncx q[15],q[17];\nt q[15];\ntdg q[17];\ncx q[15],q[17];\nswap q[15],q[17];\ncx q[15],q[18];\ntdg q[18];\nswap q[11],q[15];\ncx q[15],q[18];\nt q[18];\nswap q[15],q[18];\ncx q[11],q[15];\nt q[11];\ntdg q[15];\ncx q[18],q[15];\nt q[15];\nh q[15];\nswap q[15],q[18];\ncx q[15],q[11];\nt q[15];\ntdg q[11];\ncx q[15],q[11];\nh q[11];\ncx q[18],q[19];\ntdg q[19];\nswap q[18],q[19];\ncx q[15],q[18];\nt q[18];\ncx q[19],q[18];\nt q[19];\ntdg q[18];\ncx q[15],q[18];\nt q[18];\nh q[18];\nh q[18];\nswap q[18],q[19];\ncx q[15],q[18];\nt q[15];\ntdg q[18];\ncx q[15],q[18];\nh q[18];\ncx q[15],q[11];\ntdg q[11];\nswap q[11],q[15];\ncx q[17],q[15];\nt q[15];\ncx q[11],q[15];\nt q[11];\ntdg q[15];\ncx q[17],q[15];\nt q[15];\nh q[15];\ncx q[15],q[18];\ntdg q[18];\nswap q[11],q[15];\ncx q[17],q[15];\nt q[17];\ntdg q[15];\ncx q[17],q[15];\nswap q[15],q[18];\ncx q[18],q[19];\ntdg q[19];\ncx q[17],q[19];\nt q[19];\ncx q[18],q[19];\nt q[18];\ntdg q[19];\ncx q[17],q[19];\nt q[19];\nh q[19];\nh q[19];\nswap q[15],q[18];\ncx q[17],q[15];\nt q[17];\ntdg q[15];\ncx q[17],q[15];\nswap q[18],q[19];\ncx q[17],q[19];\nt q[19];\ncx q[15],q[18];\ntdg q[18];\nswap q[11],q[15];\nswap q[18],q[19];\ncx q[15],q[18];\nt q[15];\ntdg q[18];\nswap q[18],q[19];\ncx q[17],q[19];\nt q[19];\nh q[19];\nh q[19];\ncx q[17],q[15];\nt q[17];\ntdg q[15];\ncx q[17],q[15];\nswap q[15],q[18];\ncx q[18],q[19];\ntdg q[19];\ncx q[17],q[15];\nt q[15];\ncx q[11],q[15];\nt q[11];\ntdg q[15];\ncx q[17],q[15];\nt q[15];\nh q[15];\nh q[15];\nswap q[11],q[15];\ncx q[17],q[15];\nt q[17];\ntdg q[15];\ncx q[17],q[15];\nswap q[15],q[18];\ncx q[18],q[19];\nt q[19];\nswap q[15],q[18];\ncx q[18],q[19];\nt q[18];\ntdg q[19];\nswap q[15],q[17];\ncx q[17],q[19];\nt q[19];\nh q[19];\nswap q[18],q[19];\ncx q[17],q[19];\nt q[17];\ntdg q[19];\ncx q[17],q[19];\nswap q[11],q[15];\ncx q[18],q[15];\ntdg q[15];\ncx q[17],q[15];\nt q[15];\ncx q[18],q[15];\nt q[18];\ntdg q[15];\ncx q[17],q[15];\nt q[15];\nh q[15];\nh q[15];\nswap q[15],q[18];\ncx q[17],q[15];\nt q[17];\ntdg q[15];\ncx q[17],q[15];\ncx q[15],q[18];\ntdg q[18];\nswap q[18],q[19];\ncx q[17],q[19];\nt q[19];\nswap q[15],q[18];\ncx q[18],q[19];\nt q[18];\ntdg q[19];\ncx q[17],q[19];\nt q[19];\nh q[19];\nh q[19];\nswap q[18],q[19];\ncx q[17],q[19];\nt q[17];\ntdg q[19];\ncx q[17],q[19];\ncx q[15],q[18];\ntdg q[18];\nswap q[15],q[17];\ncx q[15],q[18];\nt q[18];\nswap q[18],q[19];\ncx q[17],q[19];\nt q[17];\ntdg q[19];\nswap q[18],q[19];\ncx q[15],q[18];\nt q[18];\nh q[18];\nh q[18];\ncx q[15],q[17];\nt q[15];\ntdg q[17];\ncx q[15],q[17];\ncx q[19],q[18];\ntdg q[18];\nswap q[11],q[15];\ncx q[15],q[18];\nt q[18];\ncx q[19],q[18];\nt q[19];\ntdg q[18];\ncx q[15],q[18];\nt q[18];\nh q[18];\nh q[18];\nswap q[15],q[18];\ncx q[18],q[19];\nt q[18];\ntdg q[19];\ncx q[18],q[19];\nswap q[15],q[18];\ncx q[19],q[18];\ntdg q[18];\ncx q[15],q[18];\nt q[18];\ncx q[19],q[18];\nt q[19];\ntdg q[18];\ncx q[15],q[18];\nt q[18];\nh q[18];\nswap q[18],q[19];\ncx q[15],q[18];\nt q[15];\ntdg q[18];\ncx q[15],q[18];",
+ "num_swaps": 102,
+ "mapping_swaps": 4,
+ "completed": true,
+ "fidelity": null,
+ "final_layout": {
+  "0": 15,
+  "1": 11,
+  "2": 17,
+  "3": 18,
+  "4": 19
+ },
+ "wall_time_ms": 733.5,
+ "from_0_19": {
+  "0": "Q26",
+  "1": "Q33",
+  "2": "Q40",
+  "3": "Q41",
+  "4": "Q48",
+  "5": "Q49",
+  "6": "Q54",
+  "7": "Q55",
+  "8": "Q56",
+  "9": "Q60",
+  "10": "Q61",
+  "11": "Q62",
+  "12": "Q63",
+  "13": "Q67",
+  "14": "Q68",
+  "15": "Q69",
+  "16": "Q70",
+  "17": "Q76",
+  "18": "Q77",
+  "19": "Q83"
+ },
+ "sabre_budget": 58,
+ "lambda_budget": 1.8
+}

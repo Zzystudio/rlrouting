@@ -267,7 +267,7 @@ def schedule_events(
         candidates.sort(key=lambda e: -e[2])
     candidates = swap_cands + candidates
 
-    placed: List[Tuple[int, float, float, str]] = []
+    placed: List[Tuple[int, float, float, str, List[int]]] = []
     total_xtalk = 0.0
     for gidx, pq, dur, kind in candidates:
         if gidx >= 0:
@@ -398,3 +398,97 @@ def schedule_routed_circuit(
         "peak_parallel": peak,
         "critical_path_lb_us": makespan,
     }
+
+
+# ============================================================================
+# 时钟化动作空间 helpers（doc/20260920训练方案.md §一/§五）
+# 纯新增，不触碰既有 schedule_events/GreedyScheduler 行为。
+# ============================================================================
+
+def next_completion(busy_until, t: float) -> float:
+    """下一完成事件时刻：min{busy_until[q] : busy_until[q] > t + EPS}。
+
+    无在飞动作时返回 inf（SKIP 的合法性判定依赖此值：合法 <=> 返回值有限）。
+    """
+    import numpy as _np
+    nz = _np.asarray(busy_until)[_np.asarray(busy_until) > t + 1e-9]
+    return float(nz.min()) if nz.size else float("inf")
+
+
+def marginal_xtalk(hw, qs, start: float, end: float, in_flight,
+                   two_gate_time: float = 0.3, swap_xtalk: bool = True) -> float:
+    """launch 动作 (qs, [start,end]) 相对在飞动作集合的**边际动态 ZZ 角**（rad）。
+
+    与 v3 `_prepare_events` 动态串扰段同口径（trajectory_sim_v2.py L323-357）：
+    - 每对重叠且不相交事件，按 1-hop 相邻交叉对计 rate*overlap
+    - rate = theta(a,b)/two_gate_time；theta(rad) = hw.zz(a,b) * _ERROR_SCALE
+    - swap_xtalk=True（v3 口径）：swap 参与对（不跳过）；False = v2 历史口径
+    - in_flight: list of (qubits_tuple, start, end)，全部为已 launch 未完成动作
+
+    可加性：每对重叠动作恰在第二个 launch 计费一次 → sum_marginal = v3
+    zz_actions 总注入角（§5.2 引理，必须单测锁定）。
+    """
+    from .graph.features import _ERROR_SCALE
+    if not in_flight:
+        return 0.0
+    adj = hw.adj
+    zz = hw.zz
+    qset = set(qs)
+    total = 0.0
+    for b_qs, b_start, b_end in in_flight:
+        ov = min(end, b_end) - max(start, b_start)
+        if ov <= 1e-12:
+            continue
+        if set(b_qs) & qset:
+            continue
+        for a in qs:
+            for b in b_qs:
+                if a != b and adj[a, b] > 0:
+                    th = float(zz[a, b]) * _ERROR_SCALE
+                    if th != 0.0:
+                        total += th / two_gate_time * ov
+    return total
+
+
+def skip_idle_delta(busy_until, last_free, t_old: float, t_new: float) -> float:
+    """SKIP 推进 [t_old, t_new] 的 idle 增量（µs·qubit）。
+
+    next-completion 语义下，区间内无中间完成事件：仅在 [t_old, t_new] 全程
+    空闲且已激活（last_free>=0）的 qubit 各累加 (t_new - t_old)。与 v3 的
+    idle 间隙热退相干（trajectory_sim_v2.py L408-415）同物理口径，只是把
+    "下次 launch 时一次性结算 gap" 提前到每次 SKIP 即时定价（总 idle 不变，
+    时间粒度更细，§5.3 反 stall）。
+    """
+    import numpy as _np
+    if t_new <= t_old + 1e-12:
+        return 0.0
+    bu = _np.asarray(busy_until)
+    lf = _np.asarray(last_free)
+    free_active = (bu <= t_old + 1e-12) & (lf >= 0.0)
+    return float(free_active.sum()) * (t_new - t_old)
+
+
+def ao_exposure(adj, zz, busy_until, t_old: float, t_new: float,
+                two_gate_time: float = 0.3) -> float:
+    """always-on ZZ 曝露（rad）：[t_old, t_new] 内双空闲耦合对的 rate*Δt 和。
+
+    与 v3 `_prepare_events` 的 always_on_zz 段（L360-373）同口径；默认关闭
+    （eta_ao=0 / 模拟器 always_on_zz=None），仅当两端同时启用时联动。
+    """
+    import numpy as _np
+    if t_new <= t_old + 1e-12:
+        return 0.0
+    from .graph.features import _ERROR_SCALE
+    bu = _np.asarray(busy_until)
+    n = bu.shape[0]
+    free = bu <= t_old + 1e-12
+    total = 0.0
+    for a in range(n):
+        if not free[a]:
+            continue
+        for b in range(a + 1, n):
+            if free[b] and adj[a, b] > 0:
+                th = float(zz[a, b]) * _ERROR_SCALE
+                if th != 0.0:
+                    total += th / two_gate_time * (t_new - t_old)
+    return total

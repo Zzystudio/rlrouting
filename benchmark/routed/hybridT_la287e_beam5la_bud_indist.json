@@ -1,0 +1,453 @@
+[
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "clifford_layer_5_0.qasm",
+  "qubits": 5,
+  "swaps": 9,
+  "T": 16,
+  "fid": 0.30179319402360505,
+  "sec": 0.0
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "clifford_layer_5_1.qasm",
+  "qubits": 5,
+  "swaps": 9,
+  "T": 16,
+  "fid": 0.5094281216075008,
+  "sec": 0.0
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "gf2_mult_12_10.qasm",
+  "qubits": 12,
+  "swaps": 67,
+  "T": 32,
+  "fid": 0.1060964522569573,
+  "sec": 3.6
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "gf2_mult_12_11.qasm",
+  "qubits": 12,
+  "swaps": 80,
+  "T": 32,
+  "fid": 0.09496211883174102,
+  "sec": 3.9
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "gf2_mult_16_10.qasm",
+  "qubits": 16,
+  "swaps": 156,
+  "T": 64,
+  "fid": 0.06532535418028118,
+  "sec": 4.7
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "gf2_mult_16_11.qasm",
+  "qubits": 16,
+  "swaps": 158,
+  "T": 64,
+  "fid": 0.06205417096951399,
+  "sec": 4.3
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "gf2_mult_8_10.qasm",
+  "qubits": 8,
+  "swaps": 28,
+  "T": 16,
+  "fid": 0.5824128173980633,
+  "sec": 0.0
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "gf2_mult_8_11.qasm",
+  "qubits": 8,
+  "swaps": 24,
+  "T": 16,
+  "fid": 0.4606302793558076,
+  "sec": 0.0
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "layered_matching_10_w1_0.qasm",
+  "qubits": 10,
+  "swaps": 64,
+  "T": 32,
+  "fid": 0.006625612613000731,
+  "sec": 0.8
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "layered_matching_10_wq_0.qasm",
+  "qubits": 10,
+  "swaps": 62,
+  "T": 32,
+  "fid": 0.0033291063312508888,
+  "sec": 0.7
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "layered_matching_12_w1_0.qasm",
+  "qubits": 12,
+  "swaps": 57,
+  "T": 32,
+  "fid": 0.00099166226654857,
+  "sec": 3.3
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "layered_matching_12_wq_0.qasm",
+  "qubits": 12,
+  "swaps": 51,
+  "T": 32,
+  "fid": 0.0039479813316321295,
+  "sec": 1.2
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "layered_matching_14_w1_0.qasm",
+  "qubits": 14,
+  "swaps": 69,
+  "T": 32,
+  "fid": 0.0009536469215001189,
+  "sec": 3.9
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "layered_matching_14_wq_0.qasm",
+  "qubits": 14,
+  "swaps": 65,
+  "T": 32,
+  "fid": 0.0018152735124650442,
+  "sec": 22.7
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "layered_matching_16_w1_0.qasm",
+  "qubits": 16,
+  "swaps": 78,
+  "T": 64,
+  "fid": 0.00102766188190568,
+  "sec": 32.5
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "layered_matching_16_wq_0.qasm",
+  "qubits": 16,
+  "swaps": 56,
+  "T": 64,
+  "fid": 0.0046051634575824014,
+  "sec": 1.5
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "layered_matching_20_w1_0.qasm",
+  "qubits": 20,
+  "swaps": 86,
+  "T": 64,
+  "fid": 0.0003988788362694955,
+  "sec": 23.4
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "layered_matching_20_wq_0.qasm",
+  "qubits": 20,
+  "swaps": 82,
+  "T": 64,
+  "fid": 0.0007954791618140574,
+  "sec": 14.7
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "layered_matching_5_w1_0.qasm",
+  "qubits": 5,
+  "swaps": 22,
+  "T": 16,
+  "fid": 0.07111612004112207,
+  "sec": 0.0
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "layered_matching_5_wq_0.qasm",
+  "qubits": 5,
+  "swaps": 28,
+  "T": 16,
+  "fid": 0.09654180322995144,
+  "sec": 0.0
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "layered_matching_8_w1_0.qasm",
+  "qubits": 8,
+  "swaps": 37,
+  "T": 16,
+  "fid": 0.029180538988394997,
+  "sec": 0.1
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "layered_matching_8_wq_0.qasm",
+  "qubits": 8,
+  "swaps": 33,
+  "T": 16,
+  "fid": 0.11387939091891972,
+  "sec": 0.0
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "mixed_serial_parallel_5_0.qasm",
+  "qubits": 5,
+  "swaps": 40,
+  "T": 16,
+  "fid": 0.687500000000002,
+  "sec": 0.0
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "mixed_serial_parallel_5_1.qasm",
+  "qubits": 5,
+  "swaps": 69,
+  "T": 16,
+  "fid": 0.6250000000000027,
+  "sec": 0.0
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "parallel_blocks_5_0.qasm",
+  "qubits": 5,
+  "swaps": 57,
+  "T": 16,
+  "fid": 0.5000000000000002,
+  "sec": 0.2
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "pauli_evolution_10_lr0_0.qasm",
+  "qubits": 10,
+  "swaps": 122,
+  "T": 32,
+  "fid": 0.34375,
+  "sec": 1.4
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "pauli_evolution_12_lr0_0.qasm",
+  "qubits": 12,
+  "swaps": 69,
+  "T": 32,
+  "fid": 0.46875000000000333,
+  "sec": 0.9
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "pauli_evolution_14_lr0_0.qasm",
+  "qubits": 14,
+  "swaps": 143,
+  "T": 32,
+  "fid": 0.46875000000000383,
+  "sec": 11.0
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "pauli_evolution_16_lr0_0.qasm",
+  "qubits": 16,
+  "swaps": 125,
+  "T": 64,
+  "fid": 0.39062500000000133,
+  "sec": 37.6
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "pauli_evolution_20_lr0_0.qasm",
+  "qubits": 20,
+  "swaps": 111,
+  "T": 64,
+  "fid": 0.31250000000000094,
+  "sec": 20.8
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "pauli_evolution_5_lr0_0.qasm",
+  "qubits": 5,
+  "swaps": 15,
+  "T": 16,
+  "fid": 0.8125000000000003,
+  "sec": 0.0
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "pauli_evolution_8_lr0_0.qasm",
+  "qubits": 8,
+  "swaps": 56,
+  "T": 16,
+  "fid": 0.5625000000000032,
+  "sec": 0.1
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "perm_12_10.qasm",
+  "qubits": 12,
+  "swaps": 6,
+  "T": 32,
+  "fid": 0.9062499999999998,
+  "sec": 0.2
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "perm_14_11.qasm",
+  "qubits": 14,
+  "swaps": 17,
+  "T": 32,
+  "fid": 0.8437500000000018,
+  "sec": 1.8
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "perm_16_10.qasm",
+  "qubits": 16,
+  "swaps": 24,
+  "T": 64,
+  "fid": 0.7187500000000011,
+  "sec": 8.9
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "perm_16_11.qasm",
+  "qubits": 16,
+  "swaps": 31,
+  "T": 64,
+  "fid": 0.6875000000000011,
+  "sec": 11.1
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "qpe_block_5_0.qasm",
+  "qubits": 5,
+  "swaps": 25,
+  "T": 16,
+  "fid": 0.8124999999999994,
+  "sec": 0.0
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "tof_tower_10_10.qasm",
+  "qubits": 10,
+  "swaps": 24,
+  "T": 32,
+  "fid": 0.4988589896917368,
+  "sec": 0.1
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "tof_tower_10_11.qasm",
+  "qubits": 10,
+  "swaps": 145,
+  "T": 32,
+  "fid": 0.10285993360353489,
+  "sec": 4.0
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "tof_tower_5_10.qasm",
+  "qubits": 5,
+  "swaps": 84,
+  "T": 16,
+  "fid": 0.16382300897383456,
+  "sec": 0.1
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "tof_tower_5_11.qasm",
+  "qubits": 5,
+  "swaps": 117,
+  "T": 16,
+  "fid": 0.15867519108020145,
+  "sec": 0.1
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "tof_tower_6_10.qasm",
+  "qubits": 6,
+  "swaps": 108,
+  "T": 16,
+  "fid": 0.13052393391861408,
+  "sec": 0.1
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "tof_tower_6_11.qasm",
+  "qubits": 6,
+  "swaps": 56,
+  "T": 16,
+  "fid": 0.19021081826575104,
+  "sec": 0.1
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "tof_tower_7_10.qasm",
+  "qubits": 7,
+  "swaps": 215,
+  "T": 16,
+  "fid": 0.08818089026266923,
+  "sec": 0.3
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "tof_tower_7_11.qasm",
+  "qubits": 7,
+  "swaps": 199,
+  "T": 16,
+  "fid": 0.1795565484984488,
+  "sec": 0.3
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "tof_tower_8_10.qasm",
+  "qubits": 8,
+  "swaps": 111,
+  "T": 16,
+  "fid": 0.06853542671805189,
+  "sec": 0.2
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "tof_tower_8_11.qasm",
+  "qubits": 8,
+  "swaps": 157,
+  "T": 16,
+  "fid": 0.12156050906909102,
+  "sec": 0.2
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "tof_tower_9_10.qasm",
+  "qubits": 9,
+  "swaps": 124,
+  "T": 16,
+  "fid": 0.05378109490104936,
+  "sec": 0.3
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "tof_tower_9_11.qasm",
+  "qubits": 9,
+  "swaps": 72,
+  "T": 16,
+  "fid": 0.15954594088338073,
+  "sec": 0.2
+ },
+ {
+  "model": "la287e_beam5la_bud_indist",
+  "circuit": "wadd_8_10.qasm",
+  "qubits": 13,
+  "swaps": 1822,
+  "T": 0,
+  "fid": 0.0,
+  "sec": 0.0,
+  "truncated": true
+ }
+]

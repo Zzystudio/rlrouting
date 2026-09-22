@@ -26,8 +26,15 @@ _POT_AVG_COST = 0.01      # 平均边噪声代价（截断惩罚：按未执行�
 
 # R5a 观测特征维度（并发/前瞻 per-edge 特征，追加在 SABRE 5 维之后）
 _SABRE_FEAT_DIM = 5
-_LOOKAHEAD_FEAT_DIM = 4   # xtalk_pred / busy_contact / d_ext_delta / d_ext_after
+_LOOKAHEAD_FEAT_DIM = 6   # 4→6（20260918 E13）：+批机会 n_exec_after / Δn_exec
 _NOISE_FEAT_DIM = 5       # P0-a: e_edge / zz_edge / e_rel / swap_price / cum_xz
+# 全局上下文广播特征（20260918 E13 D 方案）：全图 mean/max 池化(2×48) + 统计(5)
+# 追加在每条边特征末尾；零填充兼容旧 checkpoint（新列零权重、行为逐位不变）
+_GLOBAL_FEAT_DIM = 101
+# SABRE 内核显性化特征（20260919 E15）：把 SABRE decay 启发式的完整打分与轨迹记忆
+# 作为 per-edge 输入喂给策略——策略直接看到 SABRE 偏好，学"何时跟随、何时为噪声偏离"
+_SABRE_CORE_FEAT_DIM = 6   # sabre_score / decay_paper(p) / decay_paper(q) /
+                           # decay_simple(p) / decay_simple(q) / future_demand(e)
 
 
 class RoutingEnv(gym.Env):
@@ -95,6 +102,14 @@ class RoutingEnv(gym.Env):
         # （None=不启用；budget 已含 δ 膨胀系数，由调用方计算）
         sabre_swap_budget: Optional[int] = None,
         lambda_budget: float = 0.0,
+        # SWAP 边际价格校准（20260917 审计：奖励把 SWAP 低估 ~4.6×，
+        # 真实代价 0.0038 fid/颗 = 1.81 奖励单位 vs 定价 0.39）。
+        # potential 模式 SWAP 价 = -swap_price_scale × 3 × e_norm；
+        # 默认 1.0 = 历史口径。校准值 4.6 由模拟器单价回归给出。
+        swap_price_scale: float = 1.0,
+        # 动态步数上限的门数乘数（TRUNC 门数化，20260917：完成解 sw/g ≤1.24
+        # vs 游走解 3.6-8.3×，1.2 = 完成解 p90 的 1.8 倍余量；默认 2.0=历史口径）
+        step_cap_mult: float = 2.0,
         # R3b 反游走：routing 阶段连续 no_progress_limit 步无任何门执行 →
         # 主动截断（按 unfinished_penalty 计）。0 = 关闭。配合动态步数上限
         # max(1000, 2×N_gates)（类型A 预算不足的大电路自动放宽，
@@ -163,6 +178,8 @@ class RoutingEnv(gym.Env):
         self.pot_1q_reward = bool(pot_1q_reward)
         self.sabre_swap_budget = sabre_swap_budget
         self.lambda_budget = float(lambda_budget)
+        self.swap_price_scale = float(swap_price_scale)
+        self.step_cap_mult = float(step_cap_mult)
         self._mean_edge_err = (
             float(np.mean([hw.two_q_err[e] for e in coupling_map]))
             if len(coupling_map) else 0.0
@@ -210,11 +227,13 @@ class RoutingEnv(gym.Env):
         else:
             self._gnn = None
         if self._gnn is not None:
-            # per-edge 特征布局：out*3 + SABRE5 + look4（flag 开时）+ noise5（P0-a 开时）。
+            # per-edge 特征布局：out*3 + SABRE5 + look6（flag 开时）+ noise5（P0-a 开时）
+            # + global101 + sabre_core6（E15，无条件）。
             # 条件化使旧 checkpoint（out*3+5，R3b-era）可通过 --no-lookahead-features
             # --no-edge-noise-features 精确对齐评估。
             extra = (_LOOKAHEAD_FEAT_DIM if self.lookahead_features else 0) \
-                + (_NOISE_FEAT_DIM if self.edge_noise_features else 0)
+                + (_NOISE_FEAT_DIM if self.edge_noise_features else 0) \
+                + _GLOBAL_FEAT_DIM + _SABRE_CORE_FEAT_DIM
             self._edge_feat_dim = self._gnn.encoder.out_dim * 3 + _SABRE_FEAT_DIM + extra
             self._gnn_dim = self._edge_feat_dim * self.max_num_edges
         else:
@@ -255,6 +274,9 @@ class RoutingEnv(gym.Env):
         self._steps_since_progress = 0
         self._swap_history: list = []
         self._last_progress_swap: int = 0
+        # E15 修复（SABRE 保真度）：per-qubit 换位计数（自该 qubit 最近门执行以来），
+        # 供 decay 特征——SABRE 论文语义：换位 +1、该 qubit 上门执行清零（非全局重置）
+        self._qubit_swap_since_exec = np.zeros(self._n_phys_qubits(), dtype=np.float32)
         self._xz_errors = np.zeros((n, 2), dtype=float)
         self._phys_circuit = QuantumCircuit(self.hw.num_qubits)
         self._pending_measures = []
@@ -272,6 +294,12 @@ class RoutingEnv(gym.Env):
     # ------------------------------------------------------------------
     #  核心更新
     # ------------------------------------------------------------------
+    def _reset_qubit_decay(self, phys_qubits):
+        """门执行：涉及的物理 qubit decay 计数器清零（SABRE per-qubit 重置语义）。"""
+        for qq in phys_qubits:
+            if 0 <= qq < len(self._qubit_swap_since_exec):
+                self._qubit_swap_since_exec[qq] = 0.0
+
     def _apply_swap(self, p: int, q: int):
         inv = {phys: log for log, phys in enumerate(self.mapping)}
         lp = inv.get(p)
@@ -285,6 +313,9 @@ class RoutingEnv(gym.Env):
         else:
             self.mapping[lp], self.mapping[lq] = self.mapping[lq], self.mapping[lp]
         self._phys_circuit.swap(p, q)
+        # E15 修复：per-qubit decay 计数器——真实路由 swap 递增端点计数
+        self._qubit_swap_since_exec[p] += 1.0
+        self._qubit_swap_since_exec[q] += 1.0
         # SWAP 本身也耗时（默认 0.9µs = 3×CX），并占用两端 qubit。
         # 关键修复：不再在 step 内串行推进全局时钟，而是登记为「待调度事件」，
         # 交给 _auto_execute_batch_scheduled 与同批就绪门一起做 ASAP 事件级调度，
@@ -326,6 +357,7 @@ class RoutingEnv(gym.Env):
                             if not g.is_measure:
                                 pq = [self.mapping[q] for q in g.qubits]
                                 self._phys_circuit.append(g.operation, pq)
+                                self._reset_qubit_decay(pq)
                             changed = True
         self.executable_2q = []
         for g in self.dag.gates:
@@ -387,6 +419,10 @@ class RoutingEnv(gym.Env):
                 noise_feats = np.zeros((self.num_edges, _NOISE_FEAT_DIM),
                                        dtype=np.float32)
             self._last_noise_feats = noise_feats
+            global_vec = self._global_context_features(qubit_h)
+            self._last_global_feats = global_vec
+            sabre_core = self._edge_sabre_core_features()
+            self._last_sabre_core_feats = sabre_core
             edge_feats_list = []
             for i, (p, q) in enumerate(self.coupling_map):
                 h_p = qubit_h[p]
@@ -396,6 +432,8 @@ class RoutingEnv(gym.Env):
                     edge_feats_list.append(look_feats[i])
                 if self.edge_noise_features:
                     edge_feats_list.append(noise_feats[i])
+                edge_feats_list.append(global_vec)
+                edge_feats_list.append(sabre_core[i])
             edge_feats = np.concatenate(edge_feats_list).astype(np.float32)
             if self.max_num_edges > self.num_edges:
                 pad_len = (self.max_num_edges - self.num_edges) * self._edge_feat_dim
@@ -671,8 +709,178 @@ class RoutingEnv(gym.Env):
 
         return feats
 
+    def _global_context_features(self, qubit_h=None):
+        """全局上下文广播特征（20260918 E13 D 方案，_GLOBAL_FEAT_DIM=101 维）。
+
+        全图 mean/max 池化（GNN 嵌入 48×2）+ 全局统计（5 维）：
+          0-47  mean 池化；48-95  max 池化
+          96  avg_front_dist / 直径；97  n_ready/8；98  n_exec_before/n_ready
+          99  进度；100  swap_counter/sabre_budget（无预算则 0）
+        广播到每条边（edge_feat_dim 末尾）；零填充兼容旧 checkpoint（新列零权重）。
+        目的：GNN 2 层=2-hop 感受野 < 图直径 7，单节点嵌入看不到全图结构；
+        本特征给每条边一份全局视野，是"批规划需要多跳可见性"的廉价检验。
+        """
+        d = self._gnn.encoder.out_dim
+        if qubit_h is None:
+            graph_data = self.build_graph_data()
+            with torch.no_grad():
+                qubit_h = self._gnn.node_embeddings(graph_data).cpu().numpy()
+        h = np.asarray(qubit_h, dtype=np.float32)
+        h = h.reshape(-1, d)[:self.num_qubits]
+        feats = [h.mean(axis=0), h.max(axis=0)]
+        ready = self._ready_2q_gates()
+        pairs = [(self.mapping[g.qubits[0]], self.mapping[g.qubits[1]]) for g in ready]
+        dist = self._dist()
+        d_max = float(dist.max()) or 1.0
+        n_ready = len(ready)
+        if n_ready:
+            front_avg = sum(dist[a, b] for a, b in pairs) / n_ready / d_max
+            exec_before = sum(1 for a, b in pairs if dist[a, b] <= 1.0)
+        else:
+            front_avg, exec_before = 0.0, 0.0
+        _bud = getattr(self, 'sabre_swap_budget', None) or 0
+        stats = np.array([
+            front_avg,
+            n_ready / 8.0,
+            (exec_before / max(1, n_ready)),
+            float(len(self.executed) / max(1, self.dag.num_gates)),
+            float(self._swap_counter / max(1, _bud)) if _bud else 0.0,
+        ], dtype=np.float32)
+        return np.concatenate([h.mean(axis=0), h.max(axis=0), stats]).astype(np.float32)
+
+    def _n_phys_qubits(self) -> int:
+        """物理 qubit 数（coupling_map 端点空间；num_qubits 是逻辑数）。"""
+        n = 0
+        for p, q in self.coupling_map:
+            n = max(n, p, q)
+        return n + 1
+
+    def _sabre_decay_paper(self, cap: float = 5.0):
+        """SABRE 论文版 decay 状态（per 物理 qubit）：自该 qubit 最近一次门执行以来
+        的换位数 + 1（per-qubit 重置，非全局重置——E15 修复）。
+
+        对应 Qiskit `with_decay(0.001, 5)`：decay = 1 + 0.001×换位数，cap=5
+        （qiskit 源码核对：0.001 为衰减率，需 4000 次换位才到 cap；旧实现
+        每换位 +1.0 强度高 1000 倍，扭曲打分排序——2026-09-21 修复）。
+        计数器在 _apply_swap（+1）与门执行（清零）维护。
+        """
+        return np.minimum(1.0 + 0.001 * self._qubit_swap_since_exec, cap)
+
+    def _sabre_decay_simple(self, K: int = 8):
+        """简化版 decay：近 K 步内该 qubit 的换位计数（recency 特征）。"""
+        cnt = np.zeros(self._n_phys_qubits(), dtype=np.float32)
+        for action in self._swap_history[-K:]:
+            p, q = self.coupling_map[action]
+            cnt[p] += 1.0
+            cnt[q] += 1.0
+        return cnt
+
+    def _edge_sabre_core_features(self):
+        """SABRE 内核显性化 per-edge 特征（E15，6 维，追加在 global 之后）：
+
+        0. sabre_score：虚拟换位后 SABRE 完整打分（含 decay）=
+           max(decay_p,decay_q) × [front_dist/|F| + 0.5×ext_dist/|E|]，/64 归一化
+           ——策略直接看到 SABRE 的偏好（低=好），学何时跟随/偏离
+        1/2. decay_paper(p/q)：论文版轨迹记忆（换位增量+执行重置+cap5）/5
+        3/4. decay_simple(p/q)：近 8 步端点换位计数 /8
+        5. future_demand(e)：端点上逻辑比特的剩余 2Q 门数（未来通信需求）/16
+
+        计算成本可忽略（复用 front/ext 距离矩阵，与 sabre/look 特征同源）。
+        """
+        E = self.num_edges
+        feats = np.zeros((E, _SABRE_CORE_FEAT_DIM), dtype=np.float32)
+        ready = self._ready_2q_gates()
+        pairs = [(self.mapping[g.qubits[0]], self.mapping[g.qubits[1]])
+                 for g in ready]
+        n_ready = max(1, len(ready))
+        dist = self._dist()
+        inv = {phys: log for log, phys in enumerate(self.mapping)}
+        decay_paper = self._sabre_decay_paper()
+        decay_simple = self._sabre_decay_simple()
+
+        # future demand：每逻辑比特的剩余 2Q 门数
+        rem2q = np.zeros(self.num_qubits, dtype=np.float32)
+        for g in self.dag.gates:
+            if g.index in self.executed or not g.is_two_qubit:
+                continue
+            rem2q[g.qubits[0]] += 1.0
+            rem2q[g.qubits[1]] += 1.0
+
+        # ext set 门（E15 修复：SABRE 式后继 BFS——从前置层门的 DAG 后继展开、
+        # 去重、cap ext_set_size；替代旧的"前驱全完成拓扑序"口径，后者在宽电路
+        # 下与 SABRE 的扩展集差异巨大，是克隆失真的主因之一）。
+        # 2026-09-21 补充 qiskit 语义：门加入 ext 集要求**前驱全部在
+        # （已执行 ∪ front ∪ 已入 ext）**——深串行链上旧 BFS 会把前驱未就绪的
+        # 门提前计入，导致 ext_avg 失真（0b 诊断 NAM 仍 1.46× 的嫌疑根因）。
+        ready_idx = {g.index for g in ready}
+        succ = self.dag.successors()
+        ext_gates = []
+        seen = set(ready_idx)
+        frontier = list(ready_idx)
+        while frontier and len(ext_gates) < self.ext_set_size:
+            nxt = []
+            for gi in frontier:
+                for sj in succ.get(gi, []):
+                    if sj in seen or not self.dag.gates[sj].is_two_qubit:
+                        continue
+                    seen.add(sj)
+                    nxt.append(sj)   # 无论是否可入 ext，都继续 BFS 穿越
+                    if all(p in self.executed or p in ready_idx or p in seen
+                           for p in self.dag.gates[sj].predecessors):
+                        ext_gates.append(sj)
+                        if len(ext_gates) >= self.ext_set_size:
+                            break
+                if len(ext_gates) >= self.ext_set_size:
+                    break
+            frontier = nxt
+        n_ext = max(1, len(ext_gates))
+
+        for i, (p, q) in enumerate(self.coupling_map):
+            lp0, lq0 = inv.get(p), inv.get(q)
+            if lp0 is None and lq0 is None:
+                # 空端点边（两端均无逻辑占用）：no-op swap 无意义且不影响任何
+                # 门距离 → score 恒低会锁死 argmin 克隆（E15 修复：置最大惩罚）
+                feats[i, 0] = 1.0
+                feats[i, 5] = 0.0
+                continue
+            md = max(decay_paper[p], decay_paper[q])
+            d_front = 0.0
+            for (a, b) in pairs:
+                na = q if a == p else (p if a == q else a)
+                nb = q if b == p else (p if b == q else b)
+                d_front += dist[na, nb]
+            d_front = d_front / n_ready
+            # ext 距离：虚拟换位后的 m2（与 _edge_lookahead_features 同口径）
+            lp, lq = inv.get(p), inv.get(q)
+            m2 = list(self.mapping)
+            if lp is not None and lq is not None:
+                m2[lp], m2[lq] = m2[lq], m2[lp]
+            elif lp is not None:
+                m2[lp] = q
+            elif lq is not None:
+                m2[lq] = p
+            d_ext = 0.0
+            for gi in ext_gates:
+                qa, qb = self.dag.gates[gi].qubits
+                d_ext += dist[m2[qa], m2[qb]]
+            d_ext = d_ext / n_ext
+            score = md * (d_front + 0.5 * d_ext)
+            feats[i, 0] = min(score / 64.0, 1.0)
+            feats[i, 1] = decay_paper[p] / 5.0
+            feats[i, 2] = decay_paper[q] / 5.0
+            feats[i, 3] = decay_simple[p] / 8.0
+            feats[i, 4] = decay_simple[q] / 8.0
+            lp, lq = inv.get(p), inv.get(q)
+            fd = 0.0
+            if lp is not None:
+                fd += rem2q[lp]
+            if lq is not None:
+                fd += rem2q[lq]
+            feats[i, 5] = min(fd / 16.0, 1.0)
+        return feats
+
     def _edge_lookahead_features(self):
-        """R5a 并发/前瞻 per-edge 特征（4 维，追加在 SABRE 5 维之后）：
+        """R5a 并发/前瞻 per-edge 特征（6 维，追加在 SABRE 5 维之后）：
 
         0. xtalk_pred：该边换位与当前 ready 2Q 门集合的 1-hop 交叉对 ZZ 和
            （与 schedule_events 记账口径一致）/ zz_max —— 预测串扰代价
@@ -680,9 +888,13 @@ class RoutingEnv(gym.Env):
            —— 并发接触面
         2. d_ext_delta：换位后 extended set 距离均值变化（前瞻差分，可负）
         3. d_ext_after：换位后 extended set 距离均值（前瞻水平）
+        4. n_exec_after：虚拟换位后变为相邻可执行的 ready 门数 / n_ready
+           —— 批机会计数（E13：SABRE 6.0 vs 模型 3.2 门/SWAP 缺口的直接信号）
+        5. Δn_exec：换位后 − 换位前可执行 ready 门数 / n_ready（>0 = 解锁新门）
 
         语义：策略由此"看见"换位会与哪些忙碌邻居并发、对未来的门距离
-        是改善还是恶化——补齐 v2 模拟器可见而策略不可见的并发结构。
+        是改善还是恶化、以及本次换位能批量解锁几扇门——补齐 v2 模拟器
+        可见而策略不可见的并发结构 + 批执行机会。
         """
         E = self.num_edges
         feats = np.zeros((E, _LOOKAHEAD_FEAT_DIM), dtype=np.float32)
@@ -691,6 +903,7 @@ class RoutingEnv(gym.Env):
             return feats
         ready_pairs = [(self.mapping[g.qubits[0]], self.mapping[g.qubits[1]])
                        for g in ready]
+        n_ready = max(1, len(ready))
         ready_qubits = set()
         for a, b in ready_pairs:
             ready_qubits.add(a)
@@ -718,6 +931,9 @@ class RoutingEnv(gym.Env):
             ext_d0 += float(dist[pa, pb])
         ext_d0 = ext_d0 / max(1, len(ext_gates))
 
+        # 批机会基准：当前映射下已相邻（可立即执行）的 ready 门数
+        exec_before = sum(1 for a, b in ready_pairs if dist[a, b] <= 1.0)
+
         for i, (p, q) in enumerate(self.coupling_map):
             # 0) 换位预测串扰：与不相交 ready 门的 1-hop 交叉对 ZZ 和（复用 helper）
             feats[i, 0] = self._xtalk_pred_edge(p, q, ready_pairs, zz_max)
@@ -742,12 +958,22 @@ class RoutingEnv(gym.Env):
             d1 = d1 / max(1, len(ext_gates))
             feats[i, 2] = (d1 - ext_d0) / d_max
             feats[i, 3] = d1 / d_max
+            # 4/5) 批机会：虚拟换位后可执行 ready 门数（物理端点换位口径，
+            #     与 _sabre_edge_features 的 dist_after 推导等价）
+            exec_after = 0
+            for (a, b) in ready_pairs:
+                na = q if a == p else (p if a == q else a)
+                nb = q if b == p else (p if b == q else b)
+                if dist[na, nb] <= 1.0:
+                    exec_after += 1
+            feats[i, 4] = exec_after / n_ready
+            feats[i, 5] = (exec_after - exec_before) / n_ready
         return feats
 
     # ------------------------------------------------------------------
     #  死锁检测 (Phase 1)
     # ------------------------------------------------------------------
-    def get_deadlock_mask(self, lookback: int = 2, max_cycle: int = 6, stall_window: int = 6):
+    def get_deadlock_mask(self, lookback: int = 2, max_cycle: int = 12, stall_window: int = 6):
         """返回 (num_edges,) bool 数组，True = 该边因死锁被禁止。
 
         检测三种 SWAP 震荡：
@@ -820,6 +1046,8 @@ class RoutingEnv(gym.Env):
         new.pot_1q_reward = self.pot_1q_reward
         new.sabre_swap_budget = self.sabre_swap_budget
         new.lambda_budget = self.lambda_budget
+        new.swap_price_scale = self.swap_price_scale
+        new.step_cap_mult = self.step_cap_mult
         new._mean_edge_err = self._mean_edge_err
         new.no_progress_limit = self.no_progress_limit
         new._last_exec_count = self._last_exec_count
@@ -870,6 +1098,7 @@ class RoutingEnv(gym.Env):
         new._episode_step = self._episode_step
         new._swap_history = self._swap_history.copy()
         new._last_progress_swap = self._last_progress_swap
+        new._qubit_swap_since_exec = self._qubit_swap_since_exec.copy()
         new._xz_errors = self._xz_errors.copy()
         new._phys_circuit = self._phys_circuit.copy()
         new.executable_2q = self.executable_2q.copy()
@@ -921,10 +1150,13 @@ class RoutingEnv(gym.Env):
             return 0.0
         if self.reward_potential:
             # R2 势函数：物理 SWAP = 3×CX 边噪声；映射期虚拟 SWAP 免费
-            # （布局质量由 lambda_layout 与后续门代价体现）
+            # （布局质量由 lambda_layout 与后续门代价体现）。
+            # swap_price_scale：20260917 审计校准（奖励把 SWAP 低估 ~4.6×，
+            # 见 doc/train.md 单价对照）——校准值 4.6 使 SWAP 边际定价
+            # 对齐模拟器实测的保真度代价。
             if p is None or q is None:
                 return 0.0
-            return -3.0 * float(self.hw.two_q_err[p, q])
+            return -self.swap_price_scale * 3.0 * float(self.hw.two_q_err[p, q])
         r = -self.swap_cost
         # v2 口径：SWAP = 3×CX，按所在耦合边错误率 ×3 计价（边感知，
         # 惩罚"在高噪声边上换位"，与 eta_err 对 2q 门的计价同构）
@@ -974,6 +1206,7 @@ class RoutingEnv(gym.Env):
             if not g.is_measure:
                 pq = [self.mapping[q] for q in g.qubits]
                 self._phys_circuit.append(g.operation, pq)
+                self._reset_qubit_decay(pq)
             r_exec += self._step_reward_execute(True, gate_idx)
             r_prop += self._step_reward_propagate(gate_idx)
             self._update()
@@ -1065,6 +1298,7 @@ class RoutingEnv(gym.Env):
                     if not g.is_measure:
                         pq = [self.mapping[q] for q in g.qubits]
                         self._phys_circuit.append(g.operation, pq)
+                        self._reset_qubit_decay(pq)
                     r_gate_exec += self._step_reward_execute(True, gate_idx)
                     r_prop += self._step_reward_propagate(gate_idx)
                     total_serial += (end - start)
@@ -1086,6 +1320,7 @@ class RoutingEnv(gym.Env):
             for gate_idx in meas:
                 g = self.dag.gates[gate_idx]
                 q = self.mapping[g.qubits[0]]
+                self._reset_qubit_decay([q])
                 self.timing._phys_qubits_idle(None, [q], start, m_dur)
                 self.timing.schedule_log.append({
                     "kind": "measure", "gate_idx": gate_idx, "op": "measure",
@@ -1215,7 +1450,8 @@ class RoutingEnv(gym.Env):
         done = len(self.executed) == self.dag.num_gates
         truncated = False
         # 动态步数上限：大电路（类型A 预算不足）按 2×N_gates 自动放宽
-        step_cap = max(self.max_episode_steps, 2 * self.dag.num_gates)
+        step_cap = max(self.max_episode_steps,
+                       math.ceil(self.step_cap_mult * self.dag.num_gates))
         no_progress_hit = (self.no_progress_limit > 0
                            and self._steps_since_progress >= self.no_progress_limit)
         if done:

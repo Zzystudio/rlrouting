@@ -206,14 +206,14 @@ def structure_metrics(qc: QuantumCircuit) -> dict:
 # ---------------------------------------------------------------------------
 # 批量计划
 # ---------------------------------------------------------------------------
-def build_all():
+def build_all(seed_offset: int = 0):
     out = []
 
     def add(name, qc):
         out.append((name, qc))
 
     for n in SCALES:
-        rng = random.Random(1000 + n)
+        rng = random.Random(1000 + n + seed_offset)
         # 交互模式族
         for inv in (False, True):
             add(f"qft_butterfly_{n}{'_inv' if inv else ''}_0",
@@ -235,7 +235,7 @@ def build_all():
             gen_mixed_serial_parallel(n, max(3, 40 // max(2, n // 4)), rng))
         # 种子变体（×5）
         for vi in (1, 2, 3, 4, 5):
-            rng2 = random.Random(2000 + n * 10 + vi)
+            rng2 = random.Random(2000 + n * 10 + vi + seed_offset)
             add(f"parallel_blocks_{n}_{vi}",
                 gen_parallel_blocks(n, max(2, 30 // max(2, n // 4)),
                                     max(2, n // 4), rng2))
@@ -266,12 +266,14 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out-dir", default="traindata/gen_structured_v2")
     ap.add_argument("--max-gates", type=int, default=1500)
+    ap.add_argument("--seed-offset", type=int, default=0,
+                    help="RNG 种子整体平移（held-out 用非零值产出训练未见过的电路）")
     args = ap.parse_args()
 
     os.makedirs(args.out_dir, exist_ok=True)
     manifest = []
     kept = skipped_small = skipped_gates = 0
-    for name, qc in build_all():
+    for name, qc in build_all(args.seed_offset):
         try:
             tqc = transpile(qc, basis_gates=BASIS, optimization_level=0,
                             seed_transpiler=0)

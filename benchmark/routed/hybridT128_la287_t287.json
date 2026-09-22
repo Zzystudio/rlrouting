@@ -1,0 +1,74 @@
+[
+ {
+  "circuit": "barenco_tof_10.qasm",
+  "qubits": 19,
+  "swaps": 136,
+  "T": 128,
+  "fid": 0.03876593915626498,
+  "sec": 38.9
+ },
+ {
+  "circuit": "csla_mux_3.qasm",
+  "qubits": 15,
+  "swaps": 77,
+  "T": 128,
+  "fid": 0.13593506174795433,
+  "sec": 4.7
+ },
+ {
+  "circuit": "gf2^4_mult.qasm",
+  "qubits": 12,
+  "swaps": 64,
+  "T": 128,
+  "fid": 0.12184966473290454,
+  "sec": 4.3
+ },
+ {
+  "circuit": "gf2^5_mult.qasm",
+  "qubits": 15,
+  "swaps": 154,
+  "T": 128,
+  "fid": 0.04149881591633097,
+  "sec": 60.3
+ },
+ {
+  "circuit": "gf2^6_mult.qasm",
+  "qubits": 18,
+  "swaps": 339,
+  "T": 128,
+  "fid": 0.025339767286414253,
+  "sec": 30.9
+ },
+ {
+  "circuit": "hwb6.qasm",
+  "qubits": 7,
+  "swaps": 994,
+  "T": 0,
+  "fid": 0.0,
+  "truncated": true
+ },
+ {
+  "circuit": "mod_red_21.qasm",
+  "qubits": 11,
+  "swaps": 990,
+  "T": 0,
+  "fid": 0.0,
+  "truncated": true
+ },
+ {
+  "circuit": "rc_adder_6.qasm",
+  "qubits": 14,
+  "swaps": 119,
+  "T": 128,
+  "fid": 0.07326420622445842,
+  "sec": 49.0
+ },
+ {
+  "circuit": "tof_10.qasm",
+  "qubits": 19,
+  "swaps": 113,
+  "T": 128,
+  "fid": 0.1743788950124489,
+  "sec": 25.5
+ }
+]

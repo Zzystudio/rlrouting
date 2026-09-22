@@ -17,7 +17,7 @@ import torch
 
 from routing.graph.circuit_dag import CircuitDAG
 from routing.graph.features import HardwareFeatures
-from routing.rl.env import RoutingEnv
+from routing.rl.env import RoutingEnv, _LOOKAHEAD_FEAT_DIM, _GLOBAL_FEAT_DIM, _SABRE_CORE_FEAT_DIM
 from routing.rl.agent import PPOAgent
 from routing.gnn.encoder import SubGNN
 from sim.sim import NoiseConfig
@@ -275,11 +275,13 @@ def test_edge_feat_dim_formula():
     env_off = _env(edge_noise_features=False)
     env_on = _env(edge_noise_features=True)
     env_nolook = _env(edge_noise_features=False, lookahead_features=False)
-    base = env_off._gnn.encoder.out_dim * 3 + 5 + 4
+    base = (env_off._gnn.encoder.out_dim * 3 + 5 + _LOOKAHEAD_FEAT_DIM
+            + _GLOBAL_FEAT_DIM + _SABRE_CORE_FEAT_DIM)
     assert env_off._edge_feat_dim == base
     assert env_on._edge_feat_dim == base + 5
-    # look/noise 均条件化：全关时退回旧布局 out*3+5（旧 checkpoint 对齐）
-    assert env_nolook._edge_feat_dim == env_off._gnn.encoder.out_dim * 3 + 5
+    # look 条件化、global/sabre_core 无条件：全关时 = out*3 + 5 + global + core（E13/E15）
+    assert env_nolook._edge_feat_dim == (env_off._gnn.encoder.out_dim * 3 + 5
+                                         + _GLOBAL_FEAT_DIM + _SABRE_CORE_FEAT_DIM)
 
 
 # ---------------------------------------------------------------------------
@@ -413,6 +415,8 @@ def test_agent_env_feature_alignment(noise_on):
         look_feats_list=[env._last_look_feats.flatten()],
         noise_feats_list=([env._last_noise_feats.flatten()]
                           if noise_on else None),
+        global_feats_list=[env._last_global_feats],
+        sabre_core_feats_list=[env._last_sabre_core_feats],
         phase_list=[1.0 if env.mapping_phase else 0.0],
     )
     ef_np = ef[0].detach().numpy()
