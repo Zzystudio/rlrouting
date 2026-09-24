@@ -219,6 +219,14 @@ class ClockedPPOAgent(PPOAgent):
         self.ema = None
         self.edge_anchor_lambda = float(edge_anchor_lambda)
         self._anchor_params = None
+        self._init_ac = None  # R1a：BC(ASAP) 热身后的冻结策略快照
+
+    def snapshot_init_policy(self):
+        """冻结当前策略作 KL 锚（在 BC(ASAP) 热身之后调用）。"""
+        import copy as _copy
+        self._init_ac = _copy.deepcopy(self.ac).eval()
+        for _p in self._init_ac.parameters():
+            _p.requires_grad_(False)
 
     # ---- obs 拆分（时钟化布局）----
     def _split_obs(self, obs, batched=False):
@@ -380,7 +388,7 @@ class ClockedPPOAgent(PPOAgent):
                alpha_fid: float = 0.0, beta_kl: float = 0.0,
                la_vf_coef: float = 0.1, la_distill_lambda: float = 0.0,
                sabre_demo_lambda: float = 0.0, global_feats_list=None,
-               sabre_core_feats_list=None):
+               sabre_core_feats_list=None, init_kl_beta: float = 0.0):
         """时钟化 PPO 更新：flat obs 前向（_forward_obs_batch_full）。
 
         时钟化路径不启用 SABRE demo / LA / teacher KL（C0 用 BC 预热替代），
@@ -405,7 +413,7 @@ class ClockedPPOAgent(PPOAgent):
         n = acts.shape[0]
         log_data = {"pl": [], "vl": [], "vfl": [], "vla": [], "agr": [],
                     "agr_map": [], "agr_rout": [], "ent": [], "kl": [],
-                    "klp1": [], "grad": [], "dsl": []}
+                    "klp1": [], "grad": [], "dsl": [], "kli": []}
         for _ in range(epochs):
             idx = np.random.permutation(n)
             for start in range(0, n, batch_size):
@@ -429,6 +437,17 @@ class ClockedPPOAgent(PPOAgent):
                     vfid_loss = torch.zeros((), device=self.device)
                 loss = (policy_loss + self.vf_coef * value_loss
                         - self.ent_coef * entropy)
+                if init_kl_beta > 0 and self._init_ac is not None:
+                    # R1a：锚定 BC(ASAP) 初始策略——防漂移出 asap 盆地
+                    with torch.no_grad():
+                        lf_i, _vi, _vf2, _vla = self._init_ac(
+                            ef, xf, mv, pg, ph, tg)
+                    logp_i = torch.log_softmax(lf_i, dim=-1)
+                    logp_c = torch.log_softmax(logits, dim=-1)
+                    p_i = logp_i.exp()
+                    kl_init = (p_i * (logp_i - logp_c)).sum(-1).mean()
+                    loss = loss + init_kl_beta * kl_init
+                    log_data["kli"].append(float(kl_init.item()))
                 if self.edge_anchor_lambda > 0 and self._anchor_params:
                     anc = sum(((p - p0) ** 2).sum()
                               for p, p0 in self._anchor_params)

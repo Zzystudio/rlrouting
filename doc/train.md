@@ -8432,3 +8432,384 @@ tie/trials 的 ~7% 收益对 10-100× 差距杯水车薪，**无效**。
 SABRE（SabreLayout+SabreSwap+multi-trial）做路由，时钟化只做 EXEC/SKIP
 时序调度——0-swap 电路也 0 swap、布局收益直接继承、C0 调度（t287 曾 +27%）
 在平价路由上兑现。下一步实施方向 2。
+
+### MCTS Phase A 探索结论（2026-09-22）
+
+按 doc/20260922训练方案.md 实现联合 MCTS 推理算子（mcts.py + mcts_route.py），
+多轮调试后的实证结论：
+
+**已实现/修复**：PUCT 内核（确定性 backup 参数化）、三组联合先验（swap←sabre
+score / exec←criticality / skip←锁调制）、自适应触发（top-2 差距<δ 或锁窗歧义
+才搜）、top-K 展开（分支 ~50 太大）、短 rollout+余项 / 完整贪心 rollout 两种
+叶子价值、Q 首次访问赋值修复（原 max(0,-50)=0 卡死 bug）。
+
+**结果（in-dist hard 探针电路，mcts/mimic 全配置≈1.04，sims 8-64、
+rollout 12-60、alpha 0.5-6、backup max/avg、expand_k 8-16 均验证）**：
+
+| 电路 | SABRE | mimic | MCTS |
+|---|---|---|---|
+| mixed_serial_parallel_5_0 | 20 | 30 | 50-107 |
+| pauli_evolution_10 | 28 | 51 | 60-246 |
+| tof_tower_7_10 | 88 | 129 | 130 |
+
+单状态验证 MCTS 机制正确（精确 Q 下选到 29-swap 最优动作），但 **episode 层
+恒劣于 greedy mimic**。
+
+**根因（结构性的，非调参）**：
+1. **价值自洽不动点**：叶子价值=贪心续，贪心续确认贪心——搜索无改进信号
+2. **高分支 vs 算力**：~30-50 合法动作，sims 8-64 下每子节点 <2 次访问，
+   Q 估计噪声主导
+3. **receding-horizon 乐观**：价值假设"此后纯贪心"，但 episode 后续状态也会
+   被 MCTS（带误差）决策 → 当前选择基于乐观估计 → 全局更差
+4. top-K 展开可能排除正确非 swap 动作（锁等待 SKIP）
+
+**结论**：启发式价值 MCTS 在高分支离散问题上**无法胜过贪心 rollout 策略**，
+这是无学习价值函数的 MCTS 的已知局限。AlphaZero 式增益必须靠 **Phase B：
+学习价值函数**（MCTS self-play → 蒸馏价值/策略网络），但这重新引入价值学习
+的历史难点。**替代路线（方向 2，已验证组件）**：SABRE 脚本路由（布局+换手+
+multi-trial 全嵌入，RL 只留调度）——保证平价 + RL 调度 +27% 已证。
+
+---
+
+### 方向2 Phase 1 实施：SABRE 脚本路由 + RL 纯调度（2026-09-23）
+
+**背景与决策**：MCTS Phase A 诊断（见上节）确认推理时启发式搜索无法改进路由；
+AlphaRouter（QCE 2024, 10.1109/QCE60285.2024.00112）调研确认其增益来自训练期
+MCTS 蒸馏 + 纯 SWAP 动作空间 + 推理时弃用搜索。据此启动 doc/20260922训练方案.md
+方向 1+2：**完整 SABRE（SabreLayout+SabreSwap）做路由，RL 只学 EXEC/SKIP 时序
+调度**，随后叠加噪声感知（先离线噪声加权 + 保真度选 trial）。
+
+**基础设施（全部新增/修改点）**：
+
+| 组件 | 文件 | 说明 |
+|---|---|---|
+| `scheduling_only` 环境 | `src/routing/rl/env_clocked.py` | SWAP 动作全屏蔽、恒等映射、阻断父类 reset 的 auto-exec（物理电路全部 2Q 门 t0 就绪，否则一次执行完）、liveness 不回退 SWAP |
+| 三臂保真信号 | `src/routing/rl/train_agent.py` `--fid-arm {analytic,traj,hybrid}` | analytic=调度感知解析终端；traj=trajectory_v3(T=16)+per-circuit sref log-ratio；hybrid=两者几何平均（等价 0.5·log 比值之和） |
+| 调度感知解析终端 | `_make_sched_analytic_fn` | 门误差（stock 口径，固定路由下常数）+ 每比特总空闲热弛豫 + 并发事件重叠对 Σ(rate·overlap)²；**已知局限**：波内排列等价的调度（总 θ、总 idle 相同）二阶相干干涉不可分辨——这正是 A/B 臂要对比的信号粒度差异 |
+| per-circuit sref | `--sref-cache` + `scripts/export_sabre_routed.py --with-sref` | 每条电路 SABRE+ASAP 调度的 fid（解析+traj 双口径），作 log-相对终端奖励分母 |
+| Layer 0 路由缓存 | `scripts/export_sabre_routed.py` | best-of-3 外层 seed × 5 trials，1634 条（tianyan20q 全 splits 810 + gen_structured_v2/v3 755 + indist_val 50 + nam_circs 19），平价校验全过；44 秒（12 路并行 SABRE） |
+| 评估入口 | `scripts/eval_sched.py` | routed 电路 ASAP 基线 vs RL 调度，swaps_added 平价硬校验 + makespan + fid(T=32) |
+| 探针 0a | `scripts/probe_sched_fid_spread.py` | 调度策略间 fid spread vs 模拟噪声 σ |
+
+**关键 bug 修复（实施中发现）**：
+1. 父类 `RoutingEnv.reset` 的 `_auto_execute_batch` 在 scheduling_only 下把整条
+   电路一次执行光（全部 2Q 门 t0 ready∧adjacent）——置位 `enable_mapping_phase`
+   阻断后恢复。
+2. `indist_val`（评估）与 `gen_structured_v2`（训练）存在 **27 个同名不同内容**
+   电路——nam 缓存键从 `nam/<名>` 改为 `nam/<目录>__<名>` 防训练电路拿到评估
+   电路的路由结果。
+3. 参数化 pkl 电路：SABRE 路由与角度无关 → 缓存**未绑定**路由结果，训练侧每
+   episode 重绑定角度，保角度多样性。
+
+**探针 0a 结果（routed 平价前提下，纯调度自由度的 fid spread）**：
+
+| 数据域 | 电路数 | spread 中位 | σ(模拟噪声) 中位 | spread/σ 中位 | frac(>2σ) |
+|---|---|---|---|---|---|
+| in-dist 50（结构化） | 50 | 0.105 | 0.0225 | **2.5** | 60% |
+| tianyan20q_test（随机） | 30 | 0.023 | 0.0066 | 1.3 | 33% |
+
+**结论**：① 调度保真度自由度真实存在，**结构化域（2.5σ）大于随机域（1.3σ）**
+——与「随机电路调度收益大」的预期相反，分层/并行结构才是调度重排的主战场；
+② 结构化域 60% 电路 spread>2σ，T=16/32 终端信号部分可分辨但 40% 淹没——支持
+三臂对比（解析代理的确定性 vs 模拟器的细粒度）而非单押一臂。
+
+**待续**：三臂训练（analytic/traj/hybrid，各 150k steps，tmux 并行）→ 三数据集
+评估（swap 平价硬校验）→ Layer 1 bake-off（ASAP vs RL vs MCTS 仲裁算子）→
+Phase 2 离线噪声感知。
+
+---
+
+### 方向2 Phase 1 结果：三臂 RL 调度器评估与 Gate 1 判定（2026-09-23）
+
+**被测配置简介**：SABRE 脚本路由（Layer 0，best-of-3 外层 seed × 5 trials 按
+swap 最少选）+ scheduling_only RL 调度器（ClockedPPOAgent，`--no-gnn`，
+K=24 EXEC 槽位 + SKIP，动作 57 维；课程 `--curriculum-keys tianyan20q`
+phase1→3 深度递进 + 结构化 v2/v3 以 30% nam-prob 混入；150k steps，
+seed 0，`--max-episode-steps 800`）。三臂仅终端保真信号不同（控制变量）：
+- **A analytic**：调度感知解析终端（门误差 + 总空闲热弛豫 + ZZ 重叠对
+  Σ(rate·overlap)²，确定性 O(n²)）+ per-circuit sref log-ratio
+- **B traj**：trajectory_v3(T=16) 终端 + per-circuit sref log-ratio
+- **C hybrid**：A/B 几何平均
+评估：`scripts/eval_sched.py`，fid = trajectory_v3(T=32)，对照 = 同 routed
+电路的 ASAP 调度（同调度器基建）。**swap 平价 100%**（全部配置 swaps_added=0，
+0-swap 电路保持 0 swap）。
+
+**三数据集结果（fid 比 = RL/ASAP）**：
+
+| 臂 | indist 50 | tianyan20q_test 30 | NAM 19 | makespan 比 |
+|---|---|---|---|---|
+| A analytic | 0.955×（win 20/50） | **0.536×**（win 2/30） | 0.986×（7/19） | 1.56-3.53× |
+| B traj | 0.955×（19/50） | 0.544×（3/30） | 0.985×（7/19） | 1.56-3.53× |
+| C hybrid | 0.966×（20/50） | 0.673×（3/30） | 0.986×（7/19） | 1.56-3.52× |
+
+**核心发现**：
+1. **三臂收敛到同一策略**（A/B 的 win/lose 电路集合与 Δfid 几乎逐条一致，
+   如 qpe_block_5_0 两臂同为 +0.2188）——终端信号形态（解析/模拟/混合）
+   **不是**行为决定因素；策略由 per-step 奖励 + PPO 动力学 + 训练分布驱动，
+   且 PPO 熵快速塌缩（0.19-0.73）后锁死。
+2. **失败模式统一 = 过度串行化**：RL 大幅拉长 makespan（1.56-3.5×）换取
+   ZZ 重叠减少；对本就并行、串扰少的电路（layered_matching/clifford，
+   makespan 5-9µs）是灾难（fid −0.14~−0.28），对高重叠电路（pauli/qpe）
+   有真实收益（+0.13~+0.22）。
+3. **oracle 守卫上界**：逐电路 max(RL, ASAP) 的 fid = **1.096-1.099×**——
+   接近 Gate 1 的 1.10 目标，但选择需要 oracle。
+4. **解析选择器（可部署）失败**：`--selector analytic` 下 pick_rl = **0/50**
+   ——一阶解析代理（总 idle + Σθ² 重叠）对**波内排列等价**调度给出相同
+   评价值，而真实 fid 差异（0.29 vs 0.20 量级）来自 ZZ 旋转非对易组合的
+   二阶相干干涉——结构性超出标量解析近似的表达域。
+5. 随机域教训：随机电路门多且均匀 → RL 串行化 → 热弛豫暴露暴涨 →
+   fid 0.54×/makespan 3.5× 双灾难。
+
+**Gate 1 判定：不达标**（要求结构化 ≥×1.00 且 makespan 不涨；实测
+0.955-0.966× / 1.56×）。RL 纯调度器不可部署；ASAP 守卫需 oracle 亦不可部署。
+lookahead 仲裁算子（解析价值）受同一解析盲区限制，跳过 bake-off。
+
+**Phase 2(b) 上界探针（方向修正的依据）**：关键观察——离线编译场景下
+**oracle 可用**（输出固定的路由+调度组合，无需运行时选择）。20 条 in-dist
+电路 × 5 SABRE trials × ASAP 调度：
+
+| 选择策略 | mean fid | 额外 swap |
+|---|---|---|
+| 按 swap 最少选（当前 Layer 0 口径） | 0.2199 | — |
+| **按 fid 选（T=32 oracle）** | **0.2820（1.282×）** | 平均 +0.8 |
+
+不同 trial 的路由（swap 放置不同）在噪声地形上保真度差异巨大，swap 数几乎
+不变——**trial 多样性 × 保真度选择**复现了 doc 记载的"+27%"量级，且机制
+是纯离线的（SABRE + 调度 + fid 评估全在编译期）。据此启动 Phase 2(b) 全量
+实施（fid-select 缓存重建）。
+
+---
+
+### 方向2 Phase 2(b) 实施：保真度选 trial（fid-select Layer 0）（2026-09-23）
+
+**机制**：离线编译场景 oracle 可用——对每条电路跑 N=3 个独立 seed 的 SABRE
+路由（各含 5 内部 trials），逐 trial 做 ASAP 调度后按 traj fid（T=16）选优，
+缓存 best-by-fid 的路由结果（`--fid-select 3`）。部署形态 = 固定的
+(布局+路由+调度) 输出，**无运行时选择成本**。
+
+**第一版失败与诊断**：首轮重建后 indist 仅 1.003×（上界探针为 +28%）——
+根因：fid 选择用的 `EventTrajectorySimulator(seed=None)` **每次调用独立
+采样**，3 个 trial 的 fid 各带独立 σ≈0.02-0.04 噪声，trial 间真实差距
+（0.05-0.1）被淹没 → 选择近乎随机。**修复 = 公共随机数（CRN）**：固定
+seed=0，trial 间噪声实现相关、差分降噪（选择只依赖排序，同一噪声实现下
+排序由真实调度差异决定）。此教训同样解释了 Phase 1 三臂的部分失败——
+traj 臂训练终端（seed=None）与 sref 之间也是独立噪声，log-ratio 信号
+被同源噪声污染。
+
+**最终结果（fid-selected vs swap-selected Layer 0，ASAP 调度，T=32 评估）**：
+
+| 数据域 | swap-select 基线 | fid-select | 增益 | makespan |
+|---|---|---|---|---|
+| in-dist 50（结构化） | 0.3045 | **0.3219** | **+5.7%** | 1.01× |
+| NAM 19 | 0.2212 | **0.2684** | **+21.4%** | 1.05× |
+| tianyan20q_test 30（随机） | 0.0706 | 0.0688（已回退） | -2.5% | 1.01× |
+
+随机域 trial 间 fid 差异小（探针 spread 中位 0.023）、选择噪声占比高 →
+**分域策略**：结构化域用 fid-select、随机域回退 swap-select（重建后实测
+精确恢复 1.000×）。swap 代价：fid-select 均值与单路由基线持平
+（21.2 vs 21.1，indist 抽样），远低于上界探针的 +0.8 保守估计口径。
+
+**结论**：
+1. **Phase 2(b) 达成并超过 Gate 2**（+2% 门槛）：NAM +21.4%、结构化
+   +5.7%，swap/makespan 平价——doc/20260922训练方案.md 方向 1 的
+   "+27% 调度收益在平价路由上兑现"假设以 **trial 多样性 × 保真度选择**
+   的形式兑现（不是 RL 调度）。
+2. RL 三臂负结果的定位：终端信号形态无关紧要（三臂同策略），PPO 在该
+   动作空间快速塌缩到"串行化"——RL 调度路线止损，组件保留（环境、
+   评估、sref 基建）供后续噪声感知偏离复用。
+3. **CRN 是本方向的关键工程教训**：一切"多候选 × 保真度比较"的选择
+   机制必须在同一噪声实现下评估（训练终端、trial 选择、beam 候选比较
+   同理）。
+4. 后续可选：Phase 2(a) 噪声加权 SABRE（与 fid-select 正交叠加）；
+   fid-select 的 trial 数 3→5 + T=32 选择的增益-成本再平衡。
+
+### MCTS Phase B（学习价值）结论（2026-09-22）
+
+按"学习价值突破贪心不动点"思路实现 Phase B 最小可行版（value_net.py：
+12 维轻量特征 + MLP V_φ 预测剩余 swap + self-play/专家混合数据 + τ 降温
+迭代 + 评估门控）。叶子价值用网络（~0.1ms），MCTS sims 可提高。
+
+**结果（probe 3 电路，MCTS+V vs mimic）**：
+- 纯 self-play：iter0 MCTS sw 351→187（学习生效，loss 0.74→0.013），
+  但卡 ~187-315 vs mimic 70
+- 注入 mimic 专家轨迹：~150-230，仍 >70
+- 注入 SABRE 专家轨迹（脚本路由回放）：~205-283，仍 >70
+- **所有价值方案（rollout / 自举 / mimic / SABRE 专家）episode 层均劣于
+  greedy mimic**——与 Phase A 结论一致且更充分
+
+**根因（receding-horizon 乐观 + 高分支）**：V 学的是"self-play（比 mimic 差）
+策略的价值"，MCTS 用乐观估计选动作 → 困在差策略盆地；迭代不逃逸。单状态
+MCTS 正确（精确 Q 选最优），episode 层恒差。
+
+**附带发现：SABRE 脚本路由回放在时钟化 env 退化**：守卫 ASAP-EXEC/锁等待
+改变轨迹 → SABRE 预计算 swap 序列错位 → 落回 mimic（30/51/129，非 SABRE
+20/27/88）。方向 2 需在 env 内精确复刻 SABRE 执行语义（=重写路由步），
+且会让时钟化调度贡献归零。
+
+**最终评估**：MCTS 搜索式 RL（Phase A+B）在可行算力内无法超越 greedy mimic；
+SABRE 脚本路由需重写 env 语义。当前管线已证价值 = C0 调度（t287 随机域
+fidelity +27%）。结构化电路差距（mimic 1.2×）在两条探索路线上均未闭合。
+
+---
+
+### 方向2 R1a：纯净配对终端 + BC(ASAP) 初始化（2026-09-23）
+
+**动机**：Phase 1 三臂失败后，用户归因为「框架/奖励/训练设计问题而非 RL 能力」。
+只读诊断（12 条高 spread 结构化电路 × 8 种调度，Spearman ρ vs 真实 fid）证实：
+**任何一阶标量势都不可信**——热弛豫-only Φ ρ=+0.23、Σθ² ρ=+0.27（符号与"罚重叠"
+假设相反：多数电路上重叠重的并行调度 fid 更高）、makespan ρ≈0.01，且逐电路
+符号翻转（layered_5_w1 +0.90 vs gf2_8_10 −0.55）。据此 R1a **彻底放弃手工
+物理定价的稠密奖励**，奖励只剩真值锚。
+
+**奖励结构**（`--pure-terminal`）：
+```
+r_step    = −e_edge（固定路由下逐门常数，无排序梯度）
+r_terminal = λ_fid · clip( log fid^seed0(π) − log fid^seed0(ASAP), ±50 )
+```
+- CRN 配对：fid_fn 每 episode 构建一次（同 perturbed config、同 seed=0），
+  同一实例先评 ASAP 调度（`_paired_asap_fid`：同 routed 电路现跑 ASAP episode）
+  作 sref_override，再在 env 终端评 π 调度——log-ratio 差分只剩调度质量
+- 逐步定价清零：pot_progress_b/eta_time/eta_idle/eta_parallel/w_xt_launch/
+  w_zz/w_err/w_xt/w_xt_swap/shaping_gamma 全 0/None
+- **BC(ASAP) 初始化**：复用 `bc_warmup_auto_batch`（合法 EXEC→最小槽位/SKIP），
+  20000 步热身——策略起点 ≥ ASAP 基线，随机域灾难从结构上排除
+- **KL 锚**（`--kl-anchor-init 0.05`）：冻结 BC 后策略快照，PPO loss 加
+  β·KL(π‖π_init)——防漂移出 asap 盆地
+- 监控：`dev=` 偏离率（π≠ASAP 步占比，BC 后应从 ~0 缓升）
+
+**训练配置**：`--sched-only --clocked --no-gnn --pure-terminal --fid-arm traj
+--traj-trajectories 16 --traj-seed 0 --bc-warmup-steps 20000
+--kl-anchor-init 0.05 --curriculum-keys tianyan20q --reward-mode noise_aware
+--nam-circuit-prob 0.3 --timesteps 150000 --seed 0`
+
+**Gate R1a**：结构化 ≥1.03× 且随机 ≥0.98× 且 makespan ≤1.15× → 进 R2
+（时序/结构特征，冲 ≥1.08×）；不过 → R1b（EventTrajectorySimulator 增量
+前缀 logF 作稠密奖励——与终端同噪声模型，根治一阶失配）；R1b 不过 →
+RL 调度止损（能力论成立），checkpoint 降级进 Phase 2b 候选池。
+
+**结果**：（训练中）
+
+### MCTS Phase B 参数调整穷尽测试（2026-09-22 最终）
+
+针对"V 编码差策略价值"实施了教科书正确的修正组合并全部验证：
+
+| 修正 | 做法 | 结果 |
+|---|---|---|
+| τ→0 自洽价值 | self-play 用 argmax（与评估同策略），V 学评估策略自身价值 | 295-681 vs mimic 70，仍远差 |
+| 专家引导冷启动 | iter0 纯专家（SABRE 轨迹）→ V 先学会好价值 | iter0 MCTS=493（V 学了好价值但 MCTS 用不出） |
+| 组合 | 专家引导 + τ=0 自洽 | iter0 493 → iter1 295 → iter2 681（振荡，不收敛） |
+| 其余 | sims 8-64 / alpha 0.5-6 / backup max+avg / expand_k 8-16 / rollout cap+full / 学习+rollout 价值 | 全部 mcts/mimic>1 |
+
+**最终结论（穷尽性）**：问题**不是参数可解**。结构原因：时钟化 MDP 分支 ~50
++ 每步 env 成本，可行 sims 下 MCTS 无法把"好价值知识"转化为"好动作序列"——
+即使 V 准确学会专家价值（iter0 专家数据），MCTS 在决策时也导航不到专家质量
+轨迹（off-path 参考价值在深状态失效 + 高分支稀释访问）。**这是搜索-动作转化
+的结构性失败，非调参可治**。MCTS 搜索式 RL 路线就此关闭。
+
+### MCTS 失败机制实证（2026-09-22 决定性诊断）
+
+mixed_serial_parallel_5_0 上 MCTS+V（专家数据训练的价值）94 个触发决策：
+- V 与实际 corr=0.679（V 有真实信号）
+- **V 预测剩余 swap 均值 −0.9（荒谬负值），实际 11.7，乐观率 100%**
+- MCTS episode 91 swap vs mimic 30
+
+**机制（三层，全部实证）**：
+1. V 训练分布内准确（corr 0.68）
+2. argmin 控制器主动选择 V 最便宜 = 训练分布外的状态（外推区）
+3. 分布外 V 系统性乐观外推（预测负剩余 = 外推垃圾）→ 每步基于错误估计偏离 → 累积 3×
+
+**结论**：价值函数只在训练分布内可靠，而 argmin 控制器天生去分布外（那里最便宜）——分布外乐观外推是结构性失败，参数/算力不可解。自洽化（V=MCTS 自身价值）消除乐观但固定点=弱 MCTS 差盆地；唯一直路是直接用强策略（嵌入 SABRE）而非学习导航到它。MCTS 搜索式 RL 路线关闭（充分理由）。
+
+---
+
+### 方向2 R1a 判定与最终形态：BC 变体候选池（2026-09-23）
+
+**R1a 结果（纯净配对终端 + BC + KL 锚，150k steps）**：
+
+| 数据域 | fid 比 | makespan 比 |
+|---|---|---|
+| indist 50 | 0.934×（win 19/50） | 1.506× |
+| random 30 | 0.577×（win 3/30） | 3.338× |
+| NAM 19 | 0.938×（7/19） | 1.459× |
+
+Gate R1a 判负。但决定性发现来自对照实验链：
+
+1. **BC-only 对照**（20000 步 BC、零 PPO 更新）：indist fid **0.995×**——BC
+   策略在 fid 口径完美复刻 asap，但 **makespan 1.567×**——时序漂移落在
+   "波内排列等价"流形上（fid 中性，二阶相干不同）。
+2. **PPO 净倒退实锤**：R1a 在训练口径（T=16 seed=0）下也只有 **0.895×**
+   ——连自己被优化的目标都没赢。排除口径过拟合；结合 BC 起点 fid 完美
+   → 倒退由 PPO 优化动力学造成：逐步 MDP 的探索空间里，fid-中性/灾难
+   漂移大量可达，正向改进（精确协调的时序改动）探索不可达；critic
+   value loss 0.68-0.99 未收敛。R1b（增量稠密信号）预期无效——稠密化
+   不改变探索/信用结构，按此证据**取消 R1b**。
+3. **候选池机制（最终采纳形态）**：fid 选择器把 fid-中性漂移变成免费的
+   调度多样性。indist 50（fid-select 路由上）：
+
+| 候选池 | mean fid | 增益 |
+|---|---|---|
+| ASAP 单独 | 0.3219 | 基线 |
+| +BC 变体 ×1 | 0.3609 | **+12.1%** |
+| +BC 变体 ×2 | 0.3734 | **+16.0%** |
+| +BC 变体 ×3 | 0.3766 | **+17.0%** |
+
+   变体 = 不同 seed 的 BC(ASAP)（各 ~4 min 训练），增益递减但持续上升。
+
+**最终部署形态（结构化域）**：
+```
+SABRE 多 trial --[按 fid 选]--> 路由
+  → 调度候选池 {ASAP, BC(ASAP)×N 变体}
+  → 离线 fid 评估（T=32）--[按 fid 选]--> 最终 (路由+调度) 组合
+```
+swap 平价保持；成本 = N+1 次 ASAP 级调度 + N+1 次 fid 评估（编译期）。
+**注意**：BC 变体 makespan 1.5-1.6×，被选候选以 fid 优先——makespan 敏感
+场景需在选择准则中加约束（未实验）。
+
+**RL 结论（本轮完整链）**：RL 调度器（平均赢 ASAP）三形态全部失败
+（三臂/R1a 同构失败，PPO 在任何终端信号下净倒退）；**BC——RL 中最简单
+的成员——以候选生成器形态兑现 +17%**。"RL 能力不足 vs 设计问题"的
+答案：优化动力学（逐步细粒度 MDP 的探索/信用结构）是当前瓶颈；若未来
+重启 RL 调度，方向是**宏决策重构**（wave 级候选选择而非逐步控制），
+而非继续修补逐步 PPO 的信号。
+
+---
+
+### 残差学习 R0/R1 结果：G1 判负，路线停止（2026-09-24）
+
+**实施**（SABRE 先验 + 搜索 + 学习价值的框架，绑定 Layer 1 调度）：
+- **R0 仲裁蒸馏数据集**（`build_residual_dataset.py`，3 分片 ~2h）：300 条
+  gen_structured_v2 电路，ASAP episode 决策点（|legal|>1）分支 8 候选 ×
+  CRN 配对 fid(T=16, seed=0)，Δ(a)=Q(a)−Q(legal[0])。产出 **2387 决策点 /
+  6391 候选**。Δ 分布：med=0、正占比 21.7%、|Δ|>0.02 占 18.6%、min −0.44 /
+  max +0.32——**改进信号真实存在但稀疏**（与仲裁诊断一致）。
+- **R1-V1 残差回归**（`residual_model.py` + `train_residual.py`）：flat
+  obs(13576 维) → MLP(1024,512) → 逐动作 Δ̂ + sign 头；加权 MSE(w∝|Δ|)
+  + sign BCE；80/20 电路划分（按族分层）。
+
+**G1 结果（held-out n=166 决策点，预先写死判据）**：
+
+| 指标 | 实测 | 要求 |
+|---|---|---|
+| ρ(Δ̂,Δ) Spearman | **−0.039**（≈0） | > max(基线)+0.1 |
+| ρ(priority 基线) | −0.097（asap 首选择平均次优——改进空间确认） | — |
+| ρ(解析 fid 基线) | −0.010 | — |
+| 提议偏离精确率 | **31%**（要求 >60%）；平均真增益 **−0.022**（有害） | — |
+
+**失败模式定性**（训练集内 ρ = **+0.124** / 中位 +0.200，n=176）：训练分布
+上仅微弱可提取，泛化后归零——**欠拟合真实信号 + 过拟合噪声叠加**。根因与
+一阶诊断一致：fid 排序本质由二阶相干组合决定，13576 维 obs 中无并发事件
+重叠结构的显式表达，MLP 无法从摊销特征恢复；V2(GNN) 的归纳偏置虽更强，
+但训练内 ρ=0.12 的天花板表明**信息瓶颈在标签的稀疏性与特征表达，不在
+函数类**——按预先承诺停止，不追加 60k 全量/V2。
+
+**结论**：
+1. 残差可学性判负：在 flat-obs 特征下，1-ply 前瞻残差的排序能力不可学习
+   （ρ≈0），R2 选择器无意义（跳过）。
+2. 数据管道本身健康（CRN 配对、重放确定性、决策点检测全部验证通过），
+   失败在信息层——与"fid 排序是二阶相干问题"的诊断闭环。
+3. **本轮最终可部署成果不变**：SABRE-fid-select 路由 + {ASAP, BC(ASAP)
+   变体×N} 调度候选池 × 编译期 fid 选择（结构化域 +17%，NAM +21.4%）。
+   学习式组件（PPO 调度器、残差值函数）两条路线均已按 gate 判负并记录。
+4. 若未来重启学习式调度：需要 (a) 能表达并发重叠对的表征（事件图/时序
+   attention），(b) 大一个量级的标签预算，(c) 宏决策/wave 级动作空间——
+   三者缺一不建议开工。

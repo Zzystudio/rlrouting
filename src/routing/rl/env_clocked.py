@@ -94,6 +94,7 @@ class ClockedRoutingEnv(RoutingEnv):
         w_zz: float = 0.0,            # 静态 ZZ 价（Step 0 审计标定）
         eta_ao: float = 0.0,          # always-on ZZ（v2/v3 默认关，联动）
         step_cap_factor: float = 2.0, # 时钟化步数上限系数（相对门数）
+        scheduling_only: bool = False,  # 方向2：SABRE 脚本路由，RL 只学调度
     ):
         super().__init__(
             dag, hw, coupling_map, reward_mode=reward_mode,
@@ -131,6 +132,13 @@ class ClockedRoutingEnv(RoutingEnv):
         self.w_zz = w_zz
         self.eta_ao = eta_ao
         self.step_cap_factor = step_cap_factor
+        # 方向2（doc/20260922训练方案.md 方向1）：SABRE 已完成路由（DAG 为
+        # 物理电路、SWAP 已物化为 2Q 门），恒等映射、SWAP 动作全屏蔽——
+        # RL 只学 EXEC/SKIP 时序调度，swap 数与 SABRE 严格平价。
+        self.scheduling_only = scheduling_only
+        if scheduling_only:
+            self.random_init = False
+            self.mapping_phase = False
         # 动作词表：E SWAP | K EXEC | commit(E+K) | skip(E+K+1)
         self.action_space = gym.spaces.Discrete(self.num_edges + self.max_ready + 2)
         self.commit_action = self.num_edges + self.max_ready
@@ -160,7 +168,15 @@ class ClockedRoutingEnv(RoutingEnv):
         self._terminal_done = False
 
     def reset(self, *, seed=None, options=None):
+        if self.scheduling_only:
+            # 方向2：物理电路的全部 2Q 门在 t0 即 ready∧adjacent，父类
+            # reset 的 _auto_execute_batch 会把整条电路一次执行完——
+            # 置位 enable_mapping_phase 阻断 auto-exec，随后恢复标志
+            self.enable_mapping_phase = True
         super().reset(seed=seed)
+        if self.scheduling_only:
+            self.enable_mapping_phase = False
+            self.mapping_phase = False
         # barrier 对路由是 no-op：直接视为已执行，避免阻塞 1Q/measure 链
         self.executed |= {g.index for g in self.dag.gates if g.name == "barrier"}
         self._clocked_state_init()
@@ -286,11 +302,12 @@ class ClockedRoutingEnv(RoutingEnv):
         # --- routing phase ---
         occupied = {int(p) for p in self.mapping}
         deadlock = self.get_deadlock_mask()
-        for i, (p, q) in enumerate(self.coupling_map):
-            if (p in occupied and q in occupied
-                    and bu[p] <= t + 1e-9 and bu[q] <= t + 1e-9
-                    and not deadlock[i]):
-                mask[i] = True
+        if not self.scheduling_only:
+            for i, (p, q) in enumerate(self.coupling_map):
+                if (p in occupied and q in occupied
+                        and bu[p] <= t + 1e-9 and bu[q] <= t + 1e-9
+                        and not deadlock[i]):
+                    mask[i] = True
         for slot, gi in enumerate(self._candidate_slots):
             if gi is None:
                 continue
@@ -301,6 +318,10 @@ class ClockedRoutingEnv(RoutingEnv):
         mask[E + K + 1] = bool(np.any(bu > t + 1e-9))    # skip
         # liveness：零合法动作时依序放松死锁 mask -> unmapped
         if not mask.any():
+            if self.scheduling_only:
+                # 调度-only 模式不允许退回 SWAP：无 EXEC 且无在飞 = 真死锁
+                raise RuntimeError(
+                    "ClockedRoutingEnv(scheduling_only): 无合法动作（liveness 破坏）")
             for i, (p, q) in enumerate(self.coupling_map):
                 if p in occupied and q in occupied and bu[p] <= t + 1e-9 \
                         and bu[q] <= t + 1e-9:
@@ -886,7 +907,7 @@ class ClockedRoutingEnv(RoutingEnv):
                      "_rng", "_gnn", "_edge_feat_dim", "_gnn_dim",
                      "action_space", "observation_space", "commit_action",
                      "skip_action", "max_ready", "w_xt_launch", "w_zz",
-                     "eta_ao", "step_cap_factor"):
+                     "eta_ao", "step_cap_factor", "scheduling_only"):
             new.__setattr__(attr, getattr(self, attr))
         new.mapping = self.mapping.copy()
         new.mapping_phase = self.mapping_phase
