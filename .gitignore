@@ -8,3 +8,7 @@ build/
 .env.tianyan
 data/tianyan*/
 models/
+*.pkl
+*.pt
+traindata/**/*.pkl
+models/
