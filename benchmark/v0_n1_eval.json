@@ -1,0 +1,407 @@
+{
+  "summary": {
+    "t176": {
+      "rows": [
+        {
+          "circuit": "random_20q_16g_s4.pkl",
+          "sabre_swaps": 16.0,
+          "sabre_fid": 0.7031250000000007,
+          "m1pure_swaps": 16.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": null,
+          "m1noise_ok": false,
+          "m1pure_fid": 0.46875,
+          "error": null
+        },
+        {
+          "circuit": "random_20q_16g_s9.pkl",
+          "sabre_swaps": 15.8,
+          "sabre_fid": 0.5937500000000002,
+          "m1pure_swaps": 13.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 123.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.609375,
+          "error": null
+        },
+        {
+          "circuit": "random_20q_16g_s5.pkl",
+          "sabre_swaps": 23.0,
+          "sabre_fid": 0.5937499999999998,
+          "m1pure_swaps": 20.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": null,
+          "m1noise_ok": false,
+          "m1pure_fid": 0.6874999999999994,
+          "error": null
+        },
+        {
+          "circuit": "random_20q_16g_s3.pkl",
+          "sabre_swaps": 26.0,
+          "sabre_fid": 0.484375,
+          "m1pure_swaps": 23.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 29.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.453125,
+          "m1noise_fid": 0.37500000000000067,
+          "error": null
+        },
+        {
+          "circuit": "random_20q_16g_s0.pkl",
+          "sabre_swaps": 19.8,
+          "sabre_fid": 0.5937500000000009,
+          "m1pure_swaps": 19.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 23.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.6249999999999998,
+          "m1noise_fid": 0.5781250000000007,
+          "error": null
+        },
+        {
+          "circuit": "random_20q_16g_s7.pkl",
+          "sabre_swaps": 18.8,
+          "sabre_fid": 0.6250000000000008,
+          "m1pure_swaps": 18.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 22.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.5937499999999998,
+          "m1noise_fid": 0.43749999999999967,
+          "error": null
+        },
+        {
+          "circuit": "random_20q_16g_s2.pkl",
+          "sabre_swaps": 22.2,
+          "sabre_fid": 0.5312500000000004,
+          "m1pure_swaps": 20.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 24.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.5312499999999999,
+          "m1noise_fid": 0.6406250000000009,
+          "error": null
+        },
+        {
+          "circuit": "random_20q_25g_s1.pkl",
+          "sabre_swaps": 33.8,
+          "sabre_fid": 0.40625,
+          "m1pure_swaps": 29.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 144.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.40625,
+          "error": null
+        },
+        {
+          "circuit": "random_20q_16g_s1.pkl",
+          "sabre_swaps": 25.0,
+          "sabre_fid": 0.6093749999999998,
+          "m1pure_swaps": 23.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 35.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.5781250000000008,
+          "m1noise_fid": 0.5156249999999996,
+          "error": null
+        }
+      ]
+    },
+    "ring16": {
+      "rows": [
+        {
+          "circuit": "random_16q_10g_s0.pkl",
+          "sabre_swaps": 20.0,
+          "sabre_fid": 0.21875000000000044,
+          "m1pure_swaps": 20.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 20.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.3125000000000012,
+          "m1noise_fid": 0.28125000000000056,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_10g_s1.pkl",
+          "sabre_swaps": 26.0,
+          "sabre_fid": 0.1562500000000006,
+          "m1pure_swaps": 24.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 24.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.2500000000000008,
+          "m1noise_fid": 0.20312500000000083,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_10g_s2.pkl",
+          "sabre_swaps": 20.0,
+          "sabre_fid": 0.26562500000000056,
+          "m1pure_swaps": 20.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 20.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.21875000000000028,
+          "m1noise_fid": 0.20312500000000044,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_10g_s3.pkl",
+          "sabre_swaps": 20.0,
+          "sabre_fid": 0.17187500000000058,
+          "m1pure_swaps": 20.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 20.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.2343750000000009,
+          "m1noise_fid": 0.2187500000000006,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_10g_s4.pkl",
+          "sabre_swaps": 20.0,
+          "sabre_fid": 0.14062500000000017,
+          "m1pure_swaps": 20.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 20.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.14062500000000014,
+          "m1noise_fid": 0.25000000000000056,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_10g_s5.pkl",
+          "sabre_swaps": 23.0,
+          "sabre_fid": 0.17187500000000056,
+          "m1pure_swaps": 23.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 23.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.15625000000000053,
+          "m1noise_fid": 0.23437500000000078,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_10g_s6.pkl",
+          "sabre_swaps": 27.0,
+          "sabre_fid": 0.06250000000000017,
+          "m1pure_swaps": 24.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 24.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.2031250000000005,
+          "m1noise_fid": 0.07812500000000014,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_10g_s7.pkl",
+          "sabre_swaps": 15.0,
+          "sabre_fid": 0.23437500000000025,
+          "m1pure_swaps": 14.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 15.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.35937500000000067,
+          "m1noise_fid": 0.2968750000000009,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_10g_s8.pkl",
+          "sabre_swaps": 30.0,
+          "sabre_fid": 0.15625000000000044,
+          "m1pure_swaps": 25.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 26.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.17187500000000033,
+          "m1noise_fid": 0.10937500000000025,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_10g_s9.pkl",
+          "sabre_swaps": 26.0,
+          "sabre_fid": 0.14062500000000044,
+          "m1pure_swaps": 25.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 27.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.09375000000000042,
+          "m1noise_fid": 0.14062500000000094,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_16g_s0.pkl",
+          "sabre_swaps": 35.0,
+          "sabre_fid": 0.0781250000000003,
+          "m1pure_swaps": 34.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 34.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.04687500000000017,
+          "m1noise_fid": 0.14062500000000044,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_16g_s1.pkl",
+          "sabre_swaps": 25.8,
+          "sabre_fid": 0.07812500000000021,
+          "m1pure_swaps": 27.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 28.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.0937500000000005,
+          "m1noise_fid": 0.12500000000000044,
+          "error": null
+        }
+      ]
+    },
+    "grid16": {
+      "rows": [
+        {
+          "circuit": "random_16q_10g_s0.pkl",
+          "sabre_swaps": 11.0,
+          "sabre_fid": 0.5312500000000002,
+          "m1pure_swaps": 9.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 13.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.4531250000000004,
+          "m1noise_fid": 0.42187499999999967,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_10g_s1.pkl",
+          "sabre_swaps": 11.0,
+          "sabre_fid": 0.234375,
+          "m1pure_swaps": 11.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 12.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.375,
+          "m1noise_fid": 0.3750000000000001,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_10g_s3.pkl",
+          "sabre_swaps": 5.0,
+          "sabre_fid": 0.6250000000000006,
+          "m1pure_swaps": 5.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 5.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.71875,
+          "m1noise_fid": 0.8125000000000002,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_10g_s4.pkl",
+          "sabre_swaps": 10.0,
+          "sabre_fid": 0.40625000000000033,
+          "m1pure_swaps": 9.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 11.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.48437500000000044,
+          "m1noise_fid": 0.5,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_10g_s2.pkl",
+          "sabre_swaps": 10.0,
+          "sabre_fid": 0.4531250000000002,
+          "m1pure_swaps": 10.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 13.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.40624999999999933,
+          "m1noise_fid": 0.4375,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_10g_s7.pkl",
+          "sabre_swaps": 10.0,
+          "sabre_fid": 0.4687499999999997,
+          "m1pure_swaps": 9.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 9.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.4843749999999999,
+          "m1noise_fid": 0.6406250000000009,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_10g_s8.pkl",
+          "sabre_swaps": 10.0,
+          "sabre_fid": 0.5312499999999999,
+          "m1pure_swaps": 9.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 9.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.5624999999999993,
+          "m1noise_fid": 0.5000000000000002,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_10g_s6.pkl",
+          "sabre_swaps": 13.0,
+          "sabre_fid": 0.40625000000000017,
+          "m1pure_swaps": 10.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 12.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.5781249999999999,
+          "m1noise_fid": 0.4374999999999999,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_10g_s9.pkl",
+          "sabre_swaps": 9.0,
+          "sabre_fid": 0.4218750000000002,
+          "m1pure_swaps": 10.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 11.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.48437499999999967,
+          "m1noise_fid": 0.5781249999999996,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_16g_s1.pkl",
+          "sabre_swaps": 10.0,
+          "sabre_fid": 0.42187500000000033,
+          "m1pure_swaps": 10.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 10.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.4374999999999999,
+          "m1noise_fid": 0.45312500000000017,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_16g_s0.pkl",
+          "sabre_swaps": 15.0,
+          "sabre_fid": 0.2656250000000001,
+          "m1pure_swaps": 14.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 14.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.3906250000000002,
+          "m1noise_fid": 0.3125,
+          "error": null
+        },
+        {
+          "circuit": "random_16q_10g_s5.pkl",
+          "sabre_swaps": 13.0,
+          "sabre_fid": 0.421875,
+          "m1pure_swaps": 13.0,
+          "m1pure_ok": true,
+          "m1noise_swaps": 240.0,
+          "m1noise_ok": true,
+          "m1pure_fid": 0.40624999999999967,
+          "error": null
+        }
+      ]
+    }
+  }
+}

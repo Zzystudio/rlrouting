@@ -21,9 +21,11 @@ from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
+import torch
 
 from .exact_solver import ExactSolver
 from .pure_env import PureRoutingEnv
+from .value_net import state_features
 from .sabre_heuristic import SabreScorer, greedy_rollout, random_rollout, robust_rollout
 
 
@@ -38,15 +40,16 @@ class MCTSConfig:
     beta: float = 2.0              # sabre prior 温度
     max_depth: int = 200
     rollout_cap: int = 0           # >0: rollout 步数上限（M0 诊断用，超限返回 -cap）
+    depth_corrected: bool = False  # True: 叶值补 -d_leaf（深度记账修正，M1-corr 对照）
     seed: int = 0
 
 
 class PUCTNode:
     __slots__ = ("state", "parent", "action", "priors", "prior", "children",
-                 "N", "Q", "expanded", "n_legal")
+                 "N", "Q", "expanded", "n_legal", "adv_pred")
 
     def __init__(self, state, parent=None, action=-1, priors=None, prior=0.0,
-                 n_legal=0):
+                 n_legal=0, adv_pred=None):
         self.state = state          # (executed_mask, mapping)
         self.parent = parent
         self.action = action
@@ -57,6 +60,7 @@ class PUCTNode:
         self.Q = 0.0
         self.expanded = False
         self.n_legal = n_legal
+        self.adv_pred = adv_pred   # 该边预测 advantage（Scheme 1 用）
 
 
 def _prior(env: PureRoutingEnv, cfg: MCTSConfig, scorer: Optional[SabreScorer]) -> np.ndarray:
@@ -133,7 +137,7 @@ def _select_child(node: PUCTNode, cfg: MCTSConfig) -> PUCTNode:
 def mcts_search(env: PureRoutingEnv, cfg: MCTSConfig,
                 solver: Optional[ExactSolver] = None,
                 scorer: Optional[SabreScorer] = None,
-                value_net=None, noise_ctx=None,
+                value_net=None, noise_ctx=None, adv_ctx=None,
                 visited_log: Optional[List[Tuple[Tuple[int, Tuple[int, ...]], float]]] = None,
                 avoid_states: Optional[set] = None
                 ) -> Tuple[int, Dict]:
@@ -159,14 +163,42 @@ def mcts_search(env: PureRoutingEnv, cfg: MCTSConfig,
             if depth > cfg.max_depth:
                 break
 
+    work_env = env.clone()
+    expansions = 0
+    path_adv = 0.0  # Scheme 1: 根→叶累积预测 advantage
+    for _ in range(cfg.sims):
+        node = root
+        work_env.set_state(*node.state)
+        depth = 0
+        path_adv = 0.0
+        while node.expanded and node.children and not work_env.is_terminal():
+            child = _select_child(node, cfg)
+            work_env.step(child.action)
+            if child.adv_pred is not None:
+                path_adv += child.adv_pred
+            node = child
+            depth += 1
+            if depth > cfg.max_depth:
+                break
+
         # -- 评估叶子 --
-        if work_env.is_terminal():
+        # Scheme 1（adv）：叶子值 = -ΣÂ(路径)。telescoping 恒等式
+        # d_leaf + C*(leaf) = C*(root) + ΣÂ ⇒ 比较路径 = 比较 ΣÂ
+        #（公共项 C*(root) 在所有兄弟比较中消去）。同时自然含深度记账
+        #（旧 M1/Oracle 叶值缺 -d_leaf 项的偏差在此被修正）。
+        terminal = work_env.is_terminal()
+        if cfg.value == "adv":
+            v = -path_adv
+        elif terminal:
             v = 0.0
         else:
             v = _eval_state(work_env, cfg, solver, value_net, noise_ctx)
+            if cfg.depth_corrected:
+                v = v - depth  # 补上路径已付的 -d_leaf（旧叶值缺该项）
             if v == float("-inf"):
                 continue  # oracle 超预算：跳过该 playout
-            # -- 展开叶子：建子节点 --
+        # -- 展开（adv 与常规都需要；terminal 无需）--
+        if not terminal:
             if visited_log is not None:
                 visited_log.append((work_env.state_key(), v))
             node.expanded = True
@@ -178,10 +210,24 @@ def mcts_search(env: PureRoutingEnv, cfg: MCTSConfig,
                 legal = work_env.legal_actions()
                 keep = set(legal[order[:cfg.top_k]].tolist())
                 succ = [(a, s) for (a, s) in succ if a in keep]
-            for a, s in succ:
+            child_advs = None
+            if cfg.value == "adv" and adv_ctx is not None:
+                pfeat = state_features(work_env)
+                cfeats = []
+                for a, (m2, mp2) in succ:
+                    e2 = work_env.clone()
+                    e2.set_state(m2, mp2)
+                    cfeats.append(state_features(e2))
+                inp = torch.as_tensor(
+                    np.stack([np.concatenate([cf, pfeat]) for cf in cfeats]),
+                    dtype=torch.float32)
+                with torch.no_grad():
+                    child_advs = adv_ctx["model"](inp).numpy()
+            for (a, s), adv in zip(succ, child_advs if child_advs is not None
+                                   else [None] * len(succ)):
                 node.children[a] = PUCTNode(s, parent=node, action=a,
                                             prior=float(node.priors[a]),
-                                            n_legal=0)
+                                            n_legal=0, adv_pred=adv)
         expansions += 1
         _backup(node, v, cfg, depth)
 
@@ -221,7 +267,7 @@ def mcts_search(env: PureRoutingEnv, cfg: MCTSConfig,
 def mcts_episode(env: PureRoutingEnv, cfg: MCTSConfig,
                  solver: Optional[ExactSolver] = None,
                  scorer: Optional[SabreScorer] = None,
-                 value_net=None, noise_ctx=None,
+                 value_net=None, noise_ctx=None, adv_ctx=None,
                  max_steps: int = 5000,
                  collect_log: bool = False,
                  avoid_cycles: bool = True) -> Tuple[int, bool, Dict, Optional[List]]:
@@ -239,7 +285,7 @@ def mcts_episode(env: PureRoutingEnv, cfg: MCTSConfig,
             return steps, False, {"aborted": True}, visited_log
         a, st = mcts_search(env, cfg, solver=solver, scorer=scorer,
                             value_net=value_net, noise_ctx=noise_ctx,
-                            visited_log=visited_log,
+                            adv_ctx=adv_ctx, visited_log=visited_log,
                             avoid_states=seen_states)
         env.step(a)
         if seen_states is not None:

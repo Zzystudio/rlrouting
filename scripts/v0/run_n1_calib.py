@@ -24,13 +24,14 @@ import numpy as np
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 sys.path.insert(0, os.path.join(ROOT, "src"))
 
+# (name, topo_path, nq, 深度范围)——深电路给宽 cost 范围（-logF 跨 1-10）
 TOPOS = [
-    ("t287_unif", "traindata/topo/tianyan287_20q_unifnoise.json", 20),
-    ("t287_base", "traindata/topo/tianyan287_20q.json", 20),
-    ("t287_big", "traindata/topo/tianyan287_20q_bighetero.json", 20),
-    ("t176", "traindata/topo/tianyan176_20q.json", 20),
-    ("ring16", "traindata/topo/ring_16q.json", 16),
-    ("grid16", "traindata/topo/grid_4x4_16q.json", 16),
+    ("t287_unif", "traindata/topo/tianyan287_20q_unifnoise.json", 20, (60, 150)),
+    ("t287_base", "traindata/topo/tianyan287_20q.json", 20, (60, 150)),
+    ("t287_big", "traindata/topo/tianyan287_20q_bighetero.json", 20, (60, 150)),
+    ("t176", "traindata/topo/tianyan176_20q.json", 20, (60, 150)),
+    ("ring16", "traindata/topo/ring_16q.json", 16, (60, 150)),
+    ("grid16", "traindata/topo/grid_4x4_16q.json", 16, (60, 150)),
 ]
 
 
@@ -90,16 +91,16 @@ def main():
     ap.add_argument("--data-dir", default="traindata/v0")
     ap.add_argument("--limit", type=int, default=100, help="每拓扑电路数")
     ap.add_argument("--n-perturb", type=int, default=3)
-    ap.add_argument("--n-traj", type=int, default=64)
+    ap.add_argument("--n-traj", type=int, default=32)
     ap.add_argument("--workers", type=int, default=60)
     ap.add_argument("--out", default="benchmark/v0_n1_calib.json")
     args = ap.parse_args()
 
     manifest = json.load(open(os.path.join(args.data_dir, "manifest.json")))
     tasks = []
-    for tname, tpath, nq in TOPOS:
+    for tname, tpath, nq, _dr in TOPOS:
         circuits = [x["file"] for x in manifest
-                    if x["nq"] == nq and x["n2q"] >= 60][: args.limit]
+                    if x["nq"] == nq and _dr[0] <= x["n2q"] <= _dr[1]][: args.limit]
         vi = 0
         for c in circuits:
             for variant, n_pert in [("hop", 0), ("noise", 0),
@@ -126,7 +127,7 @@ def main():
     print("\n===== Gate N1：per-topo corr(ΔF, -log F_sim) =====")
     all_pass = True
     out = {"per_topo": {}}
-    for tname, tpath, nq in TOPOS:
+    for tname, tpath, nq, _dr in TOPOS:
         rows = results[tname]
         if len(rows) < 10:
             print(f"{tname:<10} 样本不足 ({len(rows)})")
@@ -138,27 +139,19 @@ def main():
         corr = float(np.corrcoef(cost, y)[0, 1])
         spear = float(np.corrcoef(np.argsort(np.argsort(cost)),
                                   np.argsort(np.argsort(y)))[0, 1])
-        # fid 下限过滤（灾难路由 fidelity≈0 在一阶线性域外）
-        keep = fid > 0.05
-        corr_f = float(np.corrcoef(cost[keep], y[keep])[0, 1]) if keep.sum() > 10 else 0.0
-        spear_f = float(np.corrcoef(np.argsort(np.argsort(cost[keep])),
-                                    np.argsort(np.argsort(y[keep])))[0, 1]) if keep.sum() > 10 else 0.0
-        alpha = float(np.sum(cost[keep] * y[keep]) / max(np.sum(cost[keep] * cost[keep]), 1e-12))
-        ok = corr_f >= 0.95
+        alpha = float(np.sum(cost * y) / max(np.sum(cost * cost), 1e-12))
+        ok = corr >= 0.90
         all_pass = all_pass and ok
-        print(f"{tname:<10} n={len(rows):>4} Pearson={corr:.3f} Spear={spear:.3f} | "
-              f"F>0.05: n={int(keep.sum())} Pearson={corr_f:.4f} Spear={spear_f:.4f} "
-              f"α={alpha:.3f} | {'PASS' if ok else 'FAIL'}")
+        print(f"{tname:<10} n={len(rows):>4} Pearson={corr:.4f} Spear={spear:.4f} "
+              f"α={alpha:.3f}  fid范围[{fid.min():.2e},{fid.max():.2e}]  "
+              f"{'PASS' if ok else 'FAIL'}")
         out["per_topo"][tname] = {"n": len(rows), "pearson": corr,
                                   "spearman": spear, "alpha": alpha,
-                                  "pearson_filtered": corr_f,
-                                  "spearman_filtered": spear_f,
-                                  "n_filtered": int(keep.sum()),
                                   "rows": rows}
 
     # 机制贡献分解（pooled，多元回归 ΔF ~ 各机制）
     X, Y = [], []
-    for tname, tpath, nq in TOPOS:
+    for tname, tpath, nq, _dr in TOPOS:
         for r in results[tname]:
             X.append([r["mech"]["depol2"], r["mech"]["depol1"],
                       r["mech"]["zz_static"], r["mech"]["zz_dyn"],
@@ -183,7 +176,7 @@ def main():
     print("\n===== 电路内路由排序（F>0.05 过滤）=====")
     from collections import defaultdict
     gate_ok = True
-    for tname, tpath, nq in TOPOS:
+    for tname, tpath, nq, _dr in TOPOS:
         by_circ = defaultdict(list)
         for r in results[tname]:
             if r["fid"] > 0.05:

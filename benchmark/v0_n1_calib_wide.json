@@ -1,0 +1,5764 @@
+{
+  "per_topo": {
+    "t287_unif": {
+      "n": 56,
+      "pearson": 0.6524695589459315,
+      "spearman": 0.46637047163362955,
+      "alpha": 0.11411953966528725,
+      "rows": [
+        {
+          "ok": true,
+          "cost": 10.157343005791228,
+          "fid": 0.3541666666666594,
+          "circuit": "random_20q_60g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.1791406249999987,
+            "depol1": 0.0,
+            "zz_static": 0.07332987813087795,
+            "zz_dyn": 0.021887865999999968,
+            "thermal": 8.882984636660352
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 8.444408877640969,
+          "fid": 0.3958333333333237,
+          "circuit": "random_20q_60g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.1608593749999983,
+            "depol1": 0.0,
+            "zz_static": 0.07219298079551553,
+            "zz_dyn": 0.013075867999999985,
+            "thermal": 7.198280653845455
+          },
+          "swaps": 65
+        },
+        {
+          "ok": true,
+          "cost": 8.17193057507335,
+          "fid": 0.24999999999999267,
+          "circuit": "random_20q_60g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.325390624999998,
+            "depol1": 0.0,
+            "zz_static": 0.08242505681377756,
+            "zz_dyn": 0.025298962000000022,
+            "thermal": 6.738815931259574
+          },
+          "swaps": 77
+        },
+        {
+          "ok": true,
+          "cost": 7.179898819393989,
+          "fid": 0.29166666666665897,
+          "circuit": "random_20q_60g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.2568359374999982,
+            "depol1": 0.0,
+            "zz_static": 0.07816169180616837,
+            "zz_dyn": 0.025014704000000006,
+            "thermal": 5.819886486087822
+          },
+          "swaps": 72
+        },
+        {
+          "ok": true,
+          "cost": 7.694028573665515,
+          "fid": 0.29166666666666025,
+          "circuit": "random_20q_60g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.1699999999999982,
+            "depol1": 0.0,
+            "zz_static": 0.07276142946319676,
+            "zz_dyn": 0.018761027999999968,
+            "thermal": 6.432506116202321
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 9.165051548190517,
+          "fid": 0.3541666666666583,
+          "circuit": "random_20q_60g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.1974218749999983,
+            "depol1": 0.0,
+            "zz_static": 0.0744667754662404,
+            "zz_dyn": 0.005685160000000008,
+            "thermal": 7.887477737724278
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 8.92243897356221,
+          "fid": 0.20833333333332824,
+          "circuit": "random_20q_60g_s2.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.1791406249999987,
+            "depol1": 0.0,
+            "zz_static": 0.07332987813087795,
+            "zz_dyn": 0.01222309400000002,
+            "thermal": 7.657745376431333
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 8.92243897356221,
+          "fid": 0.20833333333332824,
+          "circuit": "random_20q_60g_s2.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.1791406249999987,
+            "depol1": 0.0,
+            "zz_static": 0.07332987813087795,
+            "zz_dyn": 0.01222309400000002,
+            "thermal": 7.657745376431333
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 7.855356997798092,
+          "fid": 0.39583333333332565,
+          "circuit": "random_20q_60g_s3.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 0.9689062499999981,
+            "depol1": 0.0,
+            "zz_static": 0.06025555877420985,
+            "zz_dyn": 0.010801804000000007,
+            "thermal": 6.815393385023884
+          },
+          "swaps": 51
+        },
+        {
+          "ok": true,
+          "cost": 9.661120397869984,
+          "fid": 0.4166666666666569,
+          "circuit": "random_20q_60g_s2.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.1608593749999983,
+            "depol1": 0.0,
+            "zz_static": 0.07219298079551553,
+            "zz_dyn": 0.004548128000000001,
+            "thermal": 8.42351991407447
+          },
+          "swaps": 65
+        },
+        {
+          "ok": true,
+          "cost": 9.725364003465094,
+          "fid": 0.4374999999999895,
+          "circuit": "random_20q_60g_s2.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.1380078124999984,
+            "depol1": 0.0,
+            "zz_static": 0.07077185912631247,
+            "zz_dyn": 0.016486963999999982,
+            "thermal": 8.500097367838784
+          },
+          "swaps": 63
+        },
+        {
+          "ok": true,
+          "cost": 11.349960156171463,
+          "fid": 0.22916666666666075,
+          "circuit": "random_20q_60g_s2.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.2979687499999988,
+            "depol1": 0.0,
+            "zz_static": 0.08071971081073384,
+            "zz_dyn": 0.016202705999999956,
+            "thermal": 9.955068989360731
+          },
+          "swaps": 75
+        },
+        {
+          "ok": true,
+          "cost": 7.855356997798092,
+          "fid": 0.39583333333332565,
+          "circuit": "random_20q_60g_s3.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 0.9689062499999981,
+            "depol1": 0.0,
+            "zz_static": 0.06025555877420985,
+            "zz_dyn": 0.010801804000000007,
+            "thermal": 6.815393385023884
+          },
+          "swaps": 51
+        },
+        {
+          "ok": true,
+          "cost": 7.382465696710696,
+          "fid": 0.312499999999994,
+          "circuit": "random_20q_60g_s3.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 0.9551953124999983,
+            "depol1": 0.0,
+            "zz_static": 0.05940288577268801,
+            "zz_dyn": 0.011938836000000013,
+            "thermal": 6.35592866243801
+          },
+          "swaps": 51
+        },
+        {
+          "ok": true,
+          "cost": 7.690196801767946,
+          "fid": 0.2708333333333279,
+          "circuit": "random_20q_60g_s3.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 0.9551953124999981,
+            "depol1": 0.0,
+            "zz_static": 0.05940288577268802,
+            "zz_dyn": 0.013360125999999995,
+            "thermal": 6.66223847749526
+          },
+          "swaps": 51
+        },
+        {
+          "ok": true,
+          "cost": 7.593306530245408,
+          "fid": 0.3958333333333248,
+          "circuit": "random_20q_60g_s3.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.0100390624999984,
+            "depol1": 0.0,
+            "zz_static": 0.06281357777877535,
+            "zz_dyn": 0.011370320000000008,
+            "thermal": 6.509083569966634
+          },
+          "swaps": 54
+        },
+        {
+          "ok": true,
+          "cost": 12.94844165881107,
+          "fid": 0.31249999999999356,
+          "circuit": "random_20q_60g_s4.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.2202734374999984,
+            "depol1": 0.0,
+            "zz_static": 0.07588789713544347,
+            "zz_dyn": 0.012507351999999961,
+            "thermal": 11.63977297217563
+          },
+          "swaps": 69
+        },
+        {
+          "ok": true,
+          "cost": 8.285872813701365,
+          "fid": 0.45833333333332354,
+          "circuit": "random_20q_60g_s4.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.0831640624999983,
+            "depol1": 0.0,
+            "zz_static": 0.06736116712022513,
+            "zz_dyn": 0.013644384000000011,
+            "thermal": 7.121703200081141
+          },
+          "swaps": 59
+        },
+        {
+          "ok": true,
+          "cost": 12.94844165881107,
+          "fid": 0.31249999999999356,
+          "circuit": "random_20q_60g_s4.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.2202734374999984,
+            "depol1": 0.0,
+            "zz_static": 0.07588789713544347,
+            "zz_dyn": 0.012507351999999961,
+            "thermal": 11.63977297217563
+          },
+          "swaps": 69
+        },
+        {
+          "ok": true,
+          "cost": 8.950755316988118,
+          "fid": 0.4166666666666578,
+          "circuit": "random_20q_60g_s4.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.1334374999999985,
+            "depol1": 0.0,
+            "zz_static": 0.07048763479247185,
+            "zz_dyn": 0.012507352000000013,
+            "thermal": 7.734322830195649
+          },
+          "swaps": 63
+        },
+        {
+          "ok": true,
+          "cost": 10.209407819054013,
+          "fid": 0.29166666666666113,
+          "circuit": "random_20q_60g_s4.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.1654296874999983,
+            "depol1": 0.0,
+            "zz_static": 0.07247720512935614,
+            "zz_dyn": 0.01193883599999994,
+            "thermal": 8.959562090424658
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 10.783695623241087,
+          "fid": 0.3333333333333262,
+          "circuit": "random_20q_60g_s5.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.1974218749999983,
+            "depol1": 0.0,
+            "zz_static": 0.07446677546624042,
+            "zz_dyn": 0.016202705999999952,
+            "thermal": 9.495604266774848
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 10.783695623241087,
+          "fid": 0.3333333333333262,
+          "circuit": "random_20q_60g_s5.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.1974218749999983,
+            "depol1": 0.0,
+            "zz_static": 0.07446677546624042,
+            "zz_dyn": 0.016202705999999952,
+            "thermal": 9.495604266774848
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 9.609665997030053,
+          "fid": 0.41666666666665736,
+          "circuit": "random_20q_60g_s5.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.1014453124999983,
+            "depol1": 0.0,
+            "zz_static": 0.06849806445558758,
+            "zz_dyn": 0.016202705999999987,
+            "thermal": 8.423519914074467
+          },
+          "swaps": 61
+        },
+        {
+          "ok": true,
+          "cost": 9.740013812057157,
+          "fid": 0.39583333333332477,
+          "circuit": "random_20q_60g_s5.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.0877343749999984,
+            "depol1": 0.0,
+            "zz_static": 0.06764539145406574,
+            "zz_dyn": 0.00795922400000002,
+            "thermal": 8.576674821603092
+          },
+          "swaps": 60
+        },
+        {
+          "ok": true,
+          "cost": 11.24810108075135,
+          "fid": 0.39583333333332443,
+          "circuit": "random_20q_60g_s5.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.1380078124999982,
+            "depol1": 0.0,
+            "zz_static": 0.07077185912631248,
+            "zz_dyn": 0.007674966000000013,
+            "thermal": 10.031646443125041
+          },
+          "swaps": 64
+        },
+        {
+          "ok": true,
+          "cost": 7.469236947296956,
+          "fid": 0.39583333333332593,
+          "circuit": "random_20q_60g_s6.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.1105859374999985,
+            "depol1": 0.0,
+            "zz_static": 0.0690665131232688,
+            "zz_dyn": 0.010233287999999995,
+            "thermal": 6.279351208673689
+          },
+          "swaps": 62
+        },
+        {
+          "ok": true,
+          "cost": 7.469236947296956,
+          "fid": 0.39583333333332593,
+          "circuit": "random_20q_60g_s6.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.1105859374999985,
+            "depol1": 0.0,
+            "zz_static": 0.0690665131232688,
+            "zz_dyn": 0.010233287999999995,
+            "thermal": 6.279351208673689
+          },
+          "swaps": 62
+        },
+        {
+          "ok": true,
+          "cost": 8.133066211429446,
+          "fid": 0.45833333333332266,
+          "circuit": "random_20q_60g_s6.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.014609374999998,
+            "depol1": 0.0,
+            "zz_static": 0.06309780211261598,
+            "zz_dyn": 0.010233287999999967,
+            "thermal": 7.045125746316832
+          },
+          "swaps": 55
+        },
+        {
+          "ok": true,
+          "cost": 7.913349332638024,
+          "fid": 0.4374999999999926,
+          "circuit": "random_20q_60g_s6.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.0283203124999982,
+            "depol1": 0.0,
+            "zz_static": 0.0639504751141378,
+            "zz_dyn": 0.005685160000000014,
+            "thermal": 6.815393385023888
+          },
+          "swaps": 56
+        },
+        {
+          "ok": true,
+          "cost": 8.525314248661992,
+          "fid": 0.39583333333332443,
+          "circuit": "random_20q_60g_s6.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.0923046874999982,
+            "depol1": 0.0,
+            "zz_static": 0.06792961578790636,
+            "zz_dyn": 0.013644383999999989,
+            "thermal": 7.351435561374087
+          },
+          "swaps": 61
+        },
+        {
+          "ok": true,
+          "cost": 10.100796517029945,
+          "fid": 0.43749999999998934,
+          "circuit": "random_20q_60g_s7.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.2065624999999984,
+            "depol1": 0.0,
+            "zz_static": 0.07503522413392164,
+            "zz_dyn": 0.012791609999999981,
+            "thermal": 8.806407182896026
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 10.100796517029945,
+          "fid": 0.43749999999998934,
+          "circuit": "random_20q_60g_s7.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.2065624999999984,
+            "depol1": 0.0,
+            "zz_static": 0.07503522413392164,
+            "zz_dyn": 0.012791609999999981,
+            "thermal": 8.806407182896026
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 10.006462162262594,
+          "fid": 0.3333333333333259,
+          "circuit": "random_20q_60g_s7.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.1791406249999987,
+            "depol1": 0.0,
+            "zz_static": 0.07332987813087795,
+            "zz_dyn": 0.024161929999999956,
+            "thermal": 8.729829729131717
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 11.328025583258963,
+          "fid": 0.33333333333332654,
+          "circuit": "random_20q_60g_s7.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.2065624999999984,
+            "depol1": 0.0,
+            "zz_static": 0.07503522413392164,
+            "zz_dyn": 0.014781416,
+            "thermal": 10.031646443125043
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 11.504622551790629,
+          "fid": 0.3958333333333255,
+          "circuit": "random_20q_60g_s7.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.2339843749999988,
+            "depol1": 0.0,
+            "zz_static": 0.07674057013696528,
+            "zz_dyn": 0.009096255999999997,
+            "thermal": 10.184801350653665
+          },
+          "swaps": 70
+        },
+        {
+          "ok": true,
+          "cost": 8.425255242716577,
+          "fid": 0.22916666666666116,
+          "circuit": "random_20q_60g_s8.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.2202734374999986,
+            "depol1": 0.0,
+            "zz_static": 0.07588789713544346,
+            "zz_dyn": 0.0073907080000000114,
+            "thermal": 7.121703200081135
+          },
+          "swaps": 69
+        },
+        {
+          "ok": true,
+          "cost": 8.425255242716577,
+          "fid": 0.22916666666666116,
+          "circuit": "random_20q_60g_s8.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.2202734374999986,
+            "depol1": 0.0,
+            "zz_static": 0.07588789713544346,
+            "zz_dyn": 0.0073907080000000114,
+            "thermal": 7.121703200081135
+          },
+          "swaps": 69
+        },
+        {
+          "ok": true,
+          "cost": 8.81758707279485,
+          "fid": 0.31249999999999195,
+          "circuit": "random_20q_60g_s8.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.1517187499999983,
+            "depol1": 0.0,
+            "zz_static": 0.0716245321278343,
+            "zz_dyn": 0.01307586800000001,
+            "thermal": 7.581167922667017
+          },
+          "swaps": 64
+        },
+        {
+          "ok": true,
+          "cost": 10.783327572395365,
+          "fid": 0.2916666666666603,
+          "circuit": "random_20q_60g_s8.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.3436718749999983,
+            "depol1": 0.0,
+            "zz_static": 0.08356195414913999,
+            "zz_dyn": 0.013644383999999985,
+            "thermal": 9.342449359246226
+          },
+          "swaps": 78
+        },
+        {
+          "ok": true,
+          "cost": 8.55395915175557,
+          "fid": 0.3124999999999935,
+          "circuit": "random_20q_60g_s8.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.0557421874999982,
+            "depol1": 0.0,
+            "zz_static": 0.06565582111718148,
+            "zz_dyn": 0.004548128000000016,
+            "thermal": 7.428013015138392
+          },
+          "swaps": 57
+        },
+        {
+          "ok": true,
+          "cost": 10.215095384298827,
+          "fid": 0.24999999999999445,
+          "circuit": "random_20q_60g_s9.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.2476953124999985,
+            "depol1": 0.0,
+            "zz_static": 0.07759324313848713,
+            "zz_dyn": 0.006822192000000013,
+            "thermal": 8.88298463666034
+          },
+          "swaps": 71
+        },
+        {
+          "ok": true,
+          "cost": 10.215095384298827,
+          "fid": 0.24999999999999445,
+          "circuit": "random_20q_60g_s9.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.2476953124999985,
+            "depol1": 0.0,
+            "zz_static": 0.07759324313848713,
+            "zz_dyn": 0.006822192000000013,
+            "thermal": 8.88298463666034
+          },
+          "swaps": 71
+        },
+        {
+          "ok": true,
+          "cost": 10.17765822879426,
+          "fid": 0.3333333333333258,
+          "circuit": "random_20q_60g_s9.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.2065624999999984,
+            "depol1": 0.0,
+            "zz_static": 0.07503522413392164,
+            "zz_dyn": 0.013075868000000004,
+            "thermal": 8.882984636660339
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 9.278977554124028,
+          "fid": 0.3333333333333262,
+          "circuit": "random_20q_60g_s9.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.220273437499998,
+            "depol1": 0.0,
+            "zz_static": 0.0758878971354435,
+            "zz_dyn": 0.018761028000000013,
+            "thermal": 7.964055191488586
+          },
+          "swaps": 69
+        },
+        {
+          "ok": true,
+          "cost": 9.009185668069822,
+          "fid": 0.27083333333332665,
+          "circuit": "random_20q_60g_s9.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.2476953124999985,
+            "depol1": 0.0,
+            "zz_static": 0.07759324313848713,
+            "zz_dyn": 0.026151736000000005,
+            "thermal": 7.657745376431336
+          },
+          "swaps": 71
+        },
+        {
+          "ok": true,
+          "cost": 14.318369035004725,
+          "fid": 0.2083333333333266,
+          "circuit": "random_20q_100g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.933242187499999,
+            "depol1": 0.0,
+            "zz_static": 0.1202268932145788,
+            "zz_dyn": 0.012507351999999961,
+            "thermal": 12.252392602290147
+          },
+          "swaps": 108
+        },
+        {
+          "ok": true,
+          "cost": 14.318369035004725,
+          "fid": 0.2083333333333266,
+          "circuit": "random_20q_100g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.933242187499999,
+            "depol1": 0.0,
+            "zz_static": 0.1202268932145788,
+            "zz_dyn": 0.012507351999999961,
+            "thermal": 12.252392602290147
+          },
+          "swaps": 108
+        },
+        {
+          "ok": true,
+          "cost": 13.141368734280253,
+          "fid": 0.16666666666666183,
+          "circuit": "random_20q_100g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.9743749999999989,
+            "depol1": 0.0,
+            "zz_static": 0.12278491221914432,
+            "zz_dyn": 0.017055479999999942,
+            "thermal": 11.02715334206111
+          },
+          "swaps": 111
+        },
+        {
+          "ok": true,
+          "cost": 19.188933728404304,
+          "fid": 0.249999999999993,
+          "circuit": "random_20q_100g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.0429296874999987,
+            "depol1": 0.0,
+            "zz_static": 0.12704827722675352,
+            "zz_dyn": 0.01876102799999992,
+            "thermal": 17.000194735677553
+          },
+          "swaps": 116
+        },
+        {
+          "ok": true,
+          "cost": 15.334038506351767,
+          "fid": 0.08333333333333187,
+          "circuit": "random_20q_100g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 2.0109374999999985,
+            "depol1": 0.0,
+            "zz_static": 0.12505870688986923,
+            "zz_dyn": 0.026720251999999955,
+            "thermal": 13.1713220474619
+          },
+          "swaps": 114
+        },
+        {
+          "ok": true,
+          "cost": 18.02426487060426,
+          "fid": 0.10416666666666417,
+          "circuit": "random_20q_100g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.024648437499999,
+            "depol1": 0.0,
+            "zz_static": 0.12591137989139103,
+            "zz_dyn": 0.022172123999999935,
+            "thermal": 15.851532929212869
+          },
+          "swaps": 115
+        },
+        {
+          "ok": true,
+          "cost": 16.767668627039882,
+          "fid": 0.24999999999999156,
+          "circuit": "random_20q_100g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.0063671874999995,
+            "depol1": 0.0,
+            "zz_static": 0.12477448255602855,
+            "zz_dyn": 0.010233287999999922,
+            "thermal": 14.626293668983854
+          },
+          "swaps": 114
+        },
+        {
+          "ok": true,
+          "cost": 18.02426487060426,
+          "fid": 0.10416666666666417,
+          "circuit": "random_20q_100g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.024648437499999,
+            "depol1": 0.0,
+            "zz_static": 0.12591137989139103,
+            "zz_dyn": 0.022172123999999935,
+            "thermal": 15.851532929212869
+          },
+          "swaps": 115
+        },
+        {
+          "ok": true,
+          "cost": 15.645046694756262,
+          "fid": 0.1041666666666629,
+          "circuit": "random_20q_100g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.8783984374999994,
+            "depol1": 0.0,
+            "zz_static": 0.11681620120849145,
+            "zz_dyn": 0.01904528599999991,
+            "thermal": 13.630786770047772
+          },
+          "swaps": 105
+        },
+        {
+          "ok": true,
+          "cost": 16.933634890157506,
+          "fid": 0.22916666666666075,
+          "circuit": "random_20q_100g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.9286718749999998,
+            "depol1": 0.0,
+            "zz_static": 0.11994266888073815,
+            "zz_dyn": 0.02899431599999992,
+            "thermal": 14.85602603027677
+          },
+          "swaps": 108
+        }
+      ],
+      "within_spearman_med": -0.09999999999999999,
+      "within_top1_regret": 0.31827028186949596
+    },
+    "t287_base": {
+      "n": 60,
+      "pearson": 0.6350345524594178,
+      "spearman": 0.5314253959433177,
+      "alpha": 0.1191192611100334,
+      "rows": [
+        {
+          "ok": true,
+          "cost": 8.211344188364338,
+          "fid": 0.3958333333333344,
+          "circuit": "random_20q_60g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.3407890625,
+            "depol1": 0.0,
+            "zz_static": 0.10726852388236414,
+            "zz_dyn": 0.02447067072240003,
+            "thermal": 6.738815931259574
+          },
+          "swaps": 77
+        },
+        {
+          "ok": true,
+          "cost": 8.211344188364338,
+          "fid": 0.3958333333333344,
+          "circuit": "random_20q_60g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.3407890625,
+            "depol1": 0.0,
+            "zz_static": 0.10726852388236414,
+            "zz_dyn": 0.02447067072240003,
+            "thermal": 6.738815931259574
+          },
+          "swaps": 77
+        },
+        {
+          "ok": true,
+          "cost": 7.113056243147905,
+          "fid": 0.25000000000000044,
+          "circuit": "random_20q_60g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.1762578125000007,
+            "depol1": 0.0,
+            "zz_static": 0.08852192579928235,
+            "zz_dyn": 0.0283900187608,
+            "thermal": 5.819886486087822
+          },
+          "swaps": 72
+        },
+        {
+          "ok": true,
+          "cost": 9.000486527434694,
+          "fid": 0.20833333333333323,
+          "circuit": "random_20q_60g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.363710937500001,
+            "depol1": 0.0,
+            "zz_static": 0.10953414944558262,
+            "zz_dyn": 0.0226509715864,
+            "thermal": 7.504590468902711
+          },
+          "swaps": 79
+        },
+        {
+          "ok": true,
+          "cost": 8.631438625274347,
+          "fid": 0.2708333333333332,
+          "circuit": "random_20q_60g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.0293750000000008,
+            "depol1": 0.0,
+            "zz_static": 0.07766437379404074,
+            "zz_dyn": 0.019808782577599982,
+            "thermal": 7.504590468902706
+          },
+          "swaps": 61
+        },
+        {
+          "ok": true,
+          "cost": 10.117337878665458,
+          "fid": 0.3750000000000011,
+          "circuit": "random_20q_60g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.121203125,
+            "depol1": 0.0,
+            "zz_static": 0.07982938877550542,
+            "zz_dyn": 0.03332072822959995,
+            "thermal": 8.882984636660352
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 10.117337878665458,
+          "fid": 0.3750000000000011,
+          "circuit": "random_20q_60g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.121203125,
+            "depol1": 0.0,
+            "zz_static": 0.07982938877550542,
+            "zz_dyn": 0.03332072822959995,
+            "thermal": 8.882984636660352
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 8.466458063687172,
+          "fid": 0.3541666666666668,
+          "circuit": "random_20q_60g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.1629687500000006,
+            "depol1": 0.0,
+            "zz_static": 0.09028630039451639,
+            "zz_dyn": 0.014922359447199988,
+            "thermal": 7.198280653845455
+          },
+          "swaps": 65
+        },
+        {
+          "ok": true,
+          "cost": 7.807581800270291,
+          "fid": 0.2500000000000012,
+          "circuit": "random_20q_60g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.2440390625000006,
+            "depol1": 0.0,
+            "zz_static": 0.10455832190876937,
+            "zz_dyn": 0.026478299659199945,
+            "thermal": 6.432506116202321
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 9.188188096587425,
+          "fid": 0.31249999999999983,
+          "circuit": "random_20q_60g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.2029765625000008,
+            "depol1": 0.0,
+            "zz_static": 0.09058281462394674,
+            "zz_dyn": 0.007150981739200003,
+            "thermal": 7.887477737724278
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 9.06400492616136,
+          "fid": 0.24999999999999975,
+          "circuit": "random_20q_60g_s2.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.2842578125000004,
+            "depol1": 0.0,
+            "zz_static": 0.10680314971562772,
+            "zz_dyn": 0.01519858751440004,
+            "thermal": 7.657745376431333
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 9.06400492616136,
+          "fid": 0.24999999999999975,
+          "circuit": "random_20q_60g_s2.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.2842578125000004,
+            "depol1": 0.0,
+            "zz_static": 0.10680314971562772,
+            "zz_dyn": 0.01519858751440004,
+            "thermal": 7.657745376431333
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 9.83601121211763,
+          "fid": 0.16666666666666688,
+          "circuit": "random_20q_60g_s2.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.2917109375000007,
+            "depol1": 0.0,
+            "zz_static": 0.11375422104075934,
+            "zz_dyn": 0.007026139502399994,
+            "thermal": 8.42351991407447
+          },
+          "swaps": 65
+        },
+        {
+          "ok": true,
+          "cost": 11.429793780779825,
+          "fid": 0.29166666666666874,
+          "circuit": "random_20q_60g_s2.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.3432500000000007,
+            "depol1": 0.0,
+            "zz_static": 0.11064846881909399,
+            "zz_dyn": 0.020826322599999947,
+            "thermal": 9.955068989360731
+          },
+          "swaps": 75
+        },
+        {
+          "ok": true,
+          "cost": 9.893054501449512,
+          "fid": 0.20833333333333362,
+          "circuit": "random_20q_60g_s2.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.2661171875000006,
+            "depol1": 0.0,
+            "zz_static": 0.1045219448771284,
+            "zz_dyn": 0.02231800123360001,
+            "thermal": 8.500097367838784
+          },
+          "swaps": 63
+        },
+        {
+          "ok": true,
+          "cost": 7.874473370912312,
+          "fid": 0.3958333333333333,
+          "circuit": "random_20q_60g_s3.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 0.9653906250000005,
+            "depol1": 0.0,
+            "zz_static": 0.0736571154884271,
+            "zz_dyn": 0.02003224539999998,
+            "thermal": 6.815393385023884
+          },
+          "swaps": 51
+        },
+        {
+          "ok": true,
+          "cost": 7.874473370912312,
+          "fid": 0.3958333333333333,
+          "circuit": "random_20q_60g_s3.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 0.9653906250000005,
+            "depol1": 0.0,
+            "zz_static": 0.0736571154884271,
+            "zz_dyn": 0.02003224539999998,
+            "thermal": 6.815393385023884
+          },
+          "swaps": 51
+        },
+        {
+          "ok": true,
+          "cost": 7.485956482109236,
+          "fid": 0.3333333333333346,
+          "circuit": "random_20q_60g_s3.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.0267031250000003,
+            "depol1": 0.0,
+            "zz_static": 0.08220650804242563,
+            "zz_dyn": 0.02111818662880003,
+            "thermal": 6.35592866243801
+          },
+          "swaps": 51
+        },
+        {
+          "ok": true,
+          "cost": 7.727394893837413,
+          "fid": 0.395833333333334,
+          "circuit": "random_20q_60g_s3.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 0.9694687500000004,
+            "depol1": 0.0,
+            "zz_static": 0.0737870032997533,
+            "zz_dyn": 0.02190066304240001,
+            "thermal": 6.66223847749526
+          },
+          "swaps": 51
+        },
+        {
+          "ok": true,
+          "cost": 7.5980102919502475,
+          "fid": 0.37500000000000083,
+          "circuit": "random_20q_60g_s3.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.0009687500000006,
+            "depol1": 0.0,
+            "zz_static": 0.07286286897321265,
+            "zz_dyn": 0.015095103010400006,
+            "thermal": 6.509083569966634
+          },
+          "swaps": 54
+        },
+        {
+          "ok": true,
+          "cost": 12.958962007362924,
+          "fid": 0.2708333333333341,
+          "circuit": "random_20q_60g_s4.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.2082499999999998,
+            "depol1": 0.0,
+            "zz_static": 0.09144715288489526,
+            "zz_dyn": 0.019491882302399934,
+            "thermal": 11.63977297217563
+          },
+          "swaps": 69
+        },
+        {
+          "ok": true,
+          "cost": 12.958962007362924,
+          "fid": 0.2708333333333341,
+          "circuit": "random_20q_60g_s4.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.2082499999999998,
+            "depol1": 0.0,
+            "zz_static": 0.09144715288489526,
+            "zz_dyn": 0.019491882302399934,
+            "thermal": 11.63977297217563
+          },
+          "swaps": 69
+        },
+        {
+          "ok": true,
+          "cost": 8.30395647082183,
+          "fid": 0.33333333333333504,
+          "circuit": "random_20q_60g_s4.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.0779609375,
+            "depol1": 0.0,
+            "zz_static": 0.08495850472548998,
+            "zz_dyn": 0.01933382851520003,
+            "thermal": 7.121703200081141
+          },
+          "swaps": 59
+        },
+        {
+          "ok": true,
+          "cost": 8.860644551418245,
+          "fid": 0.3958333333333344,
+          "circuit": "random_20q_60g_s4.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.040343750000001,
+            "depol1": 0.0,
+            "zz_static": 0.07249022997139473,
+            "zz_dyn": 0.013487741251200029,
+            "thermal": 7.734322830195649
+          },
+          "swaps": 63
+        },
+        {
+          "ok": true,
+          "cost": 10.246568329072636,
+          "fid": 0.37500000000000083,
+          "circuit": "random_20q_60g_s4.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.1870156250000008,
+            "depol1": 0.0,
+            "zz_static": 0.09160311328317658,
+            "zz_dyn": 0.008387500364799962,
+            "thermal": 8.959562090424658
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 10.782125154331288,
+          "fid": 0.33333333333333454,
+          "circuit": "random_20q_60g_s5.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.1729531250000014,
+            "depol1": 0.0,
+            "zz_static": 0.09008840943723852,
+            "zz_dyn": 0.0234793531191999,
+            "thermal": 9.495604266774848
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 9.64704866718673,
+          "fid": 0.3125000000000011,
+          "circuit": "random_20q_60g_s5.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.1141718750000005,
+            "depol1": 0.0,
+            "zz_static": 0.08587584453626444,
+            "zz_dyn": 0.023481033575999996,
+            "thermal": 8.423519914074467
+          },
+          "swaps": 61
+        },
+        {
+          "ok": true,
+          "cost": 10.782125154331288,
+          "fid": 0.33333333333333454,
+          "circuit": "random_20q_60g_s5.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.1729531250000014,
+            "depol1": 0.0,
+            "zz_static": 0.09008840943723852,
+            "zz_dyn": 0.0234793531191999,
+            "thermal": 9.495604266774848
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 9.748476500618398,
+          "fid": 0.39583333333333415,
+          "circuit": "random_20q_60g_s5.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.0793671875000004,
+            "depol1": 0.0,
+            "zz_static": 0.08652281172410554,
+            "zz_dyn": 0.0059116797912000165,
+            "thermal": 8.576674821603092
+          },
+          "swaps": 60
+        },
+        {
+          "ok": true,
+          "cost": 11.244292212020888,
+          "fid": 0.31250000000000056,
+          "circuit": "random_20q_60g_s5.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.1206406250000012,
+            "depol1": 0.0,
+            "zz_static": 0.08449024424544468,
+            "zz_dyn": 0.007514899650400006,
+            "thermal": 10.031646443125041
+          },
+          "swaps": 64
+        },
+        {
+          "ok": true,
+          "cost": 7.468578875631518,
+          "fid": 0.3125000000000003,
+          "circuit": "random_20q_60g_s6.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.0904765625000004,
+            "depol1": 0.0,
+            "zz_static": 0.08177105016662847,
+            "zz_dyn": 0.016980054291199993,
+            "thermal": 6.279351208673689
+          },
+          "swaps": 62
+        },
+        {
+          "ok": true,
+          "cost": 7.468578875631518,
+          "fid": 0.3125000000000003,
+          "circuit": "random_20q_60g_s6.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.0904765625000004,
+            "depol1": 0.0,
+            "zz_static": 0.08177105016662847,
+            "zz_dyn": 0.016980054291199993,
+            "thermal": 6.279351208673689
+          },
+          "swaps": 62
+        },
+        {
+          "ok": true,
+          "cost": 8.612038264711401,
+          "fid": 0.3124999999999998,
+          "circuit": "random_20q_60g_s6.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.1495390625000008,
+            "depol1": 0.0,
+            "zz_static": 0.09044076920931411,
+            "zz_dyn": 0.020622871627999976,
+            "thermal": 7.351435561374087
+          },
+          "swaps": 61
+        },
+        {
+          "ok": true,
+          "cost": 7.9795041608755115,
+          "fid": 0.37500000000000105,
+          "circuit": "random_20q_60g_s6.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.069171875000001,
+            "depol1": 0.0,
+            "zz_static": 0.08560979561002303,
+            "zz_dyn": 0.009329105241600022,
+            "thermal": 6.815393385023888
+          },
+          "swaps": 56
+        },
+        {
+          "ok": true,
+          "cost": 8.214183563675522,
+          "fid": 0.4583333333333342,
+          "circuit": "random_20q_60g_s6.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.0653750000000006,
+            "depol1": 0.0,
+            "zz_static": 0.08752254138188936,
+            "zz_dyn": 0.016160275976799983,
+            "thermal": 7.045125746316832
+          },
+          "swaps": 55
+        },
+        {
+          "ok": true,
+          "cost": 10.195411450400815,
+          "fid": 0.2708333333333344,
+          "circuit": "random_20q_60g_s7.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.2640781250000002,
+            "depol1": 0.0,
+            "zz_static": 0.10567880133518927,
+            "zz_dyn": 0.01924734116959998,
+            "thermal": 8.806407182896026
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 10.195411450400815,
+          "fid": 0.2708333333333344,
+          "circuit": "random_20q_60g_s7.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.2640781250000002,
+            "depol1": 0.0,
+            "zz_static": 0.10567880133518927,
+            "zz_dyn": 0.01924734116959998,
+            "thermal": 8.806407182896026
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 10.061194640741167,
+          "fid": 0.3333333333333348,
+          "circuit": "random_20q_60g_s7.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.2044531250000001,
+            "depol1": 0.0,
+            "zz_static": 0.09505896080944959,
+            "zz_dyn": 0.03185282579999994,
+            "thermal": 8.729829729131717
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 11.393747843889214,
+          "fid": 0.39583333333333376,
+          "circuit": "random_20q_60g_s7.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.2420703124999994,
+            "depol1": 0.0,
+            "zz_static": 0.09232656348337119,
+            "zz_dyn": 0.02770452478080002,
+            "thermal": 10.031646443125043
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 11.436043271619642,
+          "fid": 0.3541666666666677,
+          "circuit": "random_20q_60g_s7.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.1571328125000002,
+            "depol1": 0.0,
+            "zz_static": 0.08246225342277667,
+            "zz_dyn": 0.011646855043199981,
+            "thermal": 10.184801350653665
+          },
+          "swaps": 70
+        },
+        {
+          "ok": true,
+          "cost": 8.404036317322731,
+          "fid": 0.2708333333333344,
+          "circuit": "random_20q_60g_s8.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.1840624999999998,
+            "depol1": 0.0,
+            "zz_static": 0.0892944432055972,
+            "zz_dyn": 0.00897617403600001,
+            "thermal": 7.121703200081135
+          },
+          "swaps": 69
+        },
+        {
+          "ok": true,
+          "cost": 8.404036317322731,
+          "fid": 0.2708333333333344,
+          "circuit": "random_20q_60g_s8.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.1840624999999998,
+            "depol1": 0.0,
+            "zz_static": 0.0892944432055972,
+            "zz_dyn": 0.00897617403600001,
+            "thermal": 7.121703200081135
+          },
+          "swaps": 69
+        },
+        {
+          "ok": true,
+          "cost": 10.86840932506436,
+          "fid": 0.2291666666666675,
+          "circuit": "random_20q_60g_s8.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.3928906250000013,
+            "depol1": 0.0,
+            "zz_static": 0.11185084602053275,
+            "zz_dyn": 0.021218494797599973,
+            "thermal": 9.342449359246226
+          },
+          "swaps": 78
+        },
+        {
+          "ok": true,
+          "cost": 8.877363929955237,
+          "fid": 0.35416666666666696,
+          "circuit": "random_20q_60g_s8.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.1881406250000002,
+            "depol1": 0.0,
+            "zz_static": 0.08953000272661978,
+            "zz_dyn": 0.01852537956160002,
+            "thermal": 7.581167922667017
+          },
+          "swaps": 64
+        },
+        {
+          "ok": true,
+          "cost": 8.606356390061105,
+          "fid": 0.2083333333333337,
+          "circuit": "random_20q_60g_s8.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.0894921875000008,
+            "depol1": 0.0,
+            "zz_static": 0.08162011753711243,
+            "zz_dyn": 0.007231069885600021,
+            "thermal": 7.428013015138392
+          },
+          "swaps": 57
+        },
+        {
+          "ok": true,
+          "cost": 10.369098856826367,
+          "fid": 0.20833333333333393,
+          "circuit": "random_20q_60g_s9.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.3635000000000004,
+            "depol1": 0.0,
+            "zz_static": 0.11438333311242568,
+            "zz_dyn": 0.008230887053600014,
+            "thermal": 8.88298463666034
+          },
+          "swaps": 71
+        },
+        {
+          "ok": true,
+          "cost": 10.369098856826367,
+          "fid": 0.20833333333333393,
+          "circuit": "random_20q_60g_s9.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.3635000000000004,
+            "depol1": 0.0,
+            "zz_static": 0.11438333311242568,
+            "zz_dyn": 0.008230887053600014,
+            "thermal": 8.88298463666034
+          },
+          "swaps": 71
+        },
+        {
+          "ok": true,
+          "cost": 10.252273156408728,
+          "fid": 0.18750000000000022,
+          "circuit": "random_20q_60g_s9.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.2577500000000013,
+            "depol1": 0.0,
+            "zz_static": 0.09303898605798873,
+            "zz_dyn": 0.018499533690400013,
+            "thermal": 8.882984636660339
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 9.365484623912591,
+          "fid": 0.27083333333333415,
+          "circuit": "random_20q_60g_s9.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.2745546875000013,
+            "depol1": 0.0,
+            "zz_static": 0.10262350732000372,
+            "zz_dyn": 0.02425123760400001,
+            "thermal": 7.964055191488586
+          },
+          "swaps": 69
+        },
+        {
+          "ok": true,
+          "cost": 9.038418910811693,
+          "fid": 0.31250000000000194,
+          "circuit": "random_20q_60g_s9.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.247835937500001,
+            "depol1": 0.0,
+            "zz_static": 0.09977696705075524,
+            "zz_dyn": 0.03306062982960002,
+            "thermal": 7.657745376431336
+          },
+          "swaps": 71
+        },
+        {
+          "ok": true,
+          "cost": 14.372793682569673,
+          "fid": 0.229166666666668,
+          "circuit": "random_20q_100g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.9562343750000026,
+            "depol1": 0.0,
+            "zz_static": 0.14724994159072313,
+            "zz_dyn": 0.01691676368879995,
+            "thermal": 12.252392602290147
+          },
+          "swaps": 108
+        },
+        {
+          "ok": true,
+          "cost": 14.372793682569673,
+          "fid": 0.229166666666668,
+          "circuit": "random_20q_100g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.9562343750000026,
+            "depol1": 0.0,
+            "zz_static": 0.14724994159072313,
+            "zz_dyn": 0.01691676368879995,
+            "thermal": 12.252392602290147
+          },
+          "swaps": 108
+        },
+        {
+          "ok": true,
+          "cost": 13.099023503728933,
+          "fid": 0.1458333333333343,
+          "circuit": "random_20q_100g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.9096875000000015,
+            "depol1": 0.0,
+            "zz_static": 0.14209822790622073,
+            "zz_dyn": 0.020084433761599938,
+            "thermal": 11.02715334206111
+          },
+          "swaps": 111
+        },
+        {
+          "ok": true,
+          "cost": 19.112627901203002,
+          "fid": 0.20833333333333426,
+          "circuit": "random_20q_100g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.9520859374999995,
+            "depol1": 0.0,
+            "zz_static": 0.13994017785745064,
+            "zz_dyn": 0.02040705016799995,
+            "thermal": 17.000194735677553
+          },
+          "swaps": 116
+        },
+        {
+          "ok": true,
+          "cost": 15.293835868447768,
+          "fid": 0.1875000000000009,
+          "circuit": "random_20q_100g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.9409062500000018,
+            "depol1": 0.0,
+            "zz_static": 0.14570274317146648,
+            "zz_dyn": 0.03590482781439994,
+            "thermal": 13.1713220474619
+          },
+          "swaps": 114
+        },
+        {
+          "ok": true,
+          "cost": 18.166411920715074,
+          "fid": 0.18750000000000014,
+          "circuit": "random_20q_100g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.1126796875000005,
+            "depol1": 0.0,
+            "zz_static": 0.170505818133405,
+            "zz_dyn": 0.03169348586879989,
+            "thermal": 15.851532929212869
+          },
+          "swaps": 115
+        },
+        {
+          "ok": true,
+          "cost": 16.847520485233034,
+          "fid": 0.16666666666666763,
+          "circuit": "random_20q_100g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.048695312500003,
+            "depol1": 0.0,
+            "zz_static": 0.16060888977317625,
+            "zz_dyn": 0.011922613975999955,
+            "thermal": 14.626293668983854
+          },
+          "swaps": 114
+        },
+        {
+          "ok": true,
+          "cost": 18.166411920715074,
+          "fid": 0.18750000000000014,
+          "circuit": "random_20q_100g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.1126796875000005,
+            "depol1": 0.0,
+            "zz_static": 0.170505818133405,
+            "zz_dyn": 0.03169348586879989,
+            "thermal": 15.851532929212869
+          },
+          "swaps": 115
+        },
+        {
+          "ok": true,
+          "cost": 16.8943694799771,
+          "fid": 0.08333333333333369,
+          "circuit": "random_20q_100g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.8711562500000007,
+            "depol1": 0.0,
+            "zz_static": 0.13616263845953083,
+            "zz_dyn": 0.031024561240799924,
+            "thermal": 14.85602603027677
+          },
+          "swaps": 108
+        },
+        {
+          "ok": true,
+          "cost": 15.806746343003185,
+          "fid": 0.1458333333333339,
+          "circuit": "random_20q_100g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.9910390625000012,
+            "depol1": 0.0,
+            "zz_static": 0.16151820222341273,
+            "zz_dyn": 0.023402308231999885,
+            "thermal": 13.630786770047772
+          },
+          "swaps": 105
+        }
+      ],
+      "within_spearman_med": -0.049999999999999996,
+      "within_top1_regret": 0.2604702880860676
+    },
+    "t287_big": {
+      "n": 60,
+      "pearson": 0.5203408728546209,
+      "spearman": 0.36198944151153106,
+      "alpha": 0.12283397410989073,
+      "rows": [
+        {
+          "ok": true,
+          "cost": 8.222653897653458,
+          "fid": 0.2708333333333319,
+          "circuit": "random_20q_60g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.32989484375,
+            "depol1": 0.0,
+            "zz_static": 0.12845263985268396,
+            "zz_dyn": 0.025490482791200027,
+            "thermal": 6.738815931259574
+          },
+          "swaps": 77
+        },
+        {
+          "ok": true,
+          "cost": 8.222653897653458,
+          "fid": 0.2708333333333319,
+          "circuit": "random_20q_60g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.32989484375,
+            "depol1": 0.0,
+            "zz_static": 0.12845263985268396,
+            "zz_dyn": 0.025490482791200027,
+            "thermal": 6.738815931259574
+          },
+          "swaps": 77
+        },
+        {
+          "ok": true,
+          "cost": 8.760948916654439,
+          "fid": 0.2916666666666657,
+          "circuit": "random_20q_60g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.1242286718749999,
+            "depol1": 0.0,
+            "zz_static": 0.1073845766735333,
+            "zz_dyn": 0.02474519920319996,
+            "thermal": 7.504590468902706
+          },
+          "swaps": 61
+        },
+        {
+          "ok": true,
+          "cost": 10.091720525257102,
+          "fid": 0.2708333333333332,
+          "circuit": "random_20q_60g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.084326328125,
+            "depol1": 0.0,
+            "zz_static": 0.0905009200205509,
+            "zz_dyn": 0.03390864045119996,
+            "thermal": 8.882984636660352
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 7.205633397418394,
+          "fid": 0.291666666666666,
+          "circuit": "random_20q_60g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.2429119531250004,
+            "depol1": 0.0,
+            "zz_static": 0.11288930646557156,
+            "zz_dyn": 0.02994565174,
+            "thermal": 5.819886486087822
+          },
+          "swaps": 72
+        },
+        {
+          "ok": true,
+          "cost": 8.980793546164206,
+          "fid": 0.24999999999999933,
+          "circuit": "random_20q_60g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.3171760156249996,
+            "depol1": 0.0,
+            "zz_static": 0.13092844998609504,
+            "zz_dyn": 0.02809861165040001,
+            "thermal": 7.504590468902711
+          },
+          "swaps": 79
+        },
+        {
+          "ok": true,
+          "cost": 10.091720525257102,
+          "fid": 0.2708333333333332,
+          "circuit": "random_20q_60g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.084326328125,
+            "depol1": 0.0,
+            "zz_static": 0.0905009200205509,
+            "zz_dyn": 0.03390864045119996,
+            "thermal": 8.882984636660352
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 8.472462421861064,
+          "fid": 0.3333333333333323,
+          "circuit": "random_20q_60g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.1517560156250006,
+            "depol1": 0.0,
+            "zz_static": 0.10624443450420804,
+            "zz_dyn": 0.016181317886400003,
+            "thermal": 7.198280653845455
+          },
+          "swaps": 65
+        },
+        {
+          "ok": true,
+          "cost": 7.772740636525965,
+          "fid": 0.2500000000000001,
+          "circuit": "random_20q_60g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.2056765625000005,
+            "depol1": 0.0,
+            "zz_static": 0.10817285562204432,
+            "zz_dyn": 0.026385102201599946,
+            "thermal": 6.432506116202321
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 9.190227723316985,
+          "fid": 0.41666666666666585,
+          "circuit": "random_20q_60g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.1833509375,
+            "depol1": 0.0,
+            "zz_static": 0.10876260421910816,
+            "zz_dyn": 0.0106364438736,
+            "thermal": 7.887477737724278
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 9.086265705151193,
+          "fid": 0.4166666666666659,
+          "circuit": "random_20q_60g_s2.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.2802162499999998,
+            "depol1": 0.0,
+            "zz_static": 0.12542942937346166,
+            "zz_dyn": 0.022874649346400037,
+            "thermal": 7.657745376431333
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 9.086265705151193,
+          "fid": 0.4166666666666659,
+          "circuit": "random_20q_60g_s2.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.2802162499999998,
+            "depol1": 0.0,
+            "zz_static": 0.12542942937346166,
+            "zz_dyn": 0.022874649346400037,
+            "thermal": 7.657745376431333
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 9.778024444516113,
+          "fid": 0.2083333333333334,
+          "circuit": "random_20q_60g_s2.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.2264278906250003,
+            "depol1": 0.0,
+            "zz_static": 0.11929036487264327,
+            "zz_dyn": 0.008786274943999998,
+            "thermal": 8.42351991407447
+          },
+          "swaps": 65
+        },
+        {
+          "ok": true,
+          "cost": 11.445338452488327,
+          "fid": 0.35416666666666513,
+          "circuit": "random_20q_60g_s2.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.34702015625,
+            "depol1": 0.0,
+            "zz_static": 0.12326349482399658,
+            "zz_dyn": 0.019985812053599925,
+            "thermal": 9.955068989360731
+          },
+          "swaps": 75
+        },
+        {
+          "ok": true,
+          "cost": 9.835030060844772,
+          "fid": 0.3541666666666667,
+          "circuit": "random_20q_60g_s2.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.1925239062500002,
+            "depol1": 0.0,
+            "zz_static": 0.12152832181678867,
+            "zz_dyn": 0.02088046493920002,
+            "thermal": 8.500097367838784
+          },
+          "swaps": 63
+        },
+        {
+          "ok": true,
+          "cost": 7.894603967727035,
+          "fid": 0.35416666666666624,
+          "circuit": "random_20q_60g_s3.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 0.9653512500000001,
+            "depol1": 0.0,
+            "zz_static": 0.09348836284555091,
+            "zz_dyn": 0.020370969857599997,
+            "thermal": 6.815393385023884
+          },
+          "swaps": 51
+        },
+        {
+          "ok": true,
+          "cost": 7.894603967727035,
+          "fid": 0.35416666666666624,
+          "circuit": "random_20q_60g_s3.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 0.9653512500000001,
+            "depol1": 0.0,
+            "zz_static": 0.09348836284555091,
+            "zz_dyn": 0.020370969857599997,
+            "thermal": 6.815393385023884
+          },
+          "swaps": 51
+        },
+        {
+          "ok": true,
+          "cost": 7.467846846844955,
+          "fid": 0.22916666666666577,
+          "circuit": "random_20q_60g_s3.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 0.9995364843750003,
+            "depol1": 0.0,
+            "zz_static": 0.09236634479274422,
+            "zz_dyn": 0.02001535523920003,
+            "thermal": 6.35592866243801
+          },
+          "swaps": 51
+        },
+        {
+          "ok": true,
+          "cost": 7.719242160551134,
+          "fid": 0.3541666666666661,
+          "circuit": "random_20q_60g_s3.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 0.9374941406249999,
+            "depol1": 0.0,
+            "zz_static": 0.08926573456687394,
+            "zz_dyn": 0.030243807863999994,
+            "thermal": 6.66223847749526
+          },
+          "swaps": 51
+        },
+        {
+          "ok": true,
+          "cost": 7.653636675881293,
+          "fid": 0.3749999999999994,
+          "circuit": "random_20q_60g_s3.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.0296907031249993,
+            "depol1": 0.0,
+            "zz_static": 0.09960389763685938,
+            "zz_dyn": 0.015258505152800018,
+            "thermal": 6.509083569966634
+          },
+          "swaps": 54
+        },
+        {
+          "ok": true,
+          "cost": 12.842324866158918,
+          "fid": 0.31249999999999917,
+          "circuit": "random_20q_60g_s4.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.077278203125,
+            "depol1": 0.0,
+            "zz_static": 0.10236688193668976,
+            "zz_dyn": 0.02290680892159991,
+            "thermal": 11.63977297217563
+          },
+          "swaps": 69
+        },
+        {
+          "ok": true,
+          "cost": 12.842324866158918,
+          "fid": 0.31249999999999917,
+          "circuit": "random_20q_60g_s4.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.077278203125,
+            "depol1": 0.0,
+            "zz_static": 0.10236688193668976,
+            "zz_dyn": 0.02290680892159991,
+            "thermal": 11.63977297217563
+          },
+          "swaps": 69
+        },
+        {
+          "ok": true,
+          "cost": 8.182434309994669,
+          "fid": 0.3124999999999997,
+          "circuit": "random_20q_60g_s4.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 0.9543142968749999,
+            "depol1": 0.0,
+            "zz_static": 0.08855729100332851,
+            "zz_dyn": 0.017859522035200023,
+            "thermal": 7.121703200081141
+          },
+          "swaps": 59
+        },
+        {
+          "ok": true,
+          "cost": 8.770824816720564,
+          "fid": 0.35416666666666585,
+          "circuit": "random_20q_60g_s4.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 0.9372164062500001,
+            "depol1": 0.0,
+            "zz_static": 0.08457282402531478,
+            "zz_dyn": 0.014712756249600025,
+            "thermal": 7.734322830195649
+          },
+          "swaps": 63
+        },
+        {
+          "ok": true,
+          "cost": 10.153298323172736,
+          "fid": 0.3541666666666669,
+          "circuit": "random_20q_60g_s4.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.0838496093749999,
+            "depol1": 0.0,
+            "zz_static": 0.10084557318347888,
+            "zz_dyn": 0.009041050189599914,
+            "thermal": 8.959562090424658
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 10.837732420275575,
+          "fid": 0.37499999999999895,
+          "circuit": "random_20q_60g_s5.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.2033646875000004,
+            "depol1": 0.0,
+            "zz_static": 0.11416373981672663,
+            "zz_dyn": 0.02459972618399992,
+            "thermal": 9.495604266774848
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 9.657698500066061,
+          "fid": 0.229166666666666,
+          "circuit": "random_20q_60g_s5.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.1052028125000002,
+            "depol1": 0.0,
+            "zz_static": 0.10367135502519449,
+            "zz_dyn": 0.0253044184664,
+            "thermal": 8.423519914074467
+          },
+          "swaps": 61
+        },
+        {
+          "ok": true,
+          "cost": 10.837732420275575,
+          "fid": 0.37499999999999895,
+          "circuit": "random_20q_60g_s5.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.2033646875000004,
+            "depol1": 0.0,
+            "zz_static": 0.11416373981672663,
+            "zz_dyn": 0.02459972618399992,
+            "thermal": 9.495604266774848
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 9.666044053968754,
+          "fid": 0.39583333333333287,
+          "circuit": "random_20q_60g_s5.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 0.9882224999999998,
+            "depol1": 0.0,
+            "zz_static": 0.09715338808246295,
+            "zz_dyn": 0.003993344283200012,
+            "thermal": 8.576674821603092
+          },
+          "swaps": 60
+        },
+        {
+          "ok": true,
+          "cost": 11.287752647142593,
+          "fid": 0.3541666666666656,
+          "circuit": "random_20q_60g_s5.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.1425907812500007,
+            "depol1": 0.0,
+            "zz_static": 0.10579819061235145,
+            "zz_dyn": 0.00771723215520002,
+            "thermal": 10.031646443125041
+          },
+          "swaps": 64
+        },
+        {
+          "ok": true,
+          "cost": 7.552631437424171,
+          "fid": 0.29166666666666746,
+          "circuit": "random_20q_60g_s6.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.1549559375,
+            "depol1": 0.0,
+            "zz_static": 0.10076789358248267,
+            "zz_dyn": 0.01755639766799999,
+            "thermal": 6.279351208673689
+          },
+          "swaps": 62
+        },
+        {
+          "ok": true,
+          "cost": 8.624849971751392,
+          "fid": 0.3333333333333339,
+          "circuit": "random_20q_60g_s6.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.1384957812499998,
+            "depol1": 0.0,
+            "zz_static": 0.1040253864297039,
+            "zz_dyn": 0.03089324269759997,
+            "thermal": 7.351435561374087
+          },
+          "swaps": 61
+        },
+        {
+          "ok": true,
+          "cost": 7.552631437424171,
+          "fid": 0.29166666666666746,
+          "circuit": "random_20q_60g_s6.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.1549559375,
+            "depol1": 0.0,
+            "zz_static": 0.10076789358248267,
+            "zz_dyn": 0.01755639766799999,
+            "thermal": 6.279351208673689
+          },
+          "swaps": 62
+        },
+        {
+          "ok": true,
+          "cost": 7.972294304507745,
+          "fid": 0.33333333333333254,
+          "circuit": "random_20q_60g_s6.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.0478524218750003,
+            "depol1": 0.0,
+            "zz_static": 0.09789842676165698,
+            "zz_dyn": 0.011150070847200025,
+            "thermal": 6.815393385023888
+          },
+          "swaps": 56
+        },
+        {
+          "ok": true,
+          "cost": 8.25088854936762,
+          "fid": 0.24999999999999992,
+          "circuit": "random_20q_60g_s6.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.0887553125,
+            "depol1": 0.0,
+            "zz_static": 0.10285634870598796,
+            "zz_dyn": 0.014151141844799991,
+            "thermal": 7.045125746316832
+          },
+          "swaps": 55
+        },
+        {
+          "ok": true,
+          "cost": 10.146895760822943,
+          "fid": 0.20833333333333334,
+          "circuit": "random_20q_60g_s7.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.211102578125,
+            "depol1": 0.0,
+            "zz_static": 0.1130101576083166,
+            "zz_dyn": 0.016375842193599985,
+            "thermal": 8.806407182896026
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 10.146895760822943,
+          "fid": 0.20833333333333334,
+          "circuit": "random_20q_60g_s7.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.211102578125,
+            "depol1": 0.0,
+            "zz_static": 0.1130101576083166,
+            "zz_dyn": 0.016375842193599985,
+            "thermal": 8.806407182896026
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 9.939364504291904,
+          "fid": 0.3124999999999993,
+          "circuit": "random_20q_60g_s7.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.07796375,
+            "depol1": 0.0,
+            "zz_static": 0.09976245440738622,
+            "zz_dyn": 0.03180857075279994,
+            "thermal": 8.729829729131717
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 11.378592569108218,
+          "fid": 0.25,
+          "circuit": "random_20q_60g_s7.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.2090663281250005,
+            "depol1": 0.0,
+            "zz_static": 0.11100033337897422,
+            "zz_dyn": 0.026879464479199994,
+            "thermal": 10.031646443125043
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 11.329777904967312,
+          "fid": 0.31249999999999917,
+          "circuit": "random_20q_60g_s7.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.0323471093750003,
+            "depol1": 0.0,
+            "zz_static": 0.09596373328024713,
+            "zz_dyn": 0.016665711658399987,
+            "thermal": 10.184801350653665
+          },
+          "swaps": 70
+        },
+        {
+          "ok": true,
+          "cost": 8.387199744514684,
+          "fid": 0.24999999999999958,
+          "circuit": "random_20q_60g_s8.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.1482621875,
+            "depol1": 0.0,
+            "zz_static": 0.10835450621114802,
+            "zz_dyn": 0.008879850722400015,
+            "thermal": 7.121703200081135
+          },
+          "swaps": 69
+        },
+        {
+          "ok": true,
+          "cost": 8.387199744514684,
+          "fid": 0.24999999999999958,
+          "circuit": "random_20q_60g_s8.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.1482621875,
+            "depol1": 0.0,
+            "zz_static": 0.10835450621114802,
+            "zz_dyn": 0.008879850722400015,
+            "thermal": 7.121703200081135
+          },
+          "swaps": 69
+        },
+        {
+          "ok": true,
+          "cost": 10.808371876806076,
+          "fid": 0.20833333333333295,
+          "circuit": "random_20q_60g_s8.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.3196587500000005,
+            "depol1": 0.0,
+            "zz_static": 0.12384610282784979,
+            "zz_dyn": 0.02241766473199999,
+            "thermal": 9.342449359246226
+          },
+          "swaps": 78
+        },
+        {
+          "ok": true,
+          "cost": 8.527949456282187,
+          "fid": 0.37500000000000017,
+          "circuit": "random_20q_60g_s8.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.000238203125,
+            "depol1": 0.0,
+            "zz_static": 0.09094769415719486,
+            "zz_dyn": 0.008750543861600025,
+            "thermal": 7.428013015138392
+          },
+          "swaps": 57
+        },
+        {
+          "ok": true,
+          "cost": 8.843612578933689,
+          "fid": 0.3333333333333335,
+          "circuit": "random_20q_60g_s8.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.1346489843749998,
+            "depol1": 0.0,
+            "zz_static": 0.10677293582447142,
+            "zz_dyn": 0.02102273606720003,
+            "thermal": 7.581167922667017
+          },
+          "swaps": 64
+        },
+        {
+          "ok": true,
+          "cost": 10.367488504321084,
+          "fid": 0.1666666666666661,
+          "circuit": "random_20q_60g_s9.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.3557269531249998,
+            "depol1": 0.0,
+            "zz_static": 0.1217449940149434,
+            "zz_dyn": 0.007031920520799999,
+            "thermal": 8.88298463666034
+          },
+          "swaps": 71
+        },
+        {
+          "ok": true,
+          "cost": 10.367488504321084,
+          "fid": 0.1666666666666661,
+          "circuit": "random_20q_60g_s9.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.3557269531249998,
+            "depol1": 0.0,
+            "zz_static": 0.1217449940149434,
+            "zz_dyn": 0.007031920520799999,
+            "thermal": 8.88298463666034
+          },
+          "swaps": 71
+        },
+        {
+          "ok": true,
+          "cost": 10.19368905749632,
+          "fid": 0.31249999999999994,
+          "circuit": "random_20q_60g_s9.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.1672353125,
+            "depol1": 0.0,
+            "zz_static": 0.11592620426958053,
+            "zz_dyn": 0.02754290406640001,
+            "thermal": 8.882984636660339
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 9.324380900486473,
+          "fid": 0.14583333333333312,
+          "circuit": "random_20q_60g_s9.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.2233285156250002,
+            "depol1": 0.0,
+            "zz_static": 0.11439521365928668,
+            "zz_dyn": 0.022601979713600007,
+            "thermal": 7.964055191488586
+          },
+          "swaps": 69
+        },
+        {
+          "ok": true,
+          "cost": 8.954227364955388,
+          "fid": 0.22916666666666607,
+          "circuit": "random_20q_60g_s9.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.1480160937500004,
+            "depol1": 0.0,
+            "zz_static": 0.10806699485725117,
+            "zz_dyn": 0.04039889991679999,
+            "thermal": 7.657745376431336
+          },
+          "swaps": 71
+        },
+        {
+          "ok": true,
+          "cost": 14.21869294133312,
+          "fid": 0.10416666666666687,
+          "circuit": "random_20q_100g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.7848532812500013,
+            "depol1": 0.0,
+            "zz_static": 0.1618460717121721,
+            "zz_dyn": 0.019600986080799934,
+            "thermal": 12.252392602290147
+          },
+          "swaps": 108
+        },
+        {
+          "ok": true,
+          "cost": 14.21869294133312,
+          "fid": 0.10416666666666687,
+          "circuit": "random_20q_100g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 1.7848532812500013,
+            "depol1": 0.0,
+            "zz_static": 0.1618460717121721,
+            "zz_dyn": 0.019600986080799934,
+            "thermal": 12.252392602290147
+          },
+          "swaps": 108
+        },
+        {
+          "ok": true,
+          "cost": 13.030127393677093,
+          "fid": 0.1041666666666667,
+          "circuit": "random_20q_100g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.8162457031249999,
+            "depol1": 0.0,
+            "zz_static": 0.1589364571829833,
+            "zz_dyn": 0.027791891307999923,
+            "thermal": 11.02715334206111
+          },
+          "swaps": 111
+        },
+        {
+          "ok": true,
+          "cost": 19.13816300422993,
+          "fid": 0.12499999999999994,
+          "circuit": "random_20q_100g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.9334707031250007,
+            "depol1": 0.0,
+            "zz_static": 0.18281621650817537,
+            "zz_dyn": 0.02168134891919992,
+            "thermal": 17.000194735677553
+          },
+          "swaps": 116
+        },
+        {
+          "ok": true,
+          "cost": 15.216237609902592,
+          "fid": 0.14583333333333293,
+          "circuit": "random_20q_100g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.8223003125000012,
+            "depol1": 0.0,
+            "zz_static": 0.17535753421349137,
+            "zz_dyn": 0.047257715727199875,
+            "thermal": 13.1713220474619
+          },
+          "swaps": 114
+        },
+        {
+          "ok": true,
+          "cost": 18.15125801190234,
+          "fid": 0.16666666666666666,
+          "circuit": "random_20q_100g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.0599678125000005,
+            "depol1": 0.0,
+            "zz_static": 0.19700500531507065,
+            "zz_dyn": 0.04275226487439985,
+            "thermal": 15.851532929212869
+          },
+          "swaps": 115
+        },
+        {
+          "ok": true,
+          "cost": 18.15125801190234,
+          "fid": 0.16666666666666666,
+          "circuit": "random_20q_100g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.0599678125000005,
+            "depol1": 0.0,
+            "zz_static": 0.19700500531507065,
+            "zz_dyn": 0.04275226487439985,
+            "thermal": 15.851532929212869
+          },
+          "swaps": 115
+        },
+        {
+          "ok": true,
+          "cost": 16.77192681571887,
+          "fid": 0.2916666666666668,
+          "circuit": "random_20q_100g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.9448184375000006,
+            "depol1": 0.0,
+            "zz_static": 0.18674565351101793,
+            "zz_dyn": 0.014069055723999944,
+            "thermal": 14.626293668983854
+          },
+          "swaps": 114
+        },
+        {
+          "ok": true,
+          "cost": 15.824315744709835,
+          "fid": 0.24999999999999956,
+          "circuit": "random_20q_100g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.985555390625,
+            "depol1": 0.0,
+            "zz_static": 0.1849811557066633,
+            "zz_dyn": 0.022992428330399897,
+            "thermal": 13.630786770047772
+          },
+          "swaps": 105
+        },
+        {
+          "ok": true,
+          "cost": 16.927708554696377,
+          "fid": 0.25000000000000006,
+          "circuit": "random_20q_100g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.8596580468750006,
+            "depol1": 0.0,
+            "zz_static": 0.17837870364940686,
+            "zz_dyn": 0.033645773895199904,
+            "thermal": 14.85602603027677
+          },
+          "swaps": 108
+        }
+      ],
+      "within_spearman_med": 0.09999999999999999,
+      "within_top1_regret": 0.251231941972572
+    },
+    "t176": {
+      "n": 60,
+      "pearson": 0.4976630369795482,
+      "spearman": 0.28635732147818843,
+      "alpha": 0.06135309458919253,
+      "rows": [
+        {
+          "ok": true,
+          "cost": 26.197723756085136,
+          "fid": 0.0833333333333333,
+          "circuit": "random_20q_60g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.4521484375,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 23.745575318585136
+          },
+          "swaps": 82
+        },
+        {
+          "ok": true,
+          "cost": 26.197723756085136,
+          "fid": 0.0833333333333333,
+          "circuit": "random_20q_60g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.4521484375,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 23.745575318585136
+          },
+          "swaps": 82
+        },
+        {
+          "ok": true,
+          "cost": 30.192233705015997,
+          "fid": 0.20833333333333295,
+          "circuit": "random_20q_60g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.4890625,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 27.703171205015998
+          },
+          "swaps": 85
+        },
+        {
+          "ok": true,
+          "cost": 29.909978910694413,
+          "fid": 0.16666666666666655,
+          "circuit": "random_20q_60g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.4046875,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 27.50529141069441
+          },
+          "swaps": 81
+        },
+        {
+          "ok": true,
+          "cost": 28.366667118622075,
+          "fid": 0.06249999999999992,
+          "circuit": "random_20q_60g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.4444140624999995,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 25.922253056122077
+          },
+          "swaps": 88
+        },
+        {
+          "ok": true,
+          "cost": 35.9330272141976,
+          "fid": 0.14583333333333323,
+          "circuit": "random_20q_60g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 2.8871015625,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 33.0459256516976
+          },
+          "swaps": 97
+        },
+        {
+          "ok": true,
+          "cost": 28.366667118622075,
+          "fid": 0.06249999999999992,
+          "circuit": "random_20q_60g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.4444140624999995,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 25.922253056122077
+          },
+          "swaps": 88
+        },
+        {
+          "ok": true,
+          "cost": 24.783848221977394,
+          "fid": 0.125,
+          "circuit": "random_20q_60g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 2.0276718749999993,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 22.756176346977394
+          },
+          "swaps": 68
+        },
+        {
+          "ok": true,
+          "cost": 24.265352482191222,
+          "fid": 0.20833333333333326,
+          "circuit": "random_20q_60g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.3006953125000003,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 21.964657169691222
+          },
+          "swaps": 76
+        },
+        {
+          "ok": true,
+          "cost": 32.77810071869601,
+          "fid": 0.22916666666666663,
+          "circuit": "random_20q_60g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.5024921875000015,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 30.27560853119601
+          },
+          "swaps": 87
+        },
+        {
+          "ok": true,
+          "cost": 31.18690611412368,
+          "fid": 0.20833333333333334,
+          "circuit": "random_20q_60g_s2.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.494335937499999,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 28.69257017662368
+          },
+          "swaps": 81
+        },
+        {
+          "ok": true,
+          "cost": 31.18690611412368,
+          "fid": 0.20833333333333334,
+          "circuit": "random_20q_60g_s2.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.494335937499999,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 28.69257017662368
+          },
+          "swaps": 81
+        },
+        {
+          "ok": true,
+          "cost": 30.781584025480615,
+          "fid": 0.18750000000000014,
+          "circuit": "random_20q_60g_s2.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.484773437499999,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 28.296810587980616
+          },
+          "swaps": 79
+        },
+        {
+          "ok": true,
+          "cost": 27.626335441335915,
+          "fid": 0.22916666666666644,
+          "circuit": "random_20q_60g_s2.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.4956015625,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 25.130733878835915
+          },
+          "swaps": 80
+        },
+        {
+          "ok": true,
+          "cost": 30.247027561837502,
+          "fid": 0.16666666666666674,
+          "circuit": "random_20q_60g_s2.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 2.345976562499999,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 27.901050999337503
+          },
+          "swaps": 73
+        },
+        {
+          "ok": true,
+          "cost": 25.571690729942038,
+          "fid": 0.24999999999999986,
+          "circuit": "random_20q_60g_s3.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.2218749999999994,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 23.349815729942037
+          },
+          "swaps": 75
+        },
+        {
+          "ok": true,
+          "cost": 25.571690729942038,
+          "fid": 0.24999999999999986,
+          "circuit": "random_20q_60g_s3.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.2218749999999994,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 23.349815729942037
+          },
+          "swaps": 75
+        },
+        {
+          "ok": true,
+          "cost": 27.745415342479003,
+          "fid": 0.24999999999999992,
+          "circuit": "random_20q_60g_s3.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.218921875,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 25.526493467479003
+          },
+          "swaps": 76
+        },
+        {
+          "ok": true,
+          "cost": 21.57038088783274,
+          "fid": 0.1458333333333333,
+          "circuit": "random_20q_60g_s3.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 1.9802812499999993,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 19.59009963783274
+          },
+          "swaps": 62
+        },
+        {
+          "ok": true,
+          "cost": 22.979516010583538,
+          "fid": 0.1666666666666667,
+          "circuit": "random_20q_60g_s3.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 2.0042578125,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 20.975258198083537
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 31.60066570276676,
+          "fid": 0.24999999999999986,
+          "circuit": "random_20q_60g_s4.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.5123359374999996,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 29.088329765266764
+          },
+          "swaps": 81
+        },
+        {
+          "ok": true,
+          "cost": 31.60066570276676,
+          "fid": 0.24999999999999986,
+          "circuit": "random_20q_60g_s4.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.5123359374999996,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 29.088329765266764
+          },
+          "swaps": 81
+        },
+        {
+          "ok": true,
+          "cost": 27.68633242315745,
+          "fid": 0.16666666666666666,
+          "circuit": "random_20q_60g_s4.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.357718749999999,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 25.32861367315745
+          },
+          "swaps": 80
+        },
+        {
+          "ok": true,
+          "cost": 22.56793610944045,
+          "fid": 0.18750000000000008,
+          "circuit": "random_20q_60g_s4.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 1.9884374999999999,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 20.57949860944045
+          },
+          "swaps": 66
+        },
+        {
+          "ok": true,
+          "cost": 26.543209907228203,
+          "fid": 0.08333333333333318,
+          "circuit": "random_20q_60g_s4.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.401875,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 24.141334907228202
+          },
+          "swaps": 80
+        },
+        {
+          "ok": true,
+          "cost": 28.66692191294364,
+          "fid": 0.12500000000000003,
+          "circuit": "random_20q_60g_s5.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.5467890625000007,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 26.12013285044364
+          },
+          "swaps": 84
+        },
+        {
+          "ok": true,
+          "cost": 28.66692191294364,
+          "fid": 0.12500000000000003,
+          "circuit": "random_20q_60g_s5.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.5467890625000007,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 26.12013285044364
+          },
+          "swaps": 84
+        },
+        {
+          "ok": true,
+          "cost": 36.68589493580533,
+          "fid": 0.06249999999999998,
+          "circuit": "random_20q_60g_s5.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.6505703124999993,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 34.03532462330533
+          },
+          "swaps": 88
+        },
+        {
+          "ok": true,
+          "cost": 32.12898477323138,
+          "fid": 0.12499999999999993,
+          "circuit": "random_20q_60g_s5.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.4470156249999993,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 29.68196914823138
+          },
+          "swaps": 80
+        },
+        {
+          "ok": true,
+          "cost": 29.001108170908232,
+          "fid": 0.16666666666666688,
+          "circuit": "random_20q_60g_s5.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 2.2873359375,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 26.713772233408232
+          },
+          "swaps": 78
+        },
+        {
+          "ok": true,
+          "cost": 27.320054191335913,
+          "fid": 0.2499999999999999,
+          "circuit": "random_20q_60g_s6.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.1893203125,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 25.130733878835912
+          },
+          "swaps": 73
+        },
+        {
+          "ok": true,
+          "cost": 27.320054191335913,
+          "fid": 0.2499999999999999,
+          "circuit": "random_20q_60g_s6.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.1893203125,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 25.130733878835912
+          },
+          "swaps": 73
+        },
+        {
+          "ok": true,
+          "cost": 24.885640302655865,
+          "fid": 0.10416666666666662,
+          "circuit": "random_20q_60g_s6.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.32734375,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 22.558296552655865
+          },
+          "swaps": 76
+        },
+        {
+          "ok": true,
+          "cost": 25.65882833676356,
+          "fid": 0.14583333333333345,
+          "circuit": "random_20q_60g_s6.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 2.1111328124999997,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 23.54769552426356
+          },
+          "swaps": 67
+        },
+        {
+          "ok": true,
+          "cost": 29.958424223194417,
+          "fid": 0.22916666666666652,
+          "circuit": "random_20q_60g_s6.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.4531328124999985,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 27.50529141069442
+          },
+          "swaps": 77
+        },
+        {
+          "ok": true,
+          "cost": 28.07606555612205,
+          "fid": 0.14583333333333345,
+          "circuit": "random_20q_60g_s7.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.153812499999998,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 25.922253056122052
+          },
+          "swaps": 74
+        },
+        {
+          "ok": true,
+          "cost": 28.07606555612205,
+          "fid": 0.14583333333333345,
+          "circuit": "random_20q_60g_s7.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.153812499999998,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 25.922253056122052
+          },
+          "swaps": 74
+        },
+        {
+          "ok": true,
+          "cost": 26.28003021972821,
+          "fid": 0.14583333333333318,
+          "circuit": "random_20q_60g_s7.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.1386953125,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 24.14133490722821
+          },
+          "swaps": 73
+        },
+        {
+          "ok": true,
+          "cost": 27.63987627997899,
+          "fid": 0.2500000000000003,
+          "circuit": "random_20q_60g_s7.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.113382812499999,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 25.52649346747899
+          },
+          "swaps": 74
+        },
+        {
+          "ok": true,
+          "cost": 26.2687802197282,
+          "fid": 0.1666666666666666,
+          "circuit": "random_20q_60g_s7.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 2.1274453125000004,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 24.1413349072282
+          },
+          "swaps": 71
+        },
+        {
+          "ok": true,
+          "cost": 33.425619895982194,
+          "fid": 0.22916666666666666,
+          "circuit": "random_20q_60g_s8.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.358492187499999,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 31.067127708482193
+          },
+          "swaps": 81
+        },
+        {
+          "ok": true,
+          "cost": 33.425619895982194,
+          "fid": 0.22916666666666666,
+          "circuit": "random_20q_60g_s8.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.358492187499999,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 31.067127708482193
+          },
+          "swaps": 81
+        },
+        {
+          "ok": true,
+          "cost": 32.04008935390985,
+          "fid": 0.27083333333333315,
+          "circuit": "random_20q_60g_s8.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.5560000000000005,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 29.48408935390985
+          },
+          "swaps": 90
+        },
+        {
+          "ok": true,
+          "cost": 28.70470014476516,
+          "fid": 0.16666666666666652,
+          "circuit": "random_20q_60g_s8.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.3866874999999985,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 26.31801264476516
+          },
+          "swaps": 82
+        },
+        {
+          "ok": true,
+          "cost": 24.542705820834318,
+          "fid": 0.20833333333333323,
+          "circuit": "random_20q_60g_s9.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.182289062500001,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 22.360416758334317
+          },
+          "swaps": 72
+        },
+        {
+          "ok": true,
+          "cost": 35.67703982101914,
+          "fid": 0.06249999999999998,
+          "circuit": "random_20q_60g_s8.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 2.433234375,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 33.243805446019145
+          },
+          "swaps": 84
+        },
+        {
+          "ok": true,
+          "cost": 24.542705820834318,
+          "fid": 0.20833333333333323,
+          "circuit": "random_20q_60g_s9.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 2.182289062500001,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 22.360416758334317
+          },
+          "swaps": 72
+        },
+        {
+          "ok": true,
+          "cost": 24.443776133334318,
+          "fid": 0.16666666666666652,
+          "circuit": "random_20q_60g_s9.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.0833593749999997,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 22.360416758334317
+          },
+          "swaps": 69
+        },
+        {
+          "ok": true,
+          "cost": 31.41321257776677,
+          "fid": 0.1666666666666666,
+          "circuit": "random_20q_60g_s9.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 2.3248828125000003,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 29.08832976526677
+          },
+          "swaps": 76
+        },
+        {
+          "ok": true,
+          "cost": 26.122840943585118,
+          "fid": 0.16666666666666632,
+          "circuit": "random_20q_60g_s9.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 2.3772656250000006,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 23.745575318585118
+          },
+          "swaps": 78
+        },
+        {
+          "ok": true,
+          "cost": 43.6681168904516,
+          "fid": 0.06249999999999991,
+          "circuit": "random_20q_100g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 3.6963984375,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 39.9717184529516
+          },
+          "swaps": 127
+        },
+        {
+          "ok": true,
+          "cost": 43.6681168904516,
+          "fid": 0.06249999999999991,
+          "circuit": "random_20q_100g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 3.6963984375,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 39.9717184529516
+          },
+          "swaps": 127
+        },
+        {
+          "ok": true,
+          "cost": 41.28823602791463,
+          "fid": 0.041666666666666644,
+          "circuit": "random_20q_100g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 3.4931953124999997,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 37.79504071541463
+          },
+          "swaps": 116
+        },
+        {
+          "ok": true,
+          "cost": 49.86352155077632,
+          "fid": 0.12499999999999993,
+          "circuit": "random_20q_100g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 4.153289062500003,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 45.71023248827632
+          },
+          "swaps": 139
+        },
+        {
+          "ok": true,
+          "cost": 43.5108573018085,
+          "fid": 0.041666666666666706,
+          "circuit": "random_20q_100g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 3.9348984374999985,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 39.575958864308504
+          },
+          "swaps": 134
+        },
+        {
+          "ok": true,
+          "cost": 44.37799189045161,
+          "fid": 0.041666666666666685,
+          "circuit": "random_20q_100g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 4.406273437500003,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 39.971718452951606
+          },
+          "swaps": 140
+        },
+        {
+          "ok": true,
+          "cost": 43.5108573018085,
+          "fid": 0.041666666666666706,
+          "circuit": "random_20q_100g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 3.9348984374999985,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 39.575958864308504
+          },
+          "swaps": 134
+        },
+        {
+          "ok": true,
+          "cost": 48.40258653484706,
+          "fid": 0.14583333333333334,
+          "circuit": "random_20q_100g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 3.8796328125000006,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 44.52295372234706
+          },
+          "swaps": 125
+        },
+        {
+          "ok": true,
+          "cost": 45.05151763820237,
+          "fid": 0.14583333333333345,
+          "circuit": "random_20q_100g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 3.6946406250000017,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 41.35687701320237
+          },
+          "swaps": 123
+        },
+        {
+          "ok": true,
+          "cost": 52.79313732242105,
+          "fid": 0.08333333333333331,
+          "circuit": "random_20q_100g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 3.916828125000001,
+            "depol1": 0.0,
+            "zz_static": 0.0,
+            "zz_dyn": 0.0,
+            "thermal": 48.87630919742105
+          },
+          "swaps": 130
+        }
+      ],
+      "within_spearman_med": 0.0,
+      "within_top1_regret": 0.41155467698727044
+    },
+    "ring16": {
+      "n": 60,
+      "pearson": -0.14449571355871269,
+      "spearman": 0.15882189497082524,
+      "alpha": 0.61660922164793,
+      "rows": [
+        {
+          "ok": true,
+          "cost": 15.972645823028968,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 9.670800937500001,
+            "depol1": 0.0,
+            "zz_static": 0.14850467880459825,
+            "zz_dyn": 0.016939028369599995,
+            "thermal": 6.1364011783547685
+          },
+          "swaps": 123
+        },
+        {
+          "ok": true,
+          "cost": 15.972645823028968,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 9.670800937500001,
+            "depol1": 0.0,
+            "zz_static": 0.14850467880459825,
+            "zz_dyn": 0.016939028369599995,
+            "thermal": 6.1364011783547685
+          },
+          "swaps": 123
+        },
+        {
+          "ok": true,
+          "cost": 18.443733462749933,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 9.521770781250005,
+            "depol1": 0.0,
+            "zz_static": 0.1465333684652319,
+            "zz_dyn": 0.023512878331999908,
+            "thermal": 8.751916434702698
+          },
+          "swaps": 121
+        },
+        {
+          "ok": true,
+          "cost": 18.636714495799914,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 10.511825624999998,
+            "depol1": 0.0,
+            "zz_static": 0.16105690265695916,
+            "zz_dyn": 0.016689458470399984,
+            "thermal": 7.947142509672558
+          },
+          "swaps": 135
+        },
+        {
+          "ok": true,
+          "cost": 18.109122183171124,
+          "fid": 0.02083333333333333,
+          "circuit": "random_16q_60g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 9.588682968749998,
+            "depol1": 0.0,
+            "zz_static": 0.15075135673429657,
+            "zz_dyn": 0.020158385499199925,
+            "thermal": 8.349529472187632
+          },
+          "swaps": 122
+        },
+        {
+          "ok": true,
+          "cost": 20.6499138887948,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 10.116142031250009,
+            "depol1": 0.0,
+            "zz_static": 0.15425443418743376,
+            "zz_dyn": 0.018053138594399956,
+            "thermal": 10.361464284762958
+          },
+          "swaps": 131
+        },
+        {
+          "ok": true,
+          "cost": 20.6499138887948,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 10.116142031250009,
+            "depol1": 0.0,
+            "zz_static": 0.15425443418743376,
+            "zz_dyn": 0.018053138594399956,
+            "thermal": 10.361464284762958
+          },
+          "swaps": 131
+        },
+        {
+          "ok": true,
+          "cost": 20.243276716998253,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 10.322797500000004,
+            "depol1": 0.0,
+            "zz_static": 0.15136480620468493,
+            "zz_dyn": 0.011230569803199968,
+            "thermal": 9.757883840990367
+          },
+          "swaps": 135
+        },
+        {
+          "ok": true,
+          "cost": 20.98604687365853,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 11.036490468750001,
+            "depol1": 0.0,
+            "zz_static": 0.16914270520376679,
+            "zz_dyn": 0.022529858714399935,
+            "thermal": 9.757883840990363
+          },
+          "swaps": 143
+        },
+        {
+          "ok": true,
+          "cost": 20.44423767487219,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 10.265499140624996,
+            "depol1": 0.0,
+            "zz_static": 0.1482590038321206,
+            "zz_dyn": 0.021103837852799935,
+            "thermal": 10.009375692562276
+          },
+          "swaps": 135
+        },
+        {
+          "ok": true,
+          "cost": 18.083078540691027,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s2.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 10.6202446875,
+            "depol1": 0.0,
+            "zz_static": 0.15474472455504973,
+            "zz_dyn": 0.014825433050400013,
+            "thermal": 7.29326369558558
+          },
+          "swaps": 137
+        },
+        {
+          "ok": true,
+          "cost": 18.083078540691027,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s2.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 10.6202446875,
+            "depol1": 0.0,
+            "zz_static": 0.15474472455504973,
+            "zz_dyn": 0.014825433050400013,
+            "thermal": 7.29326369558558
+          },
+          "swaps": 137
+        },
+        {
+          "ok": true,
+          "cost": 17.78144485821575,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s2.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 10.418959687500001,
+            "depol1": 0.0,
+            "zz_static": 0.15200220754293625,
+            "zz_dyn": 0.017816008216000014,
+            "thermal": 7.192666954956812
+          },
+          "swaps": 134
+        },
+        {
+          "ok": true,
+          "cost": 16.959044021102912,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s2.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 10.055756953125,
+            "depol1": 0.0,
+            "zz_static": 0.14937415707454918,
+            "zz_dyn": 0.013931288775999978,
+            "thermal": 6.739981622127363
+          },
+          "swaps": 131
+        },
+        {
+          "ok": true,
+          "cost": 16.45851346552037,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s3.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 8.870875312500006,
+            "depol1": 0.0,
+            "zz_static": 0.12632859091883392,
+            "zz_dyn": 0.017150755572799957,
+            "thermal": 7.444158806528726
+          },
+          "swaps": 113
+        },
+        {
+          "ok": true,
+          "cost": 14.86510096987643,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s3.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 8.003250703125001,
+            "depol1": 0.0,
+            "zz_static": 0.11473864436486982,
+            "zz_dyn": 0.00713000025919999,
+            "thermal": 6.739981622127358
+          },
+          "swaps": 102
+        },
+        {
+          "ok": true,
+          "cost": 16.45851346552037,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s3.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 8.870875312500006,
+            "depol1": 0.0,
+            "zz_static": 0.12632859091883392,
+            "zz_dyn": 0.017150755572799957,
+            "thermal": 7.444158806528726
+          },
+          "swaps": 113
+        },
+        {
+          "ok": true,
+          "cost": 22.537642271925975,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s2.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 12.122943046875001,
+            "depol1": 0.0,
+            "zz_static": 0.18366900854395812,
+            "zz_dyn": 0.020461042687199973,
+            "thermal": 10.210569173819813
+          },
+          "swaps": 160
+        },
+        {
+          "ok": true,
+          "cost": 17.6602371688847,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s3.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 10.055681718750005,
+            "depol1": 0.0,
+            "zz_static": 0.14419127421156347,
+            "zz_dyn": 0.01620536939439994,
+            "thermal": 7.444158806528732
+          },
+          "swaps": 133
+        },
+        {
+          "ok": true,
+          "cost": 14.719459275500462,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s3.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 8.257516875000007,
+            "depol1": 0.0,
+            "zz_static": 0.11570799786015384,
+            "zz_dyn": 0.008639743028000007,
+            "thermal": 6.337594659612299
+          },
+          "swaps": 105
+        },
+        {
+          "ok": true,
+          "cost": 17.945435161691773,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s4.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 9.988445390625003,
+            "depol1": 0.0,
+            "zz_static": 0.14689086702136284,
+            "zz_dyn": 0.013851505315999999,
+            "thermal": 7.796247398729407
+          },
+          "swaps": 130
+        },
+        {
+          "ok": true,
+          "cost": 17.945435161691773,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s4.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 9.988445390625003,
+            "depol1": 0.0,
+            "zz_static": 0.14689086702136284,
+            "zz_dyn": 0.013851505315999999,
+            "thermal": 7.796247398729407
+          },
+          "swaps": 130
+        },
+        {
+          "ok": true,
+          "cost": 20.086479595730136,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s4.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 10.502888203125003,
+            "depol1": 0.0,
+            "zz_static": 0.15652930728504721,
+            "zz_dyn": 0.021266836530399954,
+            "thermal": 9.405795248789685
+          },
+          "swaps": 136
+        },
+        {
+          "ok": true,
+          "cost": 19.795705017799982,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s4.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 10.608127031250003,
+            "depol1": 0.0,
+            "zz_static": 0.1604577635553624,
+            "zz_dyn": 0.02371193671999993,
+            "thermal": 9.003408286274617
+          },
+          "swaps": 140
+        },
+        {
+          "ok": true,
+          "cost": 18.975928415315437,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s4.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 10.250116875000009,
+            "depol1": 0.0,
+            "zz_static": 0.15461117427826399,
+            "zz_dyn": 0.020477412591999936,
+            "thermal": 8.550722953445163
+          },
+          "swaps": 134
+        },
+        {
+          "ok": true,
+          "cost": 19.204738775502022,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s5.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 10.780436953124998,
+            "depol1": 0.0,
+            "zz_static": 0.16002468487816923,
+            "zz_dyn": 0.015344405939999962,
+            "thermal": 8.248932731558856
+          },
+          "swaps": 140
+        },
+        {
+          "ok": true,
+          "cost": 19.204738775502022,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s5.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 10.780436953124998,
+            "depol1": 0.0,
+            "zz_static": 0.16002468487816923,
+            "zz_dyn": 0.015344405939999962,
+            "thermal": 8.248932731558856
+          },
+          "swaps": 140
+        },
+        {
+          "ok": true,
+          "cost": 19.1150472230712,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s5.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 10.351326093750004,
+            "depol1": 0.0,
+            "zz_static": 0.14746984319685622,
+            "zz_dyn": 0.015229962364799966,
+            "thermal": 8.601021323759541
+          },
+          "swaps": 136
+        },
+        {
+          "ok": true,
+          "cost": 19.044811635727775,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s5.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 9.789551015624998,
+            "depol1": 0.0,
+            "zz_static": 0.14261025685701195,
+            "zz_dyn": 0.008645336342399931,
+            "thermal": 9.104005026903367
+          },
+          "swaps": 127
+        },
+        {
+          "ok": true,
+          "cost": 21.44507187448572,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s5.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 11.496609843750004,
+            "depol1": 0.0,
+            "zz_static": 0.16654762098535747,
+            "zz_dyn": 0.02403056875999993,
+            "thermal": 9.757883840990356
+          },
+          "swaps": 154
+        },
+        {
+          "ok": true,
+          "cost": 18.01258889270513,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s6.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 9.860429531249999,
+            "depol1": 0.0,
+            "zz_static": 0.1466614182521834,
+            "zz_dyn": 0.008057063216000013,
+            "thermal": 7.9974408799869465
+          },
+          "swaps": 127
+        },
+        {
+          "ok": true,
+          "cost": 18.01258889270513,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s6.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 9.860429531249999,
+            "depol1": 0.0,
+            "zz_static": 0.1466614182521834,
+            "zz_dyn": 0.008057063216000013,
+            "thermal": 7.9974408799869465
+          },
+          "swaps": 127
+        },
+        {
+          "ok": true,
+          "cost": 18.098570192565077,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s6.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 9.940906406249999,
+            "depol1": 0.0,
+            "zz_static": 0.1478468112225336,
+            "zz_dyn": 0.012376095105600013,
+            "thermal": 7.9974408799869465
+          },
+          "swaps": 128
+        },
+        {
+          "ok": true,
+          "cost": 17.60830772830507,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s6.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 9.605096015625,
+            "depol1": 0.0,
+            "zz_static": 0.14084506101067304,
+            "zz_dyn": 0.015820882625599986,
+            "thermal": 7.846545769043798
+          },
+          "swaps": 124
+        },
+        {
+          "ok": true,
+          "cost": 16.35342201432904,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s7.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 9.392733984375006,
+            "depol1": 0.0,
+            "zz_static": 0.1519964222322898,
+            "zz_dyn": 0.018411615280000012,
+            "thermal": 6.7902799924417465
+          },
+          "swaps": 117
+        },
+        {
+          "ok": true,
+          "cost": 21.750210959959876,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s6.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 11.304677812500012,
+            "depol1": 0.0,
+            "zz_static": 0.168567605356056,
+            "zz_dyn": 0.016097997969599966,
+            "thermal": 10.260867544134207
+          },
+          "swaps": 151
+        },
+        {
+          "ok": true,
+          "cost": 16.35342201432904,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s7.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 9.392733984375006,
+            "depol1": 0.0,
+            "zz_static": 0.1519964222322898,
+            "zz_dyn": 0.018411615280000012,
+            "thermal": 6.7902799924417465
+          },
+          "swaps": 117
+        },
+        {
+          "ok": true,
+          "cost": 18.42078427695202,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s7.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 9.954401484375008,
+            "depol1": 0.0,
+            "zz_static": 0.15316458352935935,
+            "zz_dyn": 0.013987107174399957,
+            "thermal": 8.299231101873254
+          },
+          "swaps": 128
+        },
+        {
+          "ok": true,
+          "cost": 16.27543990919211,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s7.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 9.316047656250007,
+            "depol1": 0.0,
+            "zz_static": 0.15100996192035324,
+            "zz_dyn": 0.018102298580000013,
+            "thermal": 6.7902799924417465
+          },
+          "swaps": 116
+        },
+        {
+          "ok": true,
+          "cost": 16.947771282088876,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s7.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 9.529645781250004,
+            "depol1": 0.0,
+            "zz_static": 0.1576677839268759,
+            "zz_dyn": 0.01749239164080001,
+            "thermal": 7.242965325271197
+          },
+          "swaps": 117
+        },
+        {
+          "ok": true,
+          "cost": 18.477537531591025,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s8.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 10.330881328125,
+            "depol1": 0.0,
+            "zz_static": 0.15482362466865912,
+            "zz_dyn": 0.04469006912479999,
+            "thermal": 7.947142509672566
+          },
+          "swaps": 136
+        },
+        {
+          "ok": true,
+          "cost": 18.477537531591025,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s8.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 10.330881328125,
+            "depol1": 0.0,
+            "zz_static": 0.15482362466865912,
+            "zz_dyn": 0.04469006912479999,
+            "thermal": 7.947142509672566
+          },
+          "swaps": 136
+        },
+        {
+          "ok": true,
+          "cost": 18.540945105327438,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s8.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 10.39355296875,
+            "depol1": 0.0,
+            "zz_static": 0.1555595577800737,
+            "zz_dyn": 0.04469006912479999,
+            "thermal": 7.947142509672566
+          },
+          "swaps": 137
+        },
+        {
+          "ok": true,
+          "cost": 18.237788223525975,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s8.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 10.471719374999994,
+            "depol1": 0.0,
+            "zz_static": 0.15436741460610434,
+            "zz_dyn": 0.016647516447999985,
+            "thermal": 7.595053917471875
+          },
+          "swaps": 136
+        },
+        {
+          "ok": true,
+          "cost": 17.685103178751906,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s8.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 10.324810546874996,
+            "depol1": 0.0,
+            "zz_static": 0.14234863358168848,
+            "zz_dyn": 0.025277043338399984,
+            "thermal": 7.192666954956819
+          },
+          "swaps": 137
+        },
+        {
+          "ok": true,
+          "cost": 16.22899369026557,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s9.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 9.780091875000004,
+            "depol1": 0.0,
+            "zz_static": 0.139487920205242,
+            "zz_dyn": 0.02211760576239993,
+            "thermal": 6.28729628929792
+          },
+          "swaps": 129
+        },
+        {
+          "ok": true,
+          "cost": 16.22899369026557,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s9.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 9.780091875000004,
+            "depol1": 0.0,
+            "zz_static": 0.139487920205242,
+            "zz_dyn": 0.02211760576239993,
+            "thermal": 6.28729628929792
+          },
+          "swaps": 129
+        },
+        {
+          "ok": true,
+          "cost": 14.257926120139686,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s9.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 8.722335234375002,
+            "depol1": 0.0,
+            "zz_static": 0.13157200034166816,
+            "zz_dyn": 0.02209326178400002,
+            "thermal": 5.381925623639015
+          },
+          "swaps": 110
+        },
+        {
+          "ok": true,
+          "cost": 14.684078656352863,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s9.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 9.156841171874998,
+            "depol1": 0.0,
+            "zz_static": 0.13360505383324994,
+            "zz_dyn": 0.011706807005599989,
+            "thermal": 5.381925623639016
+          },
+          "swaps": 118
+        },
+        {
+          "ok": true,
+          "cost": 16.435209060030118,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s9.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 9.778579453125003,
+            "depol1": 0.0,
+            "zz_static": 0.1397595731032643,
+            "zz_dyn": 0.028380263246399955,
+            "thermal": 6.488489770555454
+          },
+          "swaps": 129
+        },
+        {
+          "ok": true,
+          "cost": 32.61007034120931,
+          "fid": 0.0,
+          "circuit": "random_16q_100g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 18.420505312499987,
+            "depol1": 0.0,
+            "zz_static": 0.2720859827067132,
+            "zz_dyn": 0.0351288392327999,
+            "thermal": 13.88235020676981
+          },
+          "swaps": 238
+        },
+        {
+          "ok": true,
+          "cost": 32.61007034120931,
+          "fid": 0.0,
+          "circuit": "random_16q_100g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 18.420505312499987,
+            "depol1": 0.0,
+            "zz_static": 0.2720859827067132,
+            "zz_dyn": 0.0351288392327999,
+            "thermal": 13.88235020676981
+          },
+          "swaps": 238
+        },
+        {
+          "ok": true,
+          "cost": 32.312362332389874,
+          "fid": 0.0,
+          "circuit": "random_16q_100g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 18.21925265625,
+            "depol1": 0.0,
+            "zz_static": 0.2793561204860349,
+            "zz_dyn": 0.032000089512799854,
+            "thermal": 13.78175346614104
+          },
+          "swaps": 236
+        },
+        {
+          "ok": true,
+          "cost": 32.70168386809324,
+          "fid": 0.0,
+          "circuit": "random_16q_100g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 18.50957156249999,
+            "depol1": 0.0,
+            "zz_static": 0.2745653120890411,
+            "zz_dyn": 0.03519678673439991,
+            "thermal": 13.88235020676981
+          },
+          "swaps": 239
+        },
+        {
+          "ok": true,
+          "cost": 29.995249451481122,
+          "fid": 0.0,
+          "circuit": "random_16q_100g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 17.226921093749993,
+            "depol1": 0.0,
+            "zz_static": 0.2523520373584546,
+            "zz_dyn": 0.04198048240559993,
+            "thermal": 12.473995837967074
+          },
+          "swaps": 226
+        },
+        {
+          "ok": true,
+          "cost": 32.78121271232057,
+          "fid": 0.0,
+          "circuit": "random_16q_100g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 18.58833984374999,
+            "depol1": 0.0,
+            "zz_static": 0.2753258750663705,
+            "zz_dyn": 0.03519678673439991,
+            "thermal": 13.88235020676981
+          },
+          "swaps": 240
+        },
+        {
+          "ok": true,
+          "cost": 29.995249451481122,
+          "fid": 0.0,
+          "circuit": "random_16q_100g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 17.226921093749993,
+            "depol1": 0.0,
+            "zz_static": 0.2523520373584546,
+            "zz_dyn": 0.04198048240559993,
+            "thermal": 12.473995837967074
+          },
+          "swaps": 226
+        },
+        {
+          "ok": true,
+          "cost": 32.7408640590616,
+          "fid": 0.0,
+          "circuit": "random_16q_100g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 18.20168859375,
+            "depol1": 0.0,
+            "zz_static": 0.2733429665690962,
+            "zz_dyn": 0.031393699772000065,
+            "thermal": 14.234438798970505
+          },
+          "swaps": 238
+        },
+        {
+          "ok": true,
+          "cost": 30.9281801259231,
+          "fid": 0.020833333333333353,
+          "circuit": "random_16q_100g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 16.531379999999984,
+            "depol1": 0.0,
+            "zz_static": 0.23849659295659695,
+            "zz_dyn": 0.024461474624799903,
+            "thermal": 14.133842058341719
+          },
+          "swaps": 217
+        },
+        {
+          "ok": true,
+          "cost": 30.106076467972038,
+          "fid": 0.0,
+          "circuit": "random_16q_100g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 17.738660390625007,
+            "depol1": 0.0,
+            "zz_static": 0.26046220902142037,
+            "zz_dyn": 0.03534499287359987,
+            "thermal": 12.071608875452013
+          },
+          "swaps": 234
+        }
+      ]
+    },
+    "grid16": {
+      "n": 60,
+      "pearson": 0.3290182764280577,
+      "spearman": 0.5814392886913032,
+      "alpha": 0.7810345626910836,
+      "rows": [
+        {
+          "ok": true,
+          "cost": 9.811476405721006,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 4.297123828125002,
+            "depol1": 0.0,
+            "zz_static": 0.07157769188013509,
+            "zz_dyn": 0.015585535016000013,
+            "thermal": 5.427189350699868
+          },
+          "swaps": 54
+        },
+        {
+          "ok": true,
+          "cost": 9.811476405721006,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 4.297123828125002,
+            "depol1": 0.0,
+            "zz_static": 0.07157769188013509,
+            "zz_dyn": 0.015585535016000013,
+            "thermal": 5.427189350699868
+          },
+          "swaps": 54
+        },
+        {
+          "ok": true,
+          "cost": 9.472634186256837,
+          "fid": 0.02083333333333338,
+          "circuit": "random_16q_60g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 3.973148437500003,
+            "depol1": 0.0,
+            "zz_static": 0.06645055507136496,
+            "zz_dyn": 0.0058458429856000135,
+            "thermal": 5.4271893506998685
+          },
+          "swaps": 50
+        },
+        {
+          "ok": true,
+          "cost": 8.909945399247254,
+          "fid": 0.04166666666666675,
+          "circuit": "random_16q_60g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 3.7582889062500002,
+            "depol1": 0.0,
+            "zz_static": 0.05983538139628801,
+            "zz_dyn": 0.013166856817600025,
+            "thermal": 5.078654254783366
+          },
+          "swaps": 49
+        },
+        {
+          "ok": true,
+          "cost": 10.049517903399401,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 4.192740703125001,
+            "depol1": 0.0,
+            "zz_static": 0.07389902991002682,
+            "zz_dyn": 0.007153723747999969,
+            "thermal": 5.775724446616374
+          },
+          "swaps": 48
+        },
+        {
+          "ok": true,
+          "cost": 11.262451804902966,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 4.586819062500003,
+            "depol1": 0.0,
+            "zz_static": 0.07496293907984031,
+            "zz_dyn": 0.028293708897599964,
+            "thermal": 6.572376094425523
+          },
+          "swaps": 59
+        },
+        {
+          "ok": true,
+          "cost": 11.262451804902966,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 4.586819062500003,
+            "depol1": 0.0,
+            "zz_static": 0.07496293907984031,
+            "zz_dyn": 0.028293708897599964,
+            "thermal": 6.572376094425523
+          },
+          "swaps": 59
+        },
+        {
+          "ok": true,
+          "cost": 9.592225720573232,
+          "fid": 0.06250000000000014,
+          "circuit": "random_16q_60g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 4.228985390625001,
+            "depol1": 0.0,
+            "zz_static": 0.07437535201577924,
+            "zz_dyn": 0.011047811196800008,
+            "thermal": 5.2778171667356535
+          },
+          "swaps": 53
+        },
+        {
+          "ok": true,
+          "cost": 9.807823183901142,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 4.489097343750001,
+            "depol1": 0.0,
+            "zz_static": 0.0776614527491567,
+            "zz_dyn": 0.013037948654400028,
+            "thermal": 5.228026438747584
+          },
+          "swaps": 57
+        },
+        {
+          "ok": true,
+          "cost": 10.89411425590524,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 5.20954453125,
+            "depol1": 0.0,
+            "zz_static": 0.08721793669915226,
+            "zz_dyn": 0.020790253292000023,
+            "thermal": 5.57656153466409
+          },
+          "swaps": 65
+        },
+        {
+          "ok": true,
+          "cost": 10.808072012447816,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s2.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 4.686761953125,
+            "depol1": 0.0,
+            "zz_static": 0.07898761852688196,
+            "zz_dyn": 0.01764435423919998,
+            "thermal": 6.024678086556735
+          },
+          "swaps": 61
+        },
+        {
+          "ok": true,
+          "cost": 10.808072012447816,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s2.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 4.686761953125,
+            "depol1": 0.0,
+            "zz_static": 0.07898761852688196,
+            "zz_dyn": 0.01764435423919998,
+            "thermal": 6.024678086556735
+          },
+          "swaps": 61
+        },
+        {
+          "ok": true,
+          "cost": 9.014828923941014,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s2.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 4.580192812499999,
+            "depol1": 0.0,
+            "zz_static": 0.0751780304691307,
+            "zz_dyn": 0.02766474600960001,
+            "thermal": 4.331793334962283
+          },
+          "swaps": 60
+        },
+        {
+          "ok": true,
+          "cost": 9.503413280635161,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s2.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 4.435806796875001,
+            "depol1": 0.0,
+            "zz_static": 0.07526497212333869,
+            "zz_dyn": 0.013268712829600009,
+            "thermal": 4.979072798807222
+          },
+          "swaps": 54
+        },
+        {
+          "ok": true,
+          "cost": 10.315783616769053,
+          "fid": 0.020833333333333353,
+          "circuit": "random_16q_60g_s2.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 4.259478515625002,
+            "depol1": 0.0,
+            "zz_static": 0.07479678291779056,
+            "zz_dyn": 0.006620959657600009,
+            "thermal": 5.974887358568661
+          },
+          "swaps": 55
+        },
+        {
+          "ok": true,
+          "cost": 8.768047852070453,
+          "fid": 0.02083333333333337,
+          "circuit": "random_16q_60g_s3.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 4.449005156250002,
+            "depol1": 0.0,
+            "zz_static": 0.07713739230311031,
+            "zz_dyn": 0.009693424531199996,
+            "thermal": 4.23221187898614
+          },
+          "swaps": 53
+        },
+        {
+          "ok": true,
+          "cost": 8.768047852070453,
+          "fid": 0.02083333333333337,
+          "circuit": "random_16q_60g_s3.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 4.449005156250002,
+            "depol1": 0.0,
+            "zz_static": 0.07713739230311031,
+            "zz_dyn": 0.009693424531199996,
+            "thermal": 4.23221187898614
+          },
+          "swaps": 53
+        },
+        {
+          "ok": true,
+          "cost": 8.875420220871733,
+          "fid": 0.04166666666666657,
+          "circuit": "random_16q_60g_s3.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 4.0229557031250005,
+            "depol1": 0.0,
+            "zz_static": 0.06698321983099895,
+            "zz_dyn": 0.005571411060800016,
+            "thermal": 4.7799098868549335
+          },
+          "swaps": 53
+        },
+        {
+          "ok": true,
+          "cost": 9.094042600055156,
+          "fid": 0.020833333333333343,
+          "circuit": "random_16q_60g_s3.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 3.93682078125,
+            "depol1": 0.0,
+            "zz_static": 0.06822659728579246,
+            "zz_dyn": 0.010340966736000018,
+            "thermal": 5.0786542547833635
+          },
+          "swaps": 49
+        },
+        {
+          "ok": true,
+          "cost": 9.34344259125736,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s3.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 4.281064453125,
+            "depol1": 0.0,
+            "zz_static": 0.07288030976434237,
+            "zz_dyn": 0.010425029560800011,
+            "thermal": 4.979072798807219
+          },
+          "swaps": 52
+        },
+        {
+          "ok": true,
+          "cost": 9.36786702732082,
+          "fid": 0.04166666666666676,
+          "circuit": "random_16q_60g_s4.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 4.533065156249999,
+            "depol1": 0.0,
+            "zz_static": 0.08166498213916298,
+            "zz_dyn": 0.02301773006480004,
+            "thermal": 4.7301191588668585
+          },
+          "swaps": 58
+        },
+        {
+          "ok": true,
+          "cost": 9.36786702732082,
+          "fid": 0.04166666666666676,
+          "circuit": "random_16q_60g_s4.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 4.533065156249999,
+            "depol1": 0.0,
+            "zz_static": 0.08166498213916298,
+            "zz_dyn": 0.02301773006480004,
+            "thermal": 4.7301191588668585
+          },
+          "swaps": 58
+        },
+        {
+          "ok": true,
+          "cost": 11.003236437606407,
+          "fid": 0.041666666666666734,
+          "circuit": "random_16q_60g_s4.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 4.346353828125002,
+            "depol1": 0.0,
+            "zz_static": 0.07292252868868515,
+            "zz_dyn": 0.011583986367200004,
+            "thermal": 6.57237609442552
+          },
+          "swaps": 61
+        },
+        {
+          "ok": true,
+          "cost": 10.12655600336316,
+          "fid": 0.020833333333333388,
+          "circuit": "random_16q_60g_s4.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 4.59940640625,
+            "depol1": 0.0,
+            "zz_static": 0.08289500875729292,
+            "zz_dyn": 0.01706523765600001,
+            "thermal": 5.427189350699866
+          },
+          "swaps": 57
+        },
+        {
+          "ok": true,
+          "cost": 10.093755573538502,
+          "fid": 0.04166666666666677,
+          "circuit": "random_16q_60g_s4.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 4.412898984375,
+            "depol1": 0.0,
+            "zz_static": 0.07545991779141406,
+            "zz_dyn": 0.028835136707999972,
+            "thermal": 5.576561534664089
+          },
+          "swaps": 57
+        },
+        {
+          "ok": true,
+          "cost": 10.373199439912472,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s5.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 4.497245859375002,
+            "depol1": 0.0,
+            "zz_static": 0.08010403969069993,
+            "zz_dyn": 0.02012509423040003,
+            "thermal": 5.775724446616372
+          },
+          "swaps": 62
+        },
+        {
+          "ok": true,
+          "cost": 10.373199439912472,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s5.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 4.497245859375002,
+            "depol1": 0.0,
+            "zz_static": 0.08010403969069993,
+            "zz_dyn": 0.02012509423040003,
+            "thermal": 5.775724446616372
+          },
+          "swaps": 62
+        },
+        {
+          "ok": true,
+          "cost": 10.638271831334524,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s5.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 4.8085425000000015,
+            "depol1": 0.0,
+            "zz_static": 0.08794047662221967,
+            "zz_dyn": 0.01585513608399999,
+            "thermal": 5.725933718628304
+          },
+          "swaps": 61
+        },
+        {
+          "ok": true,
+          "cost": 9.401891025841014,
+          "fid": 0.06250000000000003,
+          "circuit": "random_16q_60g_s5.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 4.189396640625002,
+            "depol1": 0.0,
+            "zz_static": 0.07389171912617021,
+            "zz_dyn": 0.01015768331839999,
+            "thermal": 5.128444982771443
+          },
+          "swaps": 51
+        },
+        {
+          "ok": true,
+          "cost": 9.232920866503402,
+          "fid": 0.04166666666666693,
+          "circuit": "random_16q_60g_s6.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 4.318029140625,
+            "depol1": 0.0,
+            "zz_static": 0.07206475725939294,
+            "zz_dyn": 0.013126353776000016,
+            "thermal": 4.829700614843008
+          },
+          "swaps": 52
+        },
+        {
+          "ok": true,
+          "cost": 10.388254961930471,
+          "fid": 0.02083333333333336,
+          "circuit": "random_16q_60g_s5.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 4.559986406250001,
+            "depol1": 0.0,
+            "zz_static": 0.08087111458417356,
+            "zz_dyn": 0.021463722468000032,
+            "thermal": 5.725933718628298
+          },
+          "swaps": 63
+        },
+        {
+          "ok": true,
+          "cost": 9.232920866503402,
+          "fid": 0.04166666666666693,
+          "circuit": "random_16q_60g_s6.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 4.318029140625,
+            "depol1": 0.0,
+            "zz_static": 0.07206475725939294,
+            "zz_dyn": 0.013126353776000016,
+            "thermal": 4.829700614843008
+          },
+          "swaps": 52
+        },
+        {
+          "ok": true,
+          "cost": 10.1476260048844,
+          "fid": 0.04166666666666668,
+          "circuit": "random_16q_60g_s6.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 4.424571562499999,
+            "depol1": 0.0,
+            "zz_static": 0.07490583937944603,
+            "zz_dyn": 0.021796340352799967,
+            "thermal": 5.626352262652154
+          },
+          "swaps": 57
+        },
+        {
+          "ok": true,
+          "cost": 10.944229547113194,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s6.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 4.8700891406250015,
+            "depol1": 0.0,
+            "zz_static": 0.07858343983712936,
+            "zz_dyn": 0.020669608082399957,
+            "thermal": 5.974887358568663
+          },
+          "swaps": 64
+        },
+        {
+          "ok": true,
+          "cost": 9.45535694067355,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s6.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 4.501582031250002,
+            "depol1": 0.0,
+            "zz_static": 0.06910203066607364,
+            "zz_dyn": 0.005181535926400023,
+            "thermal": 4.879491342831076
+          },
+          "swaps": 59
+        },
+        {
+          "ok": true,
+          "cost": 10.46544934569173,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s7.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 4.453387734375003,
+            "depol1": 0.0,
+            "zz_static": 0.06887483933133297,
+            "zz_dyn": 0.01809014140480002,
+            "thermal": 5.925096630580596
+          },
+          "swaps": 55
+        },
+        {
+          "ok": true,
+          "cost": 10.45178446339554,
+          "fid": 0.02083333333333338,
+          "circuit": "random_16q_60g_s7.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 4.529670468750003,
+            "depol1": 0.0,
+            "zz_static": 0.07736753534908627,
+            "zz_dyn": 0.019231284692000025,
+            "thermal": 5.825515174604452
+          },
+          "swaps": 57
+        },
+        {
+          "ok": true,
+          "cost": 10.46544934569173,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s7.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 4.453387734375003,
+            "depol1": 0.0,
+            "zz_static": 0.06887483933133297,
+            "zz_dyn": 0.01809014140480002,
+            "thermal": 5.925096630580596
+          },
+          "swaps": 55
+        },
+        {
+          "ok": true,
+          "cost": 10.055846196726309,
+          "fid": 0.020833333333333398,
+          "circuit": "random_16q_60g_s7.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 4.292341171875001,
+            "depol1": 0.0,
+            "zz_static": 0.07813910346067716,
+            "zz_dyn": 0.009222930750400002,
+            "thermal": 5.676142990640231
+          },
+          "swaps": 52
+        },
+        {
+          "ok": true,
+          "cost": 12.093197518535224,
+          "fid": 0.02083333333333333,
+          "circuit": "random_16q_60g_s7.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 4.975714687500003,
+            "depol1": 0.0,
+            "zz_static": 0.08810046116024946,
+            "zz_dyn": 0.008889723556799976,
+            "thermal": 7.020492646318171
+          },
+          "swaps": 64
+        },
+        {
+          "ok": true,
+          "cost": 11.063776895866365,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s8.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 4.887338203125003,
+            "depol1": 0.0,
+            "zz_static": 0.07971997004696066,
+            "zz_dyn": 0.022249908149600005,
+            "thermal": 6.0744688145448
+          },
+          "swaps": 64
+        },
+        {
+          "ok": true,
+          "cost": 9.423009517540013,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s8.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 3.919341093750001,
+            "depol1": 0.0,
+            "zz_static": 0.06220356683174267,
+            "zz_dyn": 0.014275506258400008,
+            "thermal": 5.4271893506998685
+          },
+          "swaps": 51
+        },
+        {
+          "ok": true,
+          "cost": 9.599928918762238,
+          "fid": 0.020833333333333398,
+          "circuit": "random_16q_60g_s8.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 4.384406953125002,
+            "depol1": 0.0,
+            "zz_static": 0.0774350544722014,
+            "zz_dyn": 0.009641928393600023,
+            "thermal": 5.128444982771435
+          },
+          "swaps": 52
+        },
+        {
+          "ok": true,
+          "cost": 8.787394722834286,
+          "fid": 0.041666666666666664,
+          "circuit": "random_16q_60g_s9.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 4.175132343749998,
+            "depol1": 0.0,
+            "zz_static": 0.06981277636811543,
+            "zz_dyn": 0.011493355801599995,
+            "thermal": 4.530956246914572
+          },
+          "swaps": 51
+        },
+        {
+          "ok": true,
+          "cost": 9.626435180771256,
+          "fid": 0.06250000000000007,
+          "circuit": "random_16q_60g_s8.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 4.303016015625001,
+            "depol1": 0.0,
+            "zz_static": 0.07309019521947745,
+            "zz_dyn": 0.02230253117920001,
+            "thermal": 5.2280264387475786
+          },
+          "swaps": 57
+        },
+        {
+          "ok": true,
+          "cost": 11.063776895866365,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s8.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 4.887338203125003,
+            "depol1": 0.0,
+            "zz_static": 0.07971997004696066,
+            "zz_dyn": 0.022249908149600005,
+            "thermal": 6.0744688145448
+          },
+          "swaps": 64
+        },
+        {
+          "ok": true,
+          "cost": 8.787394722834286,
+          "fid": 0.041666666666666664,
+          "circuit": "random_16q_60g_s9.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 4.175132343749998,
+            "depol1": 0.0,
+            "zz_static": 0.06981277636811543,
+            "zz_dyn": 0.011493355801599995,
+            "thermal": 4.530956246914572
+          },
+          "swaps": 51
+        },
+        {
+          "ok": true,
+          "cost": 9.051585229396771,
+          "fid": 0.062499999999999965,
+          "circuit": "random_16q_60g_s9.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 4.186775390625002,
+            "depol1": 0.0,
+            "zz_static": 0.07398438859443689,
+            "zz_dyn": 0.010915563322400007,
+            "thermal": 4.779909886854932
+          },
+          "swaps": 52
+        },
+        {
+          "ok": true,
+          "cost": 8.912651344806992,
+          "fid": 0.1041666666666669,
+          "circuit": "random_16q_60g_s9.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 4.303691718750001,
+            "depol1": 0.0,
+            "zz_static": 0.0685818629336208,
+            "zz_dyn": 0.009421516208800027,
+            "thermal": 4.53095624691457
+          },
+          "swaps": 56
+        },
+        {
+          "ok": true,
+          "cost": 9.078536361387318,
+          "fid": 0.0,
+          "circuit": "random_16q_60g_s9.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 4.067532421875002,
+            "depol1": 0.0,
+            "zz_static": 0.06967399806356804,
+            "zz_dyn": 0.012047870629600027,
+            "thermal": 4.929282070819147
+          },
+          "swaps": 51
+        },
+        {
+          "ok": true,
+          "cost": 14.982906268549725,
+          "fid": 0.0,
+          "circuit": "random_16q_100g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 7.258414218750004,
+            "depol1": 0.0,
+            "zz_static": 0.12479465336555842,
+            "zz_dyn": 0.031506742247199945,
+            "thermal": 7.568190654186962
+          },
+          "swaps": 86
+        },
+        {
+          "ok": true,
+          "cost": 14.982906268549725,
+          "fid": 0.0,
+          "circuit": "random_16q_100g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 7.258414218750004,
+            "depol1": 0.0,
+            "zz_static": 0.12479465336555842,
+            "zz_dyn": 0.031506742247199945,
+            "thermal": 7.568190654186962
+          },
+          "swaps": 86
+        },
+        {
+          "ok": true,
+          "cost": 16.208256926805028,
+          "fid": 0.0,
+          "circuit": "random_16q_100g_s0.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 7.534342265625004,
+            "depol1": 0.0,
+            "zz_static": 0.12891318625649126,
+            "zz_dyn": 0.030786988963199886,
+            "thermal": 8.514214485960334
+          },
+          "swaps": 94
+        },
+        {
+          "ok": true,
+          "cost": 16.029021724522167,
+          "fid": 0.0,
+          "circuit": "random_16q_100g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 7.227112500000005,
+            "depol1": 0.0,
+            "zz_static": 0.118881937957612,
+            "zz_dyn": 0.01944061663999992,
+            "thermal": 8.66358666992455
+          },
+          "swaps": 93
+        },
+        {
+          "ok": true,
+          "cost": 14.700168513673397,
+          "fid": 0.02083333333333337,
+          "circuit": "random_16q_100g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 6.804797343750006,
+            "depol1": 0.0,
+            "zz_static": 0.11373200270094352,
+            "zz_dyn": 0.014285601083199928,
+            "thermal": 7.7673535661392465
+          },
+          "swaps": 85
+        },
+        {
+          "ok": true,
+          "cost": 19.722967437264945,
+          "fid": 0.0,
+          "circuit": "random_16q_100g_s0.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 8.892132187499996,
+            "depol1": 0.0,
+            "zz_static": 0.15160509697590824,
+            "zz_dyn": 0.02401436334159984,
+            "thermal": 10.65521578944744
+          },
+          "swaps": 121
+        },
+        {
+          "ok": true,
+          "cost": 14.700168513673397,
+          "fid": 0.02083333333333337,
+          "circuit": "random_16q_100g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 0,
+          "mech": {
+            "depol2": 6.804797343750006,
+            "depol1": 0.0,
+            "zz_static": 0.11373200270094352,
+            "zz_dyn": 0.014285601083199928,
+            "thermal": 7.7673535661392465
+          },
+          "swaps": 85
+        },
+        {
+          "ok": true,
+          "cost": 16.903691056572992,
+          "fid": 0.0,
+          "circuit": "random_16q_100g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 7.595942343750001,
+            "depol1": 0.0,
+            "zz_static": 0.12691698384412092,
+            "zz_dyn": 0.019337779173599915,
+            "thermal": 9.16149394980527
+          },
+          "swaps": 97
+        },
+        {
+          "ok": true,
+          "cost": 15.579533231705263,
+          "fid": 0.020833333333333332,
+          "circuit": "random_16q_100g_s1.pkl",
+          "variant": "noise",
+          "n_perturb": 3,
+          "mech": {
+            "depol2": 6.538187109375009,
+            "depol1": 0.0,
+            "zz_static": 0.11164804278214506,
+            "zz_dyn": 0.017157769683199927,
+            "thermal": 8.912540309864909
+          },
+          "swaps": 83
+        },
+        {
+          "ok": true,
+          "cost": 18.091773058662625,
+          "fid": 0.0,
+          "circuit": "random_16q_100g_s1.pkl",
+          "variant": "hop",
+          "n_perturb": 8,
+          "mech": {
+            "depol2": 8.220074765625004,
+            "depol1": 0.0,
+            "zz_static": 0.1403625219331641,
+            "zz_dyn": 0.02214381343039995,
+            "thermal": 9.709191957674058
+          },
+          "swaps": 103
+        }
+      ]
+    }
+  },
+  "mech_coef": {
+    "depol2": 1.2640052200638643,
+    "depol1": 4.942088405179845e-13,
+    "zz_static": -13.413304537513694,
+    "zz_dyn": 82.78670715670641,
+    "thermal": -0.04296882442312329
+  },
+  "mech_r2": 0.7093650450746196
+}

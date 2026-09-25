@@ -9110,3 +9110,87 @@ M1（rollout 价值）为最终交付。
 
 **下一步选项**（需用户决策）：迭代 DAgger 2-4 轮（1-2 天，瞄准闭环）/
 接受 M1 交付关闭本线 / 把 rank-V 用于 reorder-M1-candidates 的混合模式。
+
+### N1 噪声感知 rollout：全机制解析代理 + 校准门 + 端到端（2026-09-25）
+
+**新增**：`scripts/v0/add_16q_xtalk.py`（grid/ring16 补 ZZ，t287 物理模板：
+f_ZZ∈[1,20]kHz→θ=2π·f·0.3µs，边错误排序 70/30 相关）、
+`src/routing/v0/noise_rollout.py`（NoiseTimeline：增量 ASAP 时间线 + 四机制
+ΔF 记账，物理电路副产品）、`scripts/v0/run_n1_calib.py`（跨拓扑校准）、
+`run_n1_eval.py`（端到端双指标）、`train_rank.py`/`dagger_round.py`（A 方案）。
+单测 9 项（调度一致性/机制对拍/动态串扰语义/端到端 v3）全绿。
+
+**实现中发现并修复**：①t287 系列 JSON 的 two_q_gate_error/crosstalk 为
+字符串键 dict——v0 loader 未归一化（模拟器解包崩溃）；②16q 拓扑
+single_q_gate_error 为 per-qubit list；③v3 并行 GPU OOM（60 worker × 1GB
+显存）→ CPU 后端/受限 GPU worker；④热弛豫 |1>-条件语义（下述）。
+
+**核心发现 1：模拟器热弛豫是 |1>-布居条件化的**（受控实验，T1=50/T2=70，
+空闲 10µs，512 轨迹）：|00> F=1.0000（完全不衰减！）、|11> F=0.66、
+|++> F=0.87。三段采样全部以 P(|1>) 为条件。我的全通道平均保真度公式
+系统性高估热弛豫 ~8-16×（校准 α≈0.06-0.13），NNLS 拟合热弛豫系数=0。
+
+**核心发现 2：预算非单调性之外的新陷阱——episode 防循环对 learned V 有害**
+（强迫改道越改越差）；兄弟排序损失（A 方案）有效（top-1 78%）但单轮 DAgger
+不足以修复偏离盆地。
+
+**Gate N1 校准结果**：per-topo corr(ΔF, -logF_sim) 0.33-0.97，
+**未达 0.95 门**。诊断链：轨迹采样噪声（16-48 traj ±0.05-0.17 淹没电路内
+信号 ±0.1-0.2）+ 热弛豫 |1>-条件化 + 机制共线。深度匹配（保 F 可测）后
+20q 深电路 rollout 正常但 v3 CPU 模拟超时（GPU OOM→CPU→超时链）。
+
+**N1.2 端到端（3 拓扑完整数据，t287 任务超时未完成）**：
+
+| 拓扑 | SABRE fid | M1-pure fid | M1-noise fid | M1-noise swaps |
+|---|---|---|---|---|
+| ring16 | 0.156 | 0.190 | **0.190** | 23.4（=M1-pure 23.0）|
+| grid16 | 0.432 | 0.482 | **0.497** | **29.9**（M1-pure 9.9！）|
+| t176 | **0.571** | 0.550 | 0.509 | **57.1**（M1-pure 20.1！）|
+
+**结论**：
+1. M1-noise 以 **3-6× swap 膨胀**换边际保真度（grid16 +0.0085）或在热弛豫
+   主导拓扑上直接变差（t176 -0.06）——**噪声价值函数错误定价 swap-vs-idle
+   权衡**，根因 = |1>-条件热弛豫无法被 op 级解析记账捕获。
+2. **M1-pure（v16 交付）仍是最佳路由方案**：grid16 +0.05、ring16 +0.034
+   优于 SABRE（保真度维度也赢了），t176 与 SABRE 相当。
+3. 串扰/热弛豫的精确价值需要 |1>-布居感知——超出 op 级解析的能力边界，
+   是 N2 GNN 残差的候选目标（状态图编码比特活跃度），但本轮不做。
+4. 基础设施保留：NoiseTimeline/校准管线/6 拓扑物理场，为后续立项服务。
+
+### 5-8q advantage 头实验：完整结果链闭合（2026-09-26）
+
+**背景**：用户提议将 learned value 头转为 advantage/ranking 公式
+（A*(s,a) = 1 + C*(T(s,a)) − C*(s) ≥ 0，exact solver 精确标签，5-8q 规模），
+直接 targeting v16 诊断的动作分辨力瓶颈。
+
+**新增**：`build_adv_labels.py`（5 拓扑 × 30 电路 × 状态全后继精确 A* 标注，
+17934 (s,a) 对 / 3008 父状态，112s）、`train_adv.py`（adv-MLP 24 维
+Huber+排序 vs M2-V 绝对照）、mcts.py `value="adv"`（Scheme 1：叶值 =
+−ΣÂ 路径累积，telescoping 恒等式保证兄弟比较正确；anchor C*(root) 消去）
++ `depth_corrected` 选项（M1-corr 对照）。单测 32 全绿。
+
+**训练结果**：advantage 头 val MAE=0.398（A* 均值 0.89）、**兄弟 top-1
+命中率 95.9%**（随机 20.5%；16q 绝对 V 只有 78%）——动作分辨力在
+5-8q + exact 标签下接近解决。
+
+**端到端判定**（n=190，5 拓扑 pooled，exact optimality gap）：
+
+| 方法 | mean gap | gap=0 率 | max gap |
+|---|---|---|---|
+| **M1-corr**（深度修正 rollout） | **0.079** | **95%** | 2 |
+| M1-pure（原版） | 0.105 | 92% | 2 |
+| M2-V（绝对 V） | 0.421 | 79% | 4 |
+| M-A（advantage, Scheme 1） | 0.632 | 71% | 4 |
+
+**三个结论**：
+1. **意外收获——深度记账修正改进了 M1 本身**：旧 M1/Oracle 叶值缺
+   −d_leaf 项（路径已付 SWAP 未计入 backup）；修正后 gap 0.105→0.079、
+   最优率 92%→95%（p=0.043 显著）。M1 交付升级为 M1-corr。
+2. **advantage 公式改善了分辨力但端到端更差**：M-A vs M2-V 虽分辨力更强
+   （top-1 95.9%），端到端 gap 反而 +0.21（p=0.002）——Scheme 1 的路径
+   累积使每步模型误差沿深度复合，且"假设叶子后最优续行"的语义脆弱。
+3. **learned-value 线完整关闭**：rollout 价值 > advantage-learned >
+   absolute-learned，在 exact 标签 + 小规模最优条件下依然成立。
+   rollout 的优势不是精度而是**自适应前瞻**（每条 rollout 发现路由特定
+   信息，状态级函数不可替代）。学习式组件的合理位置是**残差修正**
+   （需状态级信息源），而非主价值信号。
