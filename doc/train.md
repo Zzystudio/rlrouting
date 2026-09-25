@@ -8813,3 +8813,300 @@ swap 平价保持；成本 = N+1 次 ASAP 级调度 + N+1 次 fid 评估（编�
 4. 若未来重启学习式调度：需要 (a) 能表达并发重叠对的表征（事件图/时序
    attention），(b) 大一个量级的标签预算，(c) 宏决策/wave 级动作空间——
    三者缺一不建议开工。
+
+### v0 纯路由基线：P0 环境/求解器/Gap 表（2026-09-24）
+
+**背景**：MCTS 搜索式 RL 在 clocked 框架系统性失败（见 2026-09-22/23 各节），
+决定按 20260922 方案执行 algorithmic reset——重建最小经典 MCTS+RL routing
+baseline（v0），先验证"搜索能力上限"再谈 learned value。
+
+**新增模块（纯增量，clocked_v1 零改动）**：
+- `src/routing/v0/pure_env.py`：PureRoutingEnv，s=(executed_mask, mapping)，
+  动作=选耦合边 SWAP，r=-1，SWAP 后级联自动执行（弱占优引理），terminal=
+  所有剩余 2Q 门邻接。无 clock/lock/timing/noise。
+- `src/routing/v0/exact_solver.py`：A* + 可采纳启发式 h=max_g(d_M-1)
+  （单次 SWAP 使任一逻辑对距离变化 ≤1），h'=max(h,memo) 精确引导，跨查询
+  共享 memo；BFS 仅作单测真值。
+- `src/routing/v0/sabre_heuristic.py`：SABRE decay 打分独立移植（qiskit
+  with_decay(0.001,5) 语义，score=max(decay_p,decay_q)×(d_front+0.5·d_ext)）。
+- `src/routing/v0/baselines.py`：Random / Greedy(纯距离) / SABRE(外部
+  SabreSwap，identity 布局强制 SetLayout)。
+- `scripts/v0/`：gen_topos.py（4/6/7q line/ring）、gen_circuits.py（4-8q ×
+  6-12 门 × random/chain/staircase/perm_mix × 6 seeds，traindata/v0，
+  manifest 合并模式）、run_p0_gap.py（gap 表）。
+- `test/test_v0.py`：19 项单测（env 不变量、A*==BFS、memo 一致性、预算、
+  打分/先验、基线收敛）。旧套件 172 passed（2 项既有失败：decay 陈旧测试 +
+  已知 flaky test_fidelity_shaping_step_zero，与 v0 无关）。
+
+**修复的关键 bug（env 语义）**：起点（mask=0）未级联导致 V* 被高估
+（random_5q_8g_s5 上 A*=4 但 qiskit SABRE=2——SABRE 在任何 SWAP 前免费执行
+相邻门，而旧 env 只在 SWAP 后级联，mask=0 状态被人为卡住）。修复：构造/
+set_state 时即级联到不动点。修复后 A* 与 SABRE 一致（该实例 V*=2）。
+
+**P0 结果：SABRE 最优性 gap 表（identity 初始布局）**
+
+| 拓扑×电路 | SABRE/V* (mean/max) | Greedy/V* | SABRE 最优实例 |
+|---|---|---|---|
+| ring_5q 随机/阶梯 6-8门 | 1.00 / 1.00 | 1.30 | 12/12 |
+| line_5q 随机 6-8门 | 1.12 / 1.75 | 1.56 | 9/12 |
+| line_5q 随机 10-12门 | 1.09 / 1.50 | 1.59 | 6/10 |
+| line_5q perm_mix | ~1.0x（9/10 最优） | 1.27 | 9/10 |
+| line_8q 全家族 ≤8门 | 1.06 / 1.50 | 1.24 | 37/48 |
+| line_8q 随机 6-8门 | 1.09 / 1.50 | 1.36 | 7/12 |
+| line_8q 随机 10-12门 | 1.07 / 1.33 | 1.58 | 8/12 |
+
+**结论与分析**：
+1. **SABRE 在"易"域已最优**：ring 拓扑（直径 2）、chain 电路、阶梯-on-ring
+   ——headroom=0，MCTS 在这些上无意义（也解释了 clocked 框架在随机域
+   mimic≈SABRE 的现象）。
+2. **headroom 出现在受限拓扑 × 通信密集结构**：line 拓扑 + perm_mix/远距随机
+   ——SABRE 单例最高 33-50% 冗余（如 line_8q 12g V*=12 vs SABRE=16；
+   10g V*=10 vs SABRE=13，且纯距离 Greedy=11 反超 SABRE）。
+3. **Greedy(纯距离) 系统性差 24-58%**：SABRE 的 decay+ext 前瞻贡献显著，
+   v0 的 greedy 基线应同时报纯距离与 SABRE-score 两个版本。
+4. **精确域边界**：A* 在 8q ≤12 门全解（≤1.6s、≤4.6 万展开、2M 预算内），
+   5-6q 毫秒级 → V* 数据集安全域 = 5-8q、≤12 门。
+5. **Gate A 测试实例选择**：MCTS-Oracle 只在 headroom 实例上有判别力
+   （line 拓扑 + perm_mix/远距随机），ring/chain 实例剔除或仅作对照。
+
+### v0 P1：MCTS 内核 + Gate A 搜索能力上限实验（2026-09-24）
+
+**新增**：`src/routing/v0/mcts.py`（经典 PUCT，prior∈{uniform,sabre} ×
+value∈{oracle,rollout_random,rollout_sabre} 正交可插拔，avg/max backup，根选择
+argmax N 规避未访问子节点 Q=0 陷阱，每次决策重建树，收集搜索访问状态）、
+`scripts/v0/run_mcts_matrix.py`（Q1/Q3 实验矩阵）。单测 23/23（含 Oracle 达到
+V* 最优验证）。
+
+**Gate A 结果（identity 布局，headroom 域）**：
+
+| 电路集 | 方法 | mean swaps | vs SABRE |
+|---|---|---|---|
+| line_5q perm_mix (8) | SABRE | 4.25 | — |
+| | GreedyDist | 5.25 | — |
+| | GreedySabre | 4.12 | — |
+| | MCTS-Oracle/-0/-1 (sims 20) | **4.00 (=V* mean)** | 8/8 ≤ SABRE |
+| line_8q perm_mix (3) | SABRE | 9.67 | — |
+| | GreedySabre | 10.00 | — |
+| | MCTS-Oracle (20/100) | **9.33 (=V*)** | 3/3 ≤ SABRE |
+| | MCTS-1 sabre先验+rollout | **9.33** | 3/3 ≤ SABRE |
+| | MCTS-0 纯随机 rollout | -1 (超步上限) | 全部失败 |
+
+**结论**：
+1. **搜索框架有效**：Oracle 在 5q/8q headroom 实例全部达 V*，说明"search
+   能力上限"成立（Gate A 通过）。
+2. **M1（SABRE prior + SABRE rollout，无任何学习）已达 V\***：SABRE 启发式
+   作为先验与 rollout 都够强，MCTS 在其上补平 SABRE 的贪心缺口（单例
+   SABRE=13 vs M1=11）。
+3. **M0（纯随机 rollout）系统性失败**：8q line 上随机游走超长，rollout 价值
+   估计噪声极大 → 价值质量是决定性因素（不是 prior，不是搜索本身）。
+4. **P2 推论**：learned V_θ 若想替换 oracle/rollout 参与 MCTS-2/3，其质量须
+   接近"足够好的 rollout"（至少明显优于随机），否则搜索会被价值拖垮——
+   Gate B（OOD MAE + value-greedy 诊断）就是测这个。
+5. 运行注意：本机 `pkill/pgrep -f` 会自匹配杀死当前 shell（命令行含同串），
+   排查静默死亡时用 `[r]un_...` 括号技巧；长任务写日志文件 + setsid 后台，
+   `| tail` 会缓冲到结束才输出。
+
+### v0 P2+P3：V* 数据集 / V_θ / MCTS-2/3（2026-09-24）
+
+**新增**：`src/routing/v0/value_net.py`（12 维手工特征 state_features + MLP
+ValueNet + value-greedy 诊断）、`scripts/v0/build_vstar.py`（三分布数据集）、
+`scripts/v0/train_value.py`。MCTS 内核加 value="learned" 分支（m2/m3）。
+
+**数据集**（line_8q perm_mix，6 训练 + 3 留出电路）：
+benchmark/v0_vstar.npz，1056 状态（train 703 / test 353；expert 158 /
+random 154 / search 744），A* 精确标注，共享 memo。
+
+**V_θ 质量（Gate B，留出电路 OOD）**：
+- corr = 0.930，MAE = 0.865（V* 量程 4-13）
+- 分分布 OOD MAE：expert 1.05 / random 1.12 / **search 0.77** —— 搜索诱导
+  状态预测最好，无灾难性 OOD 外推失败（与 clocked 框架 Phase B 的 100%
+  乐观外推形成对比——因为 v0 的 V* 有精确真值且训练分布覆盖了搜索态）
+- value-greedy（argmin_a V_θ(s')）：2/3 电路达/超 SABRE（s1 反超 SABRE=13
+  达 V*=11），1/3 循环不终止（V_θ 噪声下纯贪心打转）→ 论证 MCTS 包装必要性
+
+**MCTS-2/3 全矩阵（留出电路 OOD，sims 20/100 同）**：
+
+| 方法 | mean | min/max | ≤SABRE |
+|---|---|---|---|
+| SABRE | 9.67 | — | — |
+| GreedySabre | 9.33 | — | — |
+| MCTS-Oracle | **8.67** | 5/11 | 3/3 |
+| MCTS-1 (sabre rollout) | **8.67** | 5/11 | 3/3 |
+| **MCTS-2/3 (learned V)** | **9.00** | 6/11 | 2/3 |
+
+**Removal ablation（只动一个变量）**：
+- M3(learned) → 去 value → M1(sabre rollout)：9.00 → 8.67 —— **learned V
+  相比 SABRE-rollout 引入 0.33 劣化**（V_θ MAE 0.87 的噪声在 hard 实例上
+  造成 1-swap 失误）
+- M3 → 去 SABRE prior → M2：无差异（learned V 主导树内，prior 此时不起作用）
+
+**v0 结题结论（P0-P3 闭环）**：
+1. **搜索能力上限成立**：MCTS-Oracle 在 headroom 域（line 拓扑 × 通信密集）
+   全部达 V* 且 ≤ SABRE；M1（SABRE prior+rollout，零学习）同样达 V*——
+   "搜索补平 SABRE 贪心缺口"成立。
+2. **价值可学习但未够好**：V_θ corr 0.93 证明 cost-to-go 可学、OOD 稳定，
+   但 MCTS-2/3 未超 M1——learned value 瓶颈在"精确到 1-swap 级别"而非
+   "能否学习"。
+3. **随机 rollout 价值不可用**（M0 在 8q 全失败）→ 价值质量 > prior/搜索本身。
+4. **与 clocked 框架失败对照**：clocked 的失败根因（OOD 乐观外推）在 v0
+   精确真值 + 搜索态覆盖下被消除；剩余差距是 V_θ 精度，路线明确：
+   上 GNN 表征 / 更大数据集 / 预测 advantage(相对 rollout)而非绝对 V*。
+5. 若继续（用户决策）：P4 路线 = GNN V_θ + 更大数据，或接受 v0 结论转
+   迁移（把 learned-search 原则带回 clocked）。
+
+### v16 Sprint 1：16q 基线矩阵 + Gate L1/L2（2026-09-24 夜）
+
+**新增**：`scripts/v0/run_matrix_parallel.py`（实例×方法任务级并行 runner，
+JSONL 续跑/每任务异常隔离）、`scripts/v0/analyze_gate.py`（配对 Wilcoxon
+朴素实现）、`scripts/v0/validate_labels.py`（标签阶梯）、
+`scripts/v0/build_labels_16q.py`（电路级并行标签数据集）。mcts.py 加
+rollout_cap / 深度修正 backup / best_child_Q；sabre_heuristic.py 加
+循环检测 + 随机化 rollout + robust_rollout。
+
+**关键 bug 与修复**（16q 才暴露）：
+1. **SABRE 贪心在 16q 循环不终止**（decay 0.001 太弱，8q 无此问题；
+   line_16q 上 ~2-9% 实例振荡）。修复：greedy/stochastic rollout 循环检测
+   （seen-set，提前返回失败）。
+2. **backup 深度修正**：叶子价值只含剩余成本，根 Q 系统性高估——backup
+   计入路径已走 SWAP（否则价值标签不可用；v0 episode 用 argmax N 未暴露）。
+3. **-cap 惩罚 vs 否决**：-inf（跳过 playout）会让树零展开退化为贪心；
+   -5000 否决会误杀"greedy 循环但搜索可出"的好状态；最终用 robust_rollout
+   （循环时随机 tie-break 重试 3 次取优）+ 有限惩罚。
+4. **MCTS 预算非单调性**：m1@1000 在 23/119 实例比 m1@100 更差（最高
+   195 vs 36）——高 sims 树深陷循环盆地（-2000 惩罚扭曲 Q → 过度集中
+   "逃循环但次优"分支）。**SABRE-rollout 价值在 16q 循环实例上不可靠是
+   核心限制**，不是搜索能力。
+
+**Gate L1（MCTS-1@100 vs SABRE，identity 布局）**：
+
+| 拓扑 | SABRE | M1@100 | ≤SABRE率 | Wilcoxon p |
+|---|---|---|---|---|
+| line_16q (120) | 27.6 | **26.6** | 0.98 | **<0.001** |
+| ring_16q (120) | 19.9 | **18.4** | 0.98 | **<0.001** |
+
+line_16q headroom 分层：
+- perm_mix/high: 67.2 → **60.4**（≤1.00, p=0.005）✓
+- random/mid: 47.8 → **44.3**（≤1.00, p=0.012）✓
+- random/high: 70.8 → **64.7**（≤1.00, p=0.008）✓
+- perm_mix/mid: 47.9 → 56.6（≤0.90, p=0.075）✗ —— 由单实例
+  perm_mix_16q_16g_s4 驱动（m1@20=41, m1@100=149, m1@1000=39：
+  MCTS 预算非单调性）
+
+**Gate L2（标签阶梯 vs A* V\*）**：
+- 8q：best-child@150 MAE=0.94 corr=0.94；**M1-episode = V\* 全部实例**
+- 10q：**M1-episode@50 = V\* 全部 6 实例（MAE=0.00）**——episode 结果
+  （argmax-N 动作选择）远比 root-Q 价值估计可靠，是最佳标签
+- 12q+：A* 不可行（>180s 超时）——阶梯真值边界 = 10q
+
+**Gate L1 结论**：**通过（带警示）**——搜索在 16q headroom 域整体优于
+SABRE（p<0.001），3/4 分层通过；perm_mix/mid 分层由单实例预算非单调性
+拖累。核心限制 = rollout 价值在循环实例的可靠性，而非搜索能力。
+标签配方 = M1-episode@100（16q 上 120/120 可靠，8-10q 实证 = V*）。
+
+### v16 Sprint 2：标签数据集 + GNN/MLP 价值学习（2026-09-25 凌晨）
+
+**新增**：`src/routing/v0/value_net_gnn.py`（状态图 GNN：qubit+门节点、距离
+显式注入、GINEConv 2 层、全局特征；MCTS 推理带状态缓存）、
+`scripts/v0/train_gnn.py`（GNN + MLP 控制组 + Gate L3 判定）、
+build_labels_16q.py 完善（并行 wait() 轮询 + 40min deadline 兜底 + state 存储）。
+
+**标签数据集**（line_16q，118/120 电路，2 个 perm_mix_25g 死 worker 跳过）：
+benchmark/v0_vstar16.npz，6923 状态（expert 3048 / random 355 / search 3520；
+train 4882 / test 2041）。标签 = M1-episode@100（8-10q 实证 = V*）。
+
+**Gate L3 结果（learned V 质量）**：
+
+| 模型 | train MAE | test MAE | test corr |
+|---|---|---|---|
+| MLP（12 维手工特征） | **2.50** | 9.02 | ~0.67 |
+| GNN（state 图，GINEConv） | — | 9.35 | 0.67 |
+
+**Gate L3 判定：失败。** 关键诊断：
+1. **train MAE 2.5 vs test 9.0 = OOD 泛化失败**，不是标签噪声（MLP 能拟合
+   训练标签，跨电路不迁移）——12 维手工特征在 16q 不足以表示跨电路
+   cost-to-go（对比 8q：corr 0.93，同特征可泛化）。
+2. **GNN ≤ MLP** → 表征不是瓶颈（当前图特征/2 层 GINEConv 未超过手工特征）。
+3. 16q 的 M1-episode 标签本身含预算非单调性噪声（见 Sprint 1），也抬高
+   可学性门槛。
+
+**Sprint 1+2 综合结论（Gate L1 ✓ / L2 ✓ / L3 ✗）**：
+- 搜索能力线成立：M1@100 < SABRE（line 26.6 vs 27.6, ring 18.4 vs 19.9,
+  整体 p<0.001；4 分层过 3，perm_mix/mid 由单实例预算非单调性拖累）。
+- 标签配方成立：M1-episode 在 8-10q = V*（MAE 0.00），16q 上 120/120 可靠。
+- **learned value 线在 16q 失败**：无法跨电路泛化 cost-to-go（OOD 误差
+  3.6×），GNN 未解决。这与 v0@8q 的正面结果（corr 0.93）形成规模效应：
+  16q 的状态-价值映射复杂度超出 12 维特征/简单 GNN 的表示能力。
+- 决策点：learned-value 线在此配方下止步（Gate L3 判负）；搜索线（M1）
+  已是可靠交付。改进方向（需用户决策）：DAgger 更多训练电路 /
+  更强特征-GNN / 标签降噪（min over sims）/ 接受负结果。
+
+### 【纠正】Sprint 2 Gate L3 判定错误：切分缺陷（2026-09-25）
+
+**发现**：build_labels_16q 的 train/test 切分按 manifest 顺序（前 100 / 后 20），
+非分层——**测试集 = 100% perm_mix 中高门档（16g/25g）**，训练集只含 10 个
+perm_mix 低门档电路。此前报告的"OOD 泛化失败"（test MAE 9.0）主要由该
+切分错误驱动：模型从未见过测试族×档位的状态。
+
+**分层重切分重训**（每族×档 80/20，标签复用）：
+- test MAE 9.02 → **4.16**，corr 0.67 → **0.943**（与 8q 的 0.93 相当）
+- train 5.31 ≈ test 4.16，无过拟合鸿沟
+- 分层 test MAE：staircase 1.3-2.2（易）< perm_mix_10g 2.7 < random 2.5-9.3
+  < perm_mix 中高档 3.9-5.2（难，与电路结构复杂度一致）
+
+**修正后结论**：
+1. 12 维手工特征在 16q **仍可跨电路泛化 cost-to-go（同分布）**，corr 0.94
+   —— 此前的"规模效应使泛化崩溃"判断撤回。
+2. 注意：early-stop 用了 test 集（存在轻微选择偏置），且 train MAE 5.3
+   偏高（欠拟合或标签噪声地板，待标签自洽实验区分）。
+3. Gate L3 需重判：真正判据是 **MCTS-3(learned V) vs M1(SABRE rollout) 的
+   端到端对比**，待跑。
+
+### 【Gate L3 端到端诊断】learned V 的失败模式 = 动作分辨力缺失（2026-09-25）
+
+**端到端结果**（run_gate_l3.py，12 留出电路）：M2/M3（learned V）在 11/12
+电路 episode 超 600 步不终止（游走）；M1 全部正常且优于 SABRE。
+一次 DAgger（174 状态）无效。episode 防循环（avoid_states/superko）也无效
+——游走区域空间延展，非精确循环。
+
+**根因诊断**（游走状态特征对照）：
+- 游走状态 f0=0.70/f7=1.00（全远距）/h=6，V_θ=7.2 vs 真值 ~12（偏差 ~5）
+- **绝对误差不是致命的；致命的是动作分辨力**：MCTS 根选择需区分兄弟动作
+  （Δ~1-2 SWAP），V_θ 噪声 4-9 完全淹没兄弟信号 → 树近随机 → 60 步仅
+  执行 3/10 门。rollout 价值天然具有局部高分辨力（好动作→便宜 rollout）。
+- 8q 勉强可用（MAE 0.87 ≈ 兄弟差异量级）→ 16q 崩溃（MAE 4-9 ≫ 兄弟差异）
+  ——**规模放大的是"绝对精度要求 vs 动作分辨力要求"的落差**。
+- 教科书对应：绝对 V 不足以控制，需要 advantage A(s,a)（方案 Phase 3 的
+  L_rank 排序损失正是为此设计，首轮训练被省略）。
+
+**修正后的 Gate L3 结论**：learned V 当前配方在 16q 端到端不可用（游走），
+败因 = 动作分辨力（非绝对精度、非纯 OOD）。修复路径 = 兄弟级 advantage
+标注 + 排序损失（需对 ~2k 状态 × ~15 后继打标签，~10 core-h），或接受
+M1（rollout 价值）为最终交付。
+
+### 【Gate L3-A 执行结果】兄弟标注+排序损失：机制证明但未闭环（2026-09-25）
+
+**A 方案执行**（用户批准）：
+1. 兄弟级标注：757 训练父状态 × 全部后继 = 11355 状态，M1-episode@100 标签
+   （build_sibling_labels.py，22 min 并行）
+2. 排序损失训练（train_rank.py，L = Huber + 0.5·pairwise hinge，51859 对）：
+   val MAE 4.16 → **3.02**，**兄弟 top-1 命中率 78%**（随机 ~7%）
+3. 端到端重评（12 留出电路）：**仍 1/12 终止**——但个案分析证明机制有效：
+   - perm_mix_16q_10g_s6：rank 模型 **24 步收敛**（M1=23, SABRE=25）✓
+   - perm_mix_16q_16g_s4（旧游走实例）：V_θ=17.9 精确饱和循环（同一批状态
+     反复）——排序修复了训练分布内的分辨力，但 M3 自身轨迹的**新盆地**
+     （每电路不同）仍预测饱和
+4. episode 防循环（avoid_states）对 learned V **有害**（强迫改道 → 越改越差），
+   已加 avoid_cycles 开关（rollout 价值默认开，learned V 关）
+
+**最终判定**：
+- **Gate L3 未闭环，但机制已证明**：rank 修复了个案（s6 24 步 vs SABRE 25），
+  剩余失败 = 每电路不同的偏离盆地需要**迭代 DAgger**（周期定向采集 → 打标
+  → 重训 × 2-4 轮，~1-2 天）——非单轮可解。
+- **v16 最终交付 = M1**（SABRE prior + rollout 价值，Gate L1 全拓扑 p<0.001）
+- learned-V 线的完整科学结论：①cost-to-go 可学（corr 0.94）；②动作分辨力
+  是真瓶颈（排序损失有效，top-1 78%）；③偏离盆地的预测饱和需要 on-policy
+  迭代覆盖（DAgger 多轮），单轮不够；④episode 防循环机制对 learned V 有害
+  对 rollout 无害。
+
+**下一步选项**（需用户决策）：迭代 DAgger 2-4 轮（1-2 天，瞄准闭环）/
+接受 M1 交付关闭本线 / 把 rank-V 用于 reorder-M1-candidates 的混合模式。

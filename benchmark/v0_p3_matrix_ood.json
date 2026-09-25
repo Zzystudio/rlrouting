@@ -1,0 +1,74 @@
+{
+  "topo": "traindata/topo/line_8q.json",
+  "args": {
+    "topo": "traindata/topo/line_8q.json",
+    "data_dir": "traindata/v0",
+    "nq": 8,
+    "n2q_min": 8,
+    "n2q_max": 8,
+    "family": "perm_mix",
+    "limit": 3,
+    "sims": [
+      20,
+      100
+    ],
+    "sabre_seeds": 5,
+    "sabre_trials": 20,
+    "methods": "oracle,1,2,3",
+    "model": "models/v0_value_mlp.pt",
+    "out": "benchmark/v0_p3_matrix_ood.json"
+  },
+  "results": [
+    {
+      "file": "perm_mix_8q_8g_s0.pkl",
+      "vstar": 10,
+      "sabre": 11.0,
+      "gdist": 11,
+      "gsabre": 10,
+      "mcts": {
+        "oracle_20": 10,
+        "oracle_100": 10,
+        "1_20": 10,
+        "1_100": 10,
+        "2_20": 10,
+        "2_100": 10,
+        "3_20": 10,
+        "3_100": 10
+      }
+    },
+    {
+      "file": "perm_mix_8q_8g_s1.pkl",
+      "vstar": 11,
+      "sabre": 13.0,
+      "gdist": 16,
+      "gsabre": 13,
+      "mcts": {
+        "oracle_20": 11,
+        "oracle_100": 11,
+        "1_20": 11,
+        "1_100": 11,
+        "2_20": 11,
+        "2_100": 11,
+        "3_20": 11,
+        "3_100": 11
+      }
+    },
+    {
+      "file": "perm_mix_8q_8g_s2.pkl",
+      "vstar": 5,
+      "sabre": 5.0,
+      "gdist": 5,
+      "gsabre": 5,
+      "mcts": {
+        "oracle_20": 5,
+        "oracle_100": 5,
+        "1_20": 5,
+        "1_100": 5,
+        "2_20": 6,
+        "2_100": 6,
+        "3_20": 6,
+        "3_100": 6
+      }
+    }
+  ]
+}

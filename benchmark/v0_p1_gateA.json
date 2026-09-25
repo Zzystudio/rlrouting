@@ -1,0 +1,142 @@
+{
+  "topo": "traindata/topo/ibmq_5_line.json",
+  "args": {
+    "topo": "traindata/topo/ibmq_5_line.json",
+    "data_dir": "traindata/v0",
+    "nq": 5,
+    "n2q_min": 6,
+    "n2q_max": 8,
+    "family": "perm_mix",
+    "limit": 8,
+    "sims": [
+      20,
+      100
+    ],
+    "sabre_seeds": 5,
+    "sabre_trials": 20,
+    "methods": "oracle,0,1",
+    "out": "benchmark/v0_p1_gateA.json"
+  },
+  "results": [
+    {
+      "file": "perm_mix_5q_6g_s0.pkl",
+      "vstar": 4,
+      "sabre": 4.0,
+      "gdist": 5,
+      "gsabre": 4,
+      "mcts": {
+        "oracle_20": 4,
+        "oracle_100": 4,
+        "0_20": 4,
+        "0_100": 4,
+        "1_20": 4,
+        "1_100": 4
+      }
+    },
+    {
+      "file": "perm_mix_5q_6g_s1.pkl",
+      "vstar": 2,
+      "sabre": 2.0,
+      "gdist": 2,
+      "gsabre": 2,
+      "mcts": {
+        "oracle_20": 2,
+        "oracle_100": 2,
+        "0_20": 2,
+        "0_100": 2,
+        "1_20": 2,
+        "1_100": 2
+      }
+    },
+    {
+      "file": "perm_mix_5q_6g_s2.pkl",
+      "vstar": 2,
+      "sabre": 2.0,
+      "gdist": 2,
+      "gsabre": 2,
+      "mcts": {
+        "oracle_20": 2,
+        "oracle_100": 2,
+        "0_20": 2,
+        "0_100": 2,
+        "1_20": 2,
+        "1_100": 2
+      }
+    },
+    {
+      "file": "perm_mix_5q_6g_s3.pkl",
+      "vstar": 5,
+      "sabre": 5.0,
+      "gdist": 7,
+      "gsabre": 5,
+      "mcts": {
+        "oracle_20": 5,
+        "oracle_100": 5,
+        "0_20": 5,
+        "0_100": 5,
+        "1_20": 5,
+        "1_100": 5
+      }
+    },
+    {
+      "file": "perm_mix_5q_6g_s4.pkl",
+      "vstar": 4,
+      "sabre": 4.0,
+      "gdist": 5,
+      "gsabre": 4,
+      "mcts": {
+        "oracle_20": 4,
+        "oracle_100": 4,
+        "0_20": 4,
+        "0_100": 4,
+        "1_20": 4,
+        "1_100": 4
+      }
+    },
+    {
+      "file": "perm_mix_5q_6g_s5.pkl",
+      "vstar": 4,
+      "sabre": 4.0,
+      "gdist": 5,
+      "gsabre": 4,
+      "mcts": {
+        "oracle_20": 4,
+        "oracle_100": 4,
+        "0_20": 4,
+        "0_100": 4,
+        "1_20": 4,
+        "1_100": 4
+      }
+    },
+    {
+      "file": "perm_mix_5q_8g_s0.pkl",
+      "vstar": 5,
+      "sabre": 7.0,
+      "gdist": 7,
+      "gsabre": 6,
+      "mcts": {
+        "oracle_20": 5,
+        "oracle_100": 5,
+        "0_20": 5,
+        "0_100": 5,
+        "1_20": 5,
+        "1_100": 5
+      }
+    },
+    {
+      "file": "perm_mix_5q_8g_s1.pkl",
+      "vstar": 6,
+      "sabre": 6.0,
+      "gdist": 9,
+      "gsabre": 6,
+      "mcts": {
+        "oracle_20": 6,
+        "oracle_100": 6,
+        "0_20": 6,
+        "0_100": 6,
+        "1_20": 6,
+        "1_100": 6
+      }
+    }
+  ]
+}

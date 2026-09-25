@@ -1,0 +1,85 @@
+{
+  "topo": "traindata/topo/line_8q.json",
+  "args": {
+    "topo": "traindata/topo/line_8q.json",
+    "data_dir": "traindata/v0",
+    "nq": 8,
+    "n2q_min": 6,
+    "n2q_max": 10,
+    "family": "perm_mix",
+    "train_n": 6,
+    "test_n": 3,
+    "random_walk": 20,
+    "mcts_sims": 40,
+    "max_nodes": 4000000,
+    "out": "benchmark/v0_vstar.npz",
+    "seed": 0
+  },
+  "skipped": 0,
+  "unsolvable": [],
+  "per_circuit": {
+    "perm_mix_8q_6g_s0.pkl": {
+      "expert": 0,
+      "random": 0,
+      "search": 0,
+      "vstar": 8,
+      "total": 115
+    },
+    "perm_mix_8q_6g_s1.pkl": {
+      "expert": 0,
+      "random": 0,
+      "search": 0,
+      "vstar": 11,
+      "total": 149
+    },
+    "perm_mix_8q_6g_s2.pkl": {
+      "expert": 0,
+      "random": 0,
+      "search": 0,
+      "vstar": 9,
+      "total": 125
+    },
+    "perm_mix_8q_6g_s3.pkl": {
+      "expert": 0,
+      "random": 0,
+      "search": 0,
+      "vstar": 12,
+      "total": 145
+    },
+    "perm_mix_8q_6g_s4.pkl": {
+      "expert": 0,
+      "random": 0,
+      "search": 0,
+      "vstar": 7,
+      "total": 104
+    },
+    "perm_mix_8q_6g_s5.pkl": {
+      "expert": 0,
+      "random": 0,
+      "search": 0,
+      "vstar": 4,
+      "total": 65
+    },
+    "perm_mix_8q_8g_s0.pkl": {
+      "expert": 0,
+      "random": 0,
+      "search": 0,
+      "vstar": 10,
+      "total": 130
+    },
+    "perm_mix_8q_8g_s1.pkl": {
+      "expert": 0,
+      "random": 0,
+      "search": 0,
+      "vstar": 11,
+      "total": 142
+    },
+    "perm_mix_8q_8g_s2.pkl": {
+      "expert": 0,
+      "random": 0,
+      "search": 0,
+      "vstar": 5,
+      "total": 81
+    }
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "rows": [
+    {
+      "file": "perm_mix_16q_10g_s4.pkl",
+      "sabre": 36.0,
+      "m1@100": 36,
+      "m2@100": null,
+      "m3@100": null,
+      "error": null
+    },
+    {
+      "file": "perm_mix_16q_10g_s6.pkl",
+      "sabre": 25.0,
+      "m1@100": 23,
+      "m2@100": null,
+      "m3@100": null,
+      "error": null
+    },
+    {
+      "file": "perm_mix_16q_16g_s2.pkl",
+      "sabre": 46.0,
+      "m1@100": 43,
+      "m2@100": null,
+      "m3@100": null,
+      "error": null
+    },
+    {
+      "file": "perm_mix_16q_16g_s9.pkl",
+      "sabre": 54.2,
+      "m1@100": 54,
+      "m2@100": null,
+      "m3@100": null,
+      "error": null
+    },
+    {
+      "file": "perm_mix_16q_25g_s4.pkl",
+      "sabre": 59.0,
+      "m1@100": 55,
+      "m2@100": null,
+      "m3@100": null,
+      "error": null
+    },
+    {
+      "file": "perm_mix_16q_25g_s5.pkl",
+      "sabre": 59.0,
+      "m1@100": 51,
+      "m2@100": null,
+      "m3@100": null,
+      "error": null
+    },
+    {
+      "file": "random_16q_10g_s4.pkl",
+      "sabre": 35.0,
+      "m1@100": 33,
+      "m2@100": null,
+      "m3@100": null,
+      "error": null
+    },
+    {
+      "file": "random_16q_10g_s5.pkl",
+      "sabre": 43.0,
+      "m1@100": 41,
+      "m2@100": null,
+      "m3@100": null,
+      "error": null
+    },
+    {
+      "file": "random_16q_16g_s1.pkl",
+      "sabre": 28.0,
+      "m1@100": 28,
+      "m2@100": null,
+      "m3@100": null,
+      "error": null
+    },
+    {
+      "file": "random_16q_16g_s2.pkl",
+      "sabre": 52.0,
+      "m1@100": 49,
+      "m2@100": null,
+      "m3@100": null,
+      "error": null
+    },
+    {
+      "file": "random_16q_25g_s3.pkl",
+      "sabre": 63.0,
+      "m1@100": 56,
+      "m2@100": null,
+      "m3@100": null,
+      "error": null
+    },
+    {
+      "file": "staircase_16q_10g_s4.pkl",
+      "sabre": 5.0,
+      "m1@100": 5,
+      "m2@100": 5,
+      "m3@100": 5,
+      "error": null
+    }
+  ]
+}
